@@ -204,17 +204,30 @@ function renderTable() {
   };
   rows.sort(sortFns[sortBy] || sortFns['cash-asc']);
 
-  $('status').textContent = `${rows.length.toLocaleString()} hospitals` + (stateF ? ` in ${stateF}` : '') + (payerF ? ` accepting selected insurer` : '');
+  const flaggedLow = (DATA.stats?.flagged_low || 0);
+  const flaggedHigh = (DATA.stats?.flagged_high || 0);
+  const flagNote = (flaggedLow + flaggedHigh) > 0
+    ? ` · <span class="text-amber-300">${flaggedLow + flaggedHigh} entries flagged</span> as likely parser artifacts (per-unit charges, placeholder $1 entries, or unit-decimal errors) — sorted to bottom`
+    : '';
+  $('status').innerHTML = `${rows.length.toLocaleString()} hospitals` + (stateF ? ` in ${stateF}` : '') + (payerF ? ` accepting selected insurer` : '') + flagNote;
 
   const html = rows.slice(0, 500).map(h => {
     const insurerCell = payerF
       ? fmtMoney(payerRate(h))
       : `<span class="text-zinc-500">${(h.payers || []).length} insurers</span>`;
-    return `<tr class="hover:bg-zinc-900/50">
+    const isLow = h.quality === 'low_outlier';
+    const isHigh = h.quality === 'high_outlier';
+    const flagBadge = isLow
+      ? '<span title="Suspiciously low — likely a per-unit charge or parser artifact, not a real procedure price" class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-amber-900/30 text-amber-300 border border-amber-700/40">⚠ check</span>'
+      : isHigh
+      ? '<span title="Suspiciously high — far above median, possibly a unit-decimal error" class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-amber-900/30 text-amber-300 border border-amber-700/40">⚠ high</span>'
+      : '';
+    const cashClass = isLow || isHigh ? 'text-amber-200' : 'text-emerald-300 font-medium';
+    return `<tr class="hover:bg-zinc-900/50 ${isLow || isHigh ? 'opacity-70' : ''}">
       <td class="px-3 py-2"><a href="/hospital/${h.ccn}" class="text-emerald-300 hover:underline">${escapeHtml(h.name)}</a></td>
       <td class="px-3 py-2 text-zinc-400">${escapeHtml(h.state)}</td>
       <td class="px-3 py-2 text-right tab-num text-zinc-300">${fmtMoney(h.gross)}</td>
-      <td class="px-3 py-2 text-right tab-num text-emerald-300 font-medium">${fmtMoney(h.cash)}</td>
+      <td class="px-3 py-2 text-right tab-num ${cashClass}">${fmtMoney(h.cash)}${flagBadge}</td>
       <td class="px-3 py-2 text-right tab-num text-zinc-400">${fmtMoney(h.min)}</td>
       <td class="px-3 py-2 text-right tab-num text-zinc-400">${fmtMoney(h.max)}</td>
       <td class="px-3 py-2 text-right tab-num text-zinc-200">${insurerCell}</td>

@@ -47,44 +47,80 @@
 <body class="min-h-screen">
 
 <header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
-  <div class="mx-auto max-w-6xl px-6 py-12">
+  <div class="mx-auto max-w-6xl px-6 pt-10 pb-12 md:pt-14 md:pb-16">
+    <!-- Status pill -->
     <div class="flex items-center gap-3 text-xs uppercase tracking-widest text-emerald-400">
       <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-      <span>Open · CC0 · Updated 2026-05-11</span>
+      <span>Hospital Ledger</span>
+      <span class="text-zinc-600">·</span>
+      <span class="text-zinc-500">Free forever · No signup · No tracking</span>
     </div>
-    <h1 class="mt-3 text-4xl md:text-6xl font-semibold tracking-tight">
-      Hospital Ledger
+
+    <!-- Editorial hero — patient-direct value prop -->
+    <h1 class="mt-5 serif text-5xl md:text-7xl leading-[1.05] tracking-tight max-w-4xl">
+      What does your hospital <em class="text-emerald-300">actually</em> charge?
     </h1>
-    <p class="mt-4 text-xl md:text-2xl text-zinc-300 max-w-3xl leading-snug">
-      Federal law has required <em>every</em> U.S. hospital to publish a machine-readable price file since 2021. We checked all <span id="hero-required" class="font-semibold text-white">4,625</span>.
+    <p class="mt-5 text-lg md:text-xl text-zinc-300 max-w-2xl leading-snug">
+      Compare the real price of a procedure across <span id="hero-hospital-count" class="font-semibold text-white tab-num">3,699</span> U.S. hospitals — straight from each hospital's own federally-mandated price file.
     </p>
+
+    <!-- Trust strip — costplusdrugs-style "why you can trust this" -->
+    <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-zinc-400">
+      <div class="flex items-start gap-2">
+        <svg class="w-4 h-4 mt-0.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Free forever, no signup</span>
+      </div>
+      <div class="flex items-start gap-2">
+        <svg class="w-4 h-4 mt-0.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>We don't track or store anything</span>
+      </div>
+      <div class="flex items-start gap-2">
+        <svg class="w-4 h-4 mt-0.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Built from each hospital's MRF (45 CFR § 180)</span>
+      </div>
+      <div class="flex items-start gap-2">
+        <svg class="w-4 h-4 mt-0.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Open source · CC0 public data</span>
+      </div>
+    </div>
+
+    <!-- Patient-friendly headline KPIs (replaces enforcement-flavored cards) -->
     <div class="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3">
       <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
-        <div class="text-xs uppercase text-zinc-500">Compliance</div>
-        <div id="kpi-compliance" class="mt-1 text-3xl font-semibold tab-num text-emerald-400">—</div>
-        <div class="text-xs text-zinc-500 mt-1">have a live MRF</div>
+        <div class="text-xs uppercase tracking-wider text-zinc-500">Hospitals · with prices</div>
+        <div id="kpi-patient-hospitals" class="mt-1 text-3xl font-semibold tab-num text-emerald-300">—</div>
+        <div class="text-xs text-zinc-500 mt-1">readable, indexed prices</div>
       </div>
       <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
-        <div class="text-xs uppercase text-zinc-500">Missing</div>
-        <div id="kpi-missing" class="mt-1 text-3xl font-semibold tab-num text-rose-400">—</div>
-        <div class="text-xs text-zinc-500 mt-1">no findable file</div>
+        <div class="text-xs uppercase tracking-wider text-zinc-500">Procedures</div>
+        <div id="kpi-patient-procedures" class="mt-1 text-3xl font-semibold tab-num text-emerald-300">10,000</div>
+        <div class="text-xs text-zinc-500 mt-1">comparable across hospitals</div>
       </div>
       <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
-        <div class="text-xs uppercase text-zinc-500">Under CMS enforcement</div>
-        <div id="kpi-enforcement" class="mt-1 text-3xl font-semibold tab-num text-amber-400">—</div>
-        <div class="text-xs text-zinc-500 mt-1">hospitals notified by CMS</div>
+        <div class="text-xs uppercase tracking-wider text-zinc-500">Insurance plans</div>
+        <div id="kpi-patient-payers" class="mt-1 text-3xl font-semibold tab-num text-emerald-300">200+</div>
+        <div class="text-xs text-zinc-500 mt-1">with negotiated rates</div>
       </div>
       <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
-        <div class="text-xs uppercase text-zinc-500">Total CMS actions</div>
-        <div id="kpi-actions" class="mt-1 text-3xl font-semibold tab-num text-white">—</div>
-        <div class="text-xs text-zinc-500 mt-1">since 2021</div>
+        <div class="text-xs uppercase tracking-wider text-zinc-500">Cost</div>
+        <div class="mt-1 text-3xl font-semibold tab-num text-emerald-300">$0</div>
+        <div class="text-xs text-zinc-500 mt-1">always free, public benefit</div>
       </div>
     </div>
-    <div class="mt-6 flex flex-wrap gap-3 text-sm">
-      <a href="#search" class="rounded-md bg-emerald-500 px-4 py-2 font-medium text-zinc-950 hover:bg-emerald-400">Search a hospital →</a>
-      <a href="#why" class="rounded-md border border-zinc-700 px-4 py-2 text-zinc-200 hover:bg-zinc-800">Why this matters</a>
-      <a href="/data/hospitals.json" class="rounded-md border border-zinc-700 px-4 py-2 text-zinc-200 hover:bg-zinc-800">Download raw JSON</a>
-      <a href="#methodology" class="rounded-md border border-zinc-700 px-4 py-2 text-zinc-200 hover:bg-zinc-800">Sources / methodology</a>
+    <!-- LEGACY KPIs kept hidden — their values still get populated by load() and are read in the "How well are hospitals complying?" section below. -->
+    <div class="hidden">
+      <span id="kpi-compliance">—</span>
+      <span id="kpi-missing">—</span>
+      <span id="kpi-enforcement">—</span>
+      <span id="kpi-actions">—</span>
+      <span id="hero-required">4,625</span>
+    </div>
+
+    <!-- Primary CTAs — fewer, clearer -->
+    <div class="mt-8 flex flex-wrap gap-3 text-sm">
+      <a href="#for-patients" class="rounded-md bg-emerald-500 px-5 py-2.5 font-medium text-zinc-950 hover:bg-emerald-400 transition">Find a price →</a>
+      <a href="#how-it-works" class="rounded-md border border-zinc-700 px-5 py-2.5 text-zinc-200 hover:bg-zinc-800 transition">How it works</a>
+      <a href="#methodology" class="rounded-md border border-zinc-700 px-5 py-2.5 text-zinc-200 hover:bg-zinc-800 transition">Where this data comes from</a>
     </div>
   </div>
 </header>
@@ -93,14 +129,22 @@
 
   <!-- Patient-facing entry points: search by procedure, by insurance, by hospital -->
   <section id="for-patients" class="rounded-xl border border-emerald-700/30 bg-gradient-to-br from-emerald-950/30 to-zinc-900/40 p-6 fade-in">
-    <div class="flex items-center gap-2 text-xs uppercase tracking-widest text-emerald-400 mb-3">
-      <span>For patients</span><span class="text-zinc-600">•</span><span class="text-zinc-400">Find what you'll actually pay</span>
+    <div class="section-rule">
+      <span class="num">01</span>
+      <span class="label">Find a price</span>
+      <span class="line"></span>
     </div>
+    <h2 class="serif text-3xl md:text-4xl mb-2">Three ways to start.</h2>
+    <p class="text-zinc-400 mb-5 max-w-2xl">Search by what you need, your insurance, or the hospital you're going to. Every price is straight from that hospital's own published file.</p>
     <div class="grid md:grid-cols-3 gap-4">
       <!-- By procedure -->
-      <form id="by-proc-form" class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 hover:border-emerald-700/50 transition" autocomplete="off">
-        <label for="by-proc-input" class="block text-xs uppercase tracking-wider text-zinc-500 mb-1">By procedure</label>
-        <div class="text-sm text-zinc-300 mb-2">Type a CPT/HCPCS code <em>or</em> a procedure name (e.g. <code class="mono text-emerald-300">45378</code> or "colonoscopy")</div>
+      <form id="by-proc-form" class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 lift" autocomplete="off">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="num-step text-xs">A.</span>
+          <span class="text-xs uppercase tracking-wider text-zinc-400">What you need</span>
+        </div>
+        <label for="by-proc-input" class="block serif text-xl mb-1 text-zinc-100">A procedure or test</label>
+        <div class="text-sm text-zinc-400 mb-3">Type the name (<em>"colonoscopy"</em>) or the CPT/HCPCS code (<code class="mono text-emerald-300">45378</code>).</div>
         <div class="flex gap-2">
           <input id="by-proc-input" type="search"
                  name="procedure_query"
@@ -122,20 +166,28 @@
         <div id="by-proc-msg" class="mt-2 text-xs text-zinc-500 min-h-4"></div>
       </form>
       <!-- By insurance -->
-      <form id="by-payer-form" class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 hover:border-emerald-700/50 transition">
-        <label class="block text-xs uppercase tracking-wider text-zinc-500 mb-1">By insurance</label>
-        <div class="text-sm text-zinc-300 mb-2">See hospitals with negotiated rates</div>
+      <form id="by-payer-form" class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 lift">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="num-step text-xs">B.</span>
+          <span class="text-xs uppercase tracking-wider text-zinc-400">What you have</span>
+        </div>
+        <label class="block serif text-xl mb-1 text-zinc-100">Your insurance</label>
+        <div class="text-sm text-zinc-400 mb-3">See every hospital that has a negotiated rate with your plan.</div>
         <div class="flex gap-2">
           <select id="by-payer-select" required class="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm">
-            <option value="">Loading…</option>
+            <option value="">Loading insurers…</option>
           </select>
           <button class="rounded-md bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-sm font-medium">Go</button>
         </div>
       </form>
       <!-- By hospital -->
-      <form id="by-hosp-form" class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 hover:border-emerald-700/50 transition">
-        <label class="block text-xs uppercase tracking-wider text-zinc-500 mb-1">By hospital</label>
-        <div class="text-sm text-zinc-300 mb-2">Compliance grade + price detail</div>
+      <form id="by-hosp-form" class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 lift">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="num-step text-xs">C.</span>
+          <span class="text-xs uppercase tracking-wider text-zinc-400">Where you're going</span>
+        </div>
+        <label class="block serif text-xl mb-1 text-zinc-100">A specific hospital</label>
+        <div class="text-sm text-zinc-400 mb-3">Get its compliance grade plus its top procedure prices.</div>
         <div class="flex gap-2">
           <input id="by-hosp-input" type="text" placeholder="Hospital name or 6-digit CCN"
                  class="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm">
@@ -143,24 +195,52 @@
         </div>
       </form>
     </div>
-    <p class="mt-3 text-xs text-zinc-500">
-      All prices straight from each hospital's MRF (45 CFR § 180). Cash price = the discounted self-pay rate they're required to publish.
-      Your actual cost depends on your specific plan, deductible, and copay.
+    <p class="mt-4 text-xs text-zinc-500">
+      Every price comes straight from the hospital's federally-mandated machine-readable file. The "cash price" is the self-pay discount they're required to publish. Your actual bill depends on your plan, deductible, and copay.
     </p>
   </section>
 
+  <!-- 02 — How it works (3 steps, costplusdrugs-style) -->
+  <section id="how-it-works">
+    <div class="section-rule">
+      <span class="num">02</span>
+      <span class="label">How it works</span>
+      <span class="line"></span>
+    </div>
+    <h2 class="serif text-3xl md:text-4xl mb-6">Three steps. No fees, no signup.</h2>
+    <div class="grid md:grid-cols-3 gap-6">
+      <div>
+        <div class="num-step text-2xl mb-2">01</div>
+        <h3 class="serif text-2xl mb-2">Search</h3>
+        <p class="text-zinc-400">Type a procedure name (<em>"MRI knee"</em>), a CPT code (<code class="mono text-emerald-300">73721</code>), an insurer, or a hospital. We match it against every U.S. hospital's published price file.</p>
+      </div>
+      <div>
+        <div class="num-step text-2xl mb-2">02</div>
+        <h3 class="serif text-2xl mb-2">Compare</h3>
+        <p class="text-zinc-400">See the gross price, the cash discount, and the rate every insurance plan negotiated — side by side across hundreds of hospitals.</p>
+      </div>
+      <div>
+        <div class="num-step text-2xl mb-2">03</div>
+        <h3 class="serif text-2xl mb-2">Decide</h3>
+        <p class="text-zinc-400">Pick the hospital that costs less for the procedure you need. Bring the price to your appointment if there's a dispute. <span class="text-zinc-500">(Always confirm directly — we publish what they published.)</span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 — Why this matters (kept, but tightened to bullets) -->
   <section id="why" class="grid md:grid-cols-3 gap-6">
-    <div class="md:col-span-2 prose prose-invert max-w-none">
-      <h2 class="text-2xl font-semibold tracking-tight">What the law required</h2>
-      <p class="text-zinc-300 leading-relaxed">
-        Under <a href="https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-E/part-180" class="text-emerald-400 underline">45 CFR § 180</a>, since January 1, 2021 every U.S. hospital must publish a single machine-readable file (MRF) containing standard charges, payer-specific negotiated rates, discounted cash prices, and de-identified min/max negotiated charges. The file must be free, public, and easily accessible without registration, authentication, or PII.
-      </p>
-      <p class="text-zinc-300 leading-relaxed">
-        Mark Cuban, in launching <a href="https://costplusdrugs.com" class="text-emerald-400 underline">Cost Plus Drugs</a>, has spent two years pushing for exactly this kind of price transparency. The law's already on the books. What's missing is the database.
-      </p>
-      <p class="text-zinc-300 leading-relaxed">
-        This is that database. Every CMS-required hospital, cross-referenced with the live MRF URL (where it exists) and the CMS enforcement record (where the hospital failed to comply).
-      </p>
+    <div class="md:col-span-2">
+      <div class="section-rule">
+        <span class="num">03</span>
+        <span class="label">Why this exists</span>
+        <span class="line"></span>
+      </div>
+      <h2 class="serif text-3xl md:text-4xl mb-3">The law's been on the books since 2021. The database wasn't.</h2>
+      <ul class="space-y-3 text-zinc-300 leading-relaxed">
+        <li class="flex gap-3"><span class="text-emerald-400 mt-1">▸</span><span>Under <a href="https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-E/part-180" class="text-emerald-300 underline">45 CFR § 180</a>, every U.S. hospital must publish a machine-readable price file — gross charges, cash prices, negotiated rates, and min/max — free, public, no signup.</span></li>
+        <li class="flex gap-3"><span class="text-emerald-400 mt-1">▸</span><span>Most hospitals technically comply by uploading a giant unreadable file. We parsed all 4,625 of them so you don't have to.</span></li>
+        <li class="flex gap-3"><span class="text-emerald-400 mt-1">▸</span><span>Mark Cuban built <a href="https://costplusdrugs.com" class="text-emerald-300 underline">Cost Plus Drugs</a> for the same reason — pricing transparency in healthcare. We're doing it for hospitals.</span></li>
+      </ul>
     </div>
     <aside class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
       <div class="text-xs uppercase text-zinc-500 tracking-wider">Penalty for non-compliance</div>

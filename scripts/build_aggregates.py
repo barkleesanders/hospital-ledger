@@ -242,15 +242,35 @@ def main():
 
     # ╔══════════════════════════════════════════════════════════════════════╗
     # ║ 3. cpt-detail/{code}.json — per-procedure cross-hospital comparison ║
+    # ║                                                                      ║
+    # ║ DATA QUALITY NOTE (2026-05-13): some hospitals publish per-unit     ║
+    # ║ CDM rows (e.g. $0.68 per minute of OR time), rate-multiplier rows   ║
+    # ║ (0.85 = 85% of Medicare), or placeholder $1.00 entries instead of   ║
+    # ║ real per-procedure prices. We FLAG (don't drop) suspiciously low    ║
+    # ║ outliers so the procedure page can sort them to the bottom and warn  ║
+    # ║ users instead of misleading them.                                   ║
     # ╚══════════════════════════════════════════════════════════════════════╝
+    LOW_OUTLIER_FLOOR = 50.0       # absolute floor — no real procedure costs <$50
+    LOW_OUTLIER_REL = 0.05          # also flag anything <5% of median
+    HIGH_OUTLIER_REL = 25.0         # flag anything >25× median (likely 0-decimal-shift error)
     detail_count = 0
     for rec in load_jsonl(CPT_DETAIL_RAW):
         code = rec.get('code', '')
         entries = rec.get('entries', [])
         if not code or not entries:
             continue
-        # Enrich each entry with hospital metadata + canonical payer mapping
+
+        # First pass: compute median cash for outlier detection
+        all_cash = [e.get('cash') for e in entries if e.get('cash') is not None]
+        all_cash_sorted = sorted(all_cash) if all_cash else []
+        cash_median = all_cash_sorted[len(all_cash_sorted) // 2] if all_cash_sorted else 0
+        low_threshold = max(LOW_OUTLIER_FLOOR, cash_median * LOW_OUTLIER_REL) if cash_median else LOW_OUTLIER_FLOOR
+        high_threshold = cash_median * HIGH_OUTLIER_REL if cash_median else float('inf')
+
+        # Enrich each entry with hospital metadata + canonical payer mapping + quality flag
         enriched = []
+        flagged_low = 0
+        flagged_high = 0
         for e in entries:
             ccn = e.get('ccn')
             meta = hospitals_meta.get(ccn, {})
@@ -262,33 +282,53 @@ def main():
                     'display': display,
                     'rate': p.get('r'),
                 })
+            cash = e.get('cash')
+            quality = 'normal'
+            # Only flag when we have a meaningful median and a cash value
+            if cash is not None and cash_median > 0:
+                if cash < low_threshold:
+                    quality = 'low_outlier'
+                    flagged_low += 1
+                elif cash > high_threshold:
+                    quality = 'high_outlier'
+                    flagged_high += 1
             enriched.append({
                 'ccn': ccn,
                 'name': meta.get('name') or slim_by_ccn.get(ccn, {}).get('name', ''),
                 'state': meta.get('state', ''),
                 'city': meta.get('city', ''),
                 'gross': e.get('gross'),
-                'cash': e.get('cash'),
+                'cash': cash,
                 'min': e.get('min'),
                 'max': e.get('max'),
                 'payer_count': e.get('pc', 0),
                 'payers': payers_canonical,
+                'quality': quality,
             })
-        # Sort by cash asc (cheapest cash first); fall back to gross
-        enriched.sort(key=lambda h: (h['cash'] if h['cash'] is not None else float('inf')))
-        # Compute headline stats
-        cash_values = [h['cash'] for h in enriched if h['cash'] is not None]
-        gross_values = [h['gross'] for h in enriched if h['gross'] is not None]
+
+        # Sort: normal entries first by cash asc, outliers (low or high) at the
+        # bottom. Inside each group, sort by cash asc.
+        QUALITY_ORDER = {'normal': 0, 'low_outlier': 1, 'high_outlier': 2}
+        enriched.sort(key=lambda h: (
+            QUALITY_ORDER.get(h['quality'], 0),
+            h['cash'] if h['cash'] is not None else float('inf')
+        ))
+
+        # Compute headline stats from NORMAL entries only (so cash_min isn't $0.68)
+        normal_cash = [h['cash'] for h in enriched if h['cash'] is not None and h['quality'] == 'normal']
+        normal_gross = [h['gross'] for h in enriched if h['gross'] is not None and h['quality'] == 'normal']
         out = {
             'code': code,
             'desc': entries[0].get('desc', '') if entries else '',
             'type': entries[0].get('type', '') if entries else '',
             'stats': {
                 'hospital_count': len(enriched),
-                'cash_p50': round(median(cash_values), 2) if cash_values else None,
-                'cash_min': round(min(cash_values), 2) if cash_values else None,
-                'cash_max': round(max(cash_values), 2) if cash_values else None,
-                'gross_p50': round(median(gross_values), 2) if gross_values else None,
+                'cash_p50': round(median(normal_cash), 2) if normal_cash else None,
+                'cash_min': round(min(normal_cash), 2) if normal_cash else None,
+                'cash_max': round(max(normal_cash), 2) if normal_cash else None,
+                'gross_p50': round(median(normal_gross), 2) if normal_gross else None,
+                'flagged_low': flagged_low,
+                'flagged_high': flagged_high,
             },
             'hospitals': enriched[:MAX_HOSPITALS_PER_PROCEDURE],
         }
