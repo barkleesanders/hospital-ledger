@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hospital Ledger Pipeline Monitor</title>
+<style>
+  :root {
+    --bg: #0d1412;
+    --panel: #13201c;
+    --panel-2: #182723;
+    --line: #29413a;
+    --text: #eef6f2;
+    --muted: #9bb4aa;
+    --green: #7ef0b2;
+    --amber: #f4c66c;
+    --rose: #ff8d96;
+    --cyan: #8fd7ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(126,240,178,.10), transparent 28rem),
+      radial-gradient(circle at top right, rgba(143,215,255,.10), transparent 24rem),
+      linear-gradient(180deg, #0d1412 0%, #0a100e 100%);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  a { color: var(--green); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .wrap {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 28px 20px 40px;
+  }
+  .hero {
+    padding: 28px;
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    background: linear-gradient(180deg, rgba(19,32,28,.92), rgba(13,20,18,.94));
+    box-shadow: 0 24px 80px rgba(0,0,0,.25);
+  }
+  .eyebrow {
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    font-size: 12px;
+    color: var(--green);
+  }
+  h1 {
+    margin: 10px 0 8px;
+    font-size: clamp(32px, 5vw, 64px);
+    line-height: .95;
+    letter-spacing: -.04em;
+  }
+  .subtitle {
+    margin: 0;
+    max-width: 900px;
+    font-size: 18px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 18px;
+  }
+  .button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(255,255,255,.02);
+    color: var(--text);
+  }
+  .grid {
+    display: grid;
+    gap: 16px;
+    margin-top: 18px;
+  }
+  .stats {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: rgba(19,32,28,.88);
+    padding: 18px;
+  }
+  .kpi-label {
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .kpi-value {
+    margin-top: 8px;
+    font-size: 34px;
+    line-height: 1;
+    letter-spacing: -.04em;
+  }
+  .kpi-meta {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .section-grid {
+    grid-template-columns: 1.15fr .85fr;
+    align-items: start;
+  }
+  .progress-rail {
+    display: grid;
+    gap: 12px;
+  }
+  .stage {
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+  }
+  .stage-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+  }
+  .stage-name {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -.02em;
+  }
+  .badge {
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+  }
+  .badge-green { color: var(--green); background: rgba(126,240,178,.10); border-color: rgba(126,240,178,.24); }
+  .badge-amber { color: var(--amber); background: rgba(244,198,108,.10); border-color: rgba(244,198,108,.24); }
+  .badge-rose { color: var(--rose); background: rgba(255,141,150,.10); border-color: rgba(255,141,150,.24); }
+  .badge-cyan { color: var(--cyan); background: rgba(143,215,255,.10); border-color: rgba(143,215,255,.24); }
+  .stage-body {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .progress {
+    height: 12px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255,255,255,.05);
+    margin-top: 12px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #68e9a6 0%, #8fd7ff 100%);
+    width: 0%;
+    transition: width .35s ease;
+  }
+  .split {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th, td {
+    padding: 10px 8px;
+    border-top: 1px solid rgba(255,255,255,.06);
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-top: none;
+  }
+  td.num, th.num { text-align: right; }
+  .logbox {
+    min-height: 240px;
+    max-height: 360px;
+    overflow: auto;
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.06);
+    background: #0c1210;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.45;
+    font-size: 12px;
+  }
+  .muted { color: var(--muted); }
+  .good { color: var(--green); }
+  .warn { color: var(--amber); }
+  .bad { color: var(--rose); }
+  .small { font-size: 13px; }
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: end;
+    margin-bottom: 12px;
+  }
+  .header-row h2 {
+    margin: 0;
+    font-size: 24px;
+    letter-spacing: -.03em;
+  }
+  .pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pill {
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.06);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .notice {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(244,198,108,.25);
+    background: rgba(244,198,108,.07);
+    color: #f7d99f;
+    display: none;
+  }
+  @media (max-width: 980px) {
+    .section-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <div class="eyebrow mono">Local operator page · auto-refresh every 15s</div>
+    <h1>Hospital Ledger pipeline monitor</h1>
+    <p class="subtitle">
+      This local page reads the real repo files for the current gap backfill, the automatic finalizer, local standardized preview output, and the latest log tails. It is meant to answer one question fast: is the pipeline moving, what stage is it in, and what has already become visible on the site.
+    </p>
+    <div class="hero-actions">
+      <a class="button mono" href="/site/index.html" target="_blank" rel="noopener">Open local site shell</a>
+      <a class="button mono" href="/data/gap_backfill_sharded.status.json" target="_blank" rel="noopener">gap_backfill_sharded.status.json</a>
+      <a class="button mono" href="/data/gap_shard_supervisor.status.json" target="_blank" rel="noopener">gap_shard_supervisor.status.json</a>
+      <a class="button mono" href="/data/finalize_gap_backfill.status.json" target="_blank" rel="noopener">finalize_gap_backfill.status.json</a>
+      <a class="button mono" href="https://hospital-ledger.pages.dev" target="_blank" rel="noopener">Open production site</a>
+    </div>
+    <div id="file-warning" class="notice">
+      This page was opened via <span class="mono">file://</span>. Use the local server URL instead so the page can fetch JSON and log files.
+    </div>
+  </section>
+
+  <section class="grid stats" id="kpis">
+    <div class="panel">
+      <div class="kpi-label">Gap Backfill</div>
+      <div class="kpi-value mono" id="gap-progress">-</div>
+      <div class="kpi-meta" id="gap-meta">Waiting for status...</div>
+    </div>
+    <div class="panel">
+      <div class="kpi-label">Current Preview Corpus</div>
+      <div class="kpi-value mono" id="preview-usable">-</div>
+      <div class="kpi-meta" id="preview-meta">Loading local standardized preview index...</div>
+    </div>
+    <div class="panel">
+      <div class="kpi-label">Automatic Finalizer</div>
+      <div class="kpi-value mono" id="finalizer-phase">-</div>
+      <div class="kpi-meta" id="finalizer-meta">Waiting for finalizer state...</div>
+    </div>
+    <div class="panel">
+      <div class="kpi-label">Shard Supervisor</div>
+      <div class="kpi-value mono" id="supervisor-state">-</div>
+      <div class="kpi-meta" id="supervisor-meta">Waiting for shard supervisor state...</div>
+    </div>
+    <div class="panel">
+      <div class="kpi-label">Projected Finish</div>
+      <div class="kpi-value mono" id="finish-window">-</div>
+      <div class="kpi-meta" id="finish-meta">Combines the current gap ETA with the retry/rebuild/upload/deploy tail.</div>
+    </div>
+    <div class="panel">
+      <div class="kpi-label">Last Refresh</div>
+      <div class="kpi-value mono" id="last-refresh">-</div>
+      <div class="kpi-meta" id="last-refresh-meta">Page auto-refreshes every 15 seconds</div>
+    </div>
+  </section>
+
+  <section class="grid section-grid">
+    <div class="panel">
+      <div class="header-row">
+        <div>
+          <h2>Pipeline stage view</h2>
+          <div class="small muted">Derived from local status files, preview outputs, and the active finalizer lane.</div>
+        </div>
+        <div class="pill-row">
+          <div class="pill mono" id="gap-updated-pill">gap: -</div>
+          <div class="pill mono" id="finalizer-updated-pill">finalizer: -</div>
+        </div>
+      </div>
+      <div class="progress">
+        <div class="progress-fill" id="gap-bar"></div>
+      </div>
+      <div class="progress-rail" id="stage-list"></div>
+    </div>
+
+    <div class="panel">
+      <div class="header-row">
+        <div>
+          <h2>Failure mix</h2>
+          <div class="small muted">Parsed from the current JSONL failures file.</div>
+        </div>
+        <a class="small mono" href="/data/gap_backfill.failures.jsonl" target="_blank" rel="noopener">open file</a>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Type</th><th class="num">Count</th><th class="num">Share</th></tr>
+        </thead>
+        <tbody id="failure-breakdown"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="grid split">
+    <div class="panel">
+      <div class="header-row">
+        <div>
+          <h2>Current backfill snapshot</h2>
+          <div class="small muted">The live `batch_ingest.py --ccns-file` run.</div>
+        </div>
+      </div>
+      <table>
+        <tbody id="gap-table"></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <div class="header-row">
+        <div>
+          <h2>Finalizer snapshot</h2>
+          <div class="small muted">The follow-on lane that waits, retries, rebuilds, uploads, redeploys, and verifies.</div>
+        </div>
+      </div>
+      <table>
+        <tbody id="finalizer-table"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="header-row">
+      <div>
+        <h2>Shard supervisor snapshot</h2>
+        <div class="small muted">Watches the 2x2 tmux lanes and restarts only a stale or missing shard after the quiet window.</div>
+      </div>
+      <a class="small mono" href="/data/gap_shard_supervisor.status.json" target="_blank" rel="noopener">open file</a>
+    </div>
+    <table>
+      <tbody id="supervisor-table"></tbody>
+    </table>
+  </section>
+
+  <section class="panel">
+    <div class="header-row">
+      <div>
+        <h2>Sample hospital previews</h2>
+        <div class="small muted">These local preview JSON files let you see which recoveries are already materialized and which hospitals still need more work.</div>
+      </div>
+      <a class="small mono" href="/site/data/prices/index.json" target="_blank" rel="noopener">open local price index</a>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>CCN</th>
+          <th>Hospital</th>
+          <th class="num">Local rows</th>
+          <th>Status</th>
+          <th>Source</th>
+        </tr>
+      </thead>
+      <tbody id="sample-table"></tbody>
+    </table>
+  </section>
+
+  <section class="grid split">
+    <div class="panel">
+      <div class="header-row">
+        <div>
+          <h2>Gap backfill log tail</h2>
+          <div class="small muted">Last 40 lines from `data/gap_backfill.log`.</div>
+        </div>
+      </div>
+      <div class="logbox mono" id="gap-log">Loading...</div>
+    </div>
+    <div class="panel">
+      <div class="header-row">
+        <div>
+          <h2>Finalizer log tail</h2>
+          <div class="small muted">Last 40 lines from `data/finalize_gap_backfill.log`.</div>
+        </div>
+      </div>
+      <div class="logbox mono" id="finalizer-log">Loading...</div>
+    </div>
+  </section>
+</div>
+
+<script>
+const SAMPLE_CCNS = ['050334', '110121', '310064', '331320', '181314', '431310'];
+const SAMPLE_NAMES = {
+  '050334': 'Salinas Valley Memorial Hospital',
+  '110121': 'Grady General Hospital',
+  '310064': 'AtlantiCare Regional Medical Center - City Campus',
+  '331320': 'Clifton Springs Hospital',
+  '181314': 'Clark Regional Medical Center',
+  '431310': 'Avera McKennan Hospital and University Health Center',
+};
+
+function bust(url) {
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}_=${Date.now()}`;
+}
+
+async function fetchJson(url) {
+  const res = await fetch(bust(url), { cache: 'no-store' });
+  if (!res.ok) throw new Error(`${url} -> ${res.status}`);
+  return res.json();
+}
+
+async function fetchOptionalJson(url) {
+  try {
+    return await fetchJson(url);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchOptionalText(url) {
+  try {
+    const res = await fetch(bust(url), { cache: 'no-store' });
+    if (!res.ok) return '';
+    return await res.text();
+  } catch {
+    return '';
+  }
+}
+
+function fmtNum(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toLocaleString() : '-';
+}
+
+function fmtPct(done, total) {
+  if (!total) return '0.0%';
+  return `${((done / total) * 100).toFixed(1)}%`;
+}
+
+function fmtEta(seconds) {
+  const n = Number(seconds);
+  if (!Number.isFinite(n) || n <= 0) return '-';
+  const h = Math.floor(n / 3600);
+  const m = Math.floor((n % 3600) / 60);
+  const s = Math.floor(n % 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function fmtAge(seconds) {
+  const n = Number(seconds);
+  if (!Number.isFinite(n) || n < 0) return '-';
+  return `${fmtEta(n)} ago`;
+}
+
+function fmtWhen(value) {
+  if (!value) return '-';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString();
+}
+
+function fmtFutureLabel(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '-';
+  const now = new Date();
+  const startOfNow = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayDiff = Math.round((startOfDate - startOfNow) / 86400000);
+  const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (dayDiff === 0) return `Today ${time}`;
+  if (dayDiff === 1) return `Tomorrow ${time}`;
+  return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function badge(label, tone) {
+  return `<span class="badge badge-${tone}">${escapeHtml(label)}</span>`;
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+}
+
+function statusTone(ok, warnOnly = false) {
+  if (ok) return 'green';
+  return warnOnly ? 'amber' : 'rose';
+}
+
+function summarizePreviewIndex(priceIndex) {
+  const hospitals = Array.isArray(priceIndex)
+    ? priceIndex
+    : Array.isArray(priceIndex?.hospitals) ? priceIndex.hospitals : [];
+  const usable = hospitals.filter((item) => Number(item.n || item.count || item.items || 0) > 0).length;
+  return {
+    entries: hospitals.length,
+    usable,
+    zero: hospitals.length - usable,
+  };
+}
+
+function parseFailureSummary(text) {
+  const counts = new Map();
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  for (const line of lines) {
+    try {
+      const payload = JSON.parse(line);
+      const key = classifyFailure(payload.error);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    } catch {
+      counts.set('invalid_json', (counts.get('invalid_json') || 0) + 1);
+    }
+  }
+  const total = Array.from(counts.values()).reduce((sum, value) => sum + value, 0);
+  return { counts, total };
+}
+
+function classifyFailure(errorText) {
+  const text = String(errorText || '');
+  if (text.includes('no_live_mrf')) return 'no_live_mrf';
+  if (text.includes('timeout')) return 'timeout';
+  if (text.includes('0 items  OK')) return 'zero_items_ok';
+  return 'other';
+}
+
+function renderFailureBreakdown(summary) {
+  const rows = [];
+  const counts = summary?.counts || new Map();
+  const total = summary?.total || 0;
+  for (const [key, value] of Array.from(counts.entries()).sort((a, b) => b[1] - a[1])) {
+    rows.push(`
+      <tr>
+        <td class="mono">${escapeHtml(key)}</td>
+        <td class="num mono">${fmtNum(value)}</td>
+        <td class="num mono">${total ? ((value / total) * 100).toFixed(1) : '0.0'}%</td>
+      </tr>
+    `);
+  }
+  document.getElementById('failure-breakdown').innerHTML = rows.join('') || `
+    <tr><td colspan="3" class="muted">No failures file data yet.</td></tr>
+  `;
+}
+
+function estimateFinish(gap, finalizer, failureSummary) {
+  if (finalizer?.verify || finalizer?.phase === 'done') {
+    return {
+      label: 'Verified',
+      detail: 'The automatic finalizer already reached live verification.',
+      low: 0,
+      high: 0,
+    };
+  }
+
+  const counts = Object.fromEntries(failureSummary?.counts || []);
+  const workers = Math.max(1, Number(gap?.workers || 3));
+  const retryLow = Math.ceil(
+    (
+      (counts.zero_items_ok || 0) * 30 +
+      (counts.no_live_mrf || 0) * 15 +
+      (counts.other || 0) * 120 +
+      (counts.timeout || 0) * 600
+    ) / workers
+  );
+  const retryHigh = Math.ceil(
+    (
+      (counts.zero_items_ok || 0) * 90 +
+      (counts.no_live_mrf || 0) * 45 +
+      (counts.other || 0) * 240 +
+      (counts.timeout || 0) * 600
+    ) / workers
+  );
+  const rebuildLow = 5 * 60;
+  const rebuildHigh = 15 * 60;
+  const uploadLow = 45 * 60;
+  const uploadHigh = 120 * 60;
+  const deployLow = 5 * 60;
+  const deployHigh = 15 * 60;
+  const postLow = retryLow + rebuildLow + uploadLow + deployLow;
+  const postHigh = retryHigh + rebuildHigh + uploadHigh + deployHigh;
+  const gapEta = Math.max(0, Number(gap?.eta_seconds || 0));
+  const phase = finalizer?.phase || 'waiting_for_gap_backfill';
+
+  let low = postLow;
+  let high = postHigh;
+  let detail = `Post-gap tail estimate is ${fmtEta(postLow)} to ${fmtEta(postHigh)} for retries, rebuild, R2 upload, and deploy.`;
+
+  if (phase === 'waiting_for_gap_backfill') {
+    low += gapEta;
+    high += gapEta;
+    detail = `Current backfill ETA ${fmtEta(gapEta)} plus a post-gap tail of ${fmtEta(postLow)} to ${fmtEta(postHigh)}.`;
+  } else if (phase === 'waiting_for_stage4_idle') {
+    detail = `Gap parsing is done. Remaining tail is still roughly ${fmtEta(postLow)} to ${fmtEta(postHigh)}.`;
+  } else if (phase === 'retrying_failures') {
+    detail = `Retry lane is active. Remaining work is roughly ${fmtEta(postLow)} to ${fmtEta(postHigh)}, with ${fmtNum(counts.timeout || 0)} timeout-class failures potentially consuming the long pole.`;
+  } else if (phase === 'rebuilding_slim_prices' || phase === 'rebuilt_slim_prices') {
+    low = uploadLow + deployLow;
+    high = uploadHigh + deployHigh;
+    detail = `Retries are out of the way. Remaining work is upload plus deploy: roughly ${fmtEta(low)} to ${fmtEta(high)}.`;
+  } else if (phase === 'uploading_r2') {
+    low = 20 * 60;
+    high = uploadHigh + deployHigh;
+    detail = `R2 upload is the long pole now. Remaining work is roughly ${fmtEta(low)} to ${fmtEta(high)} including deploy and verify.`;
+  } else if (phase === 'deploying_pages') {
+    low = deployLow;
+    high = deployHigh;
+    detail = `Only deploy and verify remain: roughly ${fmtEta(low)} to ${fmtEta(high)}.`;
+  }
+
+  const lowDate = new Date(Date.now() + low * 1000);
+  const highDate = new Date(Date.now() + high * 1000);
+  return {
+    label: `${fmtFutureLabel(lowDate)} to ${fmtFutureLabel(highDate)}`,
+    detail,
+    low,
+    high,
+  };
+}
+
+function renderGapTable(gap) {
+  const rows = [
+    ['Done', fmtNum(gap?.done)],
+    ['Eligible', fmtNum(gap?.eligible)],
+    ['Success', fmtNum(gap?.success)],
+    ['Failed', fmtNum(gap?.failed)],
+    ['Pending', fmtNum(gap?.pending)],
+    ['Rate / sec', gap?.rate_per_second ?? '-'],
+    ['ETA', fmtEta(gap?.eta_seconds)],
+    ['Total parsed items', fmtNum(gap?.total_items)],
+    ['Updated at', fmtWhen(gap?.updated_at)],
+  ];
+  document.getElementById('gap-table').innerHTML = rows.map(([k, v]) => `
+    <tr><th>${escapeHtml(k)}</th><td class="mono">${escapeHtml(v)}</td></tr>
+  `).join('');
+}
+
+function renderFinalizerTable(finalizer, finishEstimate) {
+  const rows = [
+    ['Phase', finalizer?.phase || '-'],
+    ['Gap done snapshot', fmtNum(finalizer?.done)],
+    ['Gap pending snapshot', fmtNum(finalizer?.pending)],
+    ['Gap updated at', fmtWhen(finalizer?.gap_updated_at)],
+    ['Finalizer updated at', fmtWhen(finalizer?.updated_at)],
+    ['Projected finish', finishEstimate?.label || '-'],
+    ['Estimate detail', finishEstimate?.detail || '-'],
+  ];
+  if (finalizer?.verify) {
+    rows.push(['Verified live entries', fmtNum(finalizer.verify.entries)]);
+    rows.push(['Verified live usable', fmtNum(finalizer.verify.usable)]);
+    rows.push(['Verified live zero', fmtNum(finalizer.verify.zero)]);
+  }
+  document.getElementById('finalizer-table').innerHTML = rows.map(([k, v]) => `
+    <tr><th>${escapeHtml(k)}</th><td class="mono">${escapeHtml(v)}</td></tr>
+  `).join('');
+}
+
+function renderSupervisorTable(supervisor) {
+  const latestAction = Array.isArray(supervisor?.recent_actions) && supervisor.recent_actions.length
+    ? supervisor.recent_actions[supervisor.recent_actions.length - 1]
+    : null;
+  const shardStates = Array.isArray(supervisor?.shards)
+    ? supervisor.shards.map((shard) => {
+        const bits = [
+          `${shard.shard}: ${shard.state}`,
+          `done ${fmtNum(shard.done)}/${fmtNum(shard.limit)}`,
+          `age ${fmtAge(shard.age_seconds)}`,
+        ];
+        return bits.join(' · ');
+      }).join(' | ')
+    : '-';
+  const rows = [
+    ['State', supervisor?.state || '-'],
+    ['Watched shards', fmtNum(supervisor?.shard_count)],
+    ['Stale threshold', fmtEta(supervisor?.stale_seconds)],
+    ['Restart cooldown', fmtEta(supervisor?.restart_cooldown_seconds)],
+    ['Missing sessions', fmtNum(supervisor?.missing_count)],
+    ['Stale shards', fmtNum(supervisor?.stale_count)],
+    ['Last action', latestAction ? `${latestAction.action} ${latestAction.session} at ${fmtWhen(latestAction.at)} (${latestAction.reason})` : 'None yet'],
+    ['Shard states', shardStates],
+    ['Updated at', fmtWhen(supervisor?.updated_at)],
+  ];
+  document.getElementById('supervisor-table').innerHTML = rows.map(([k, v]) => `
+    <tr><th>${escapeHtml(k)}</th><td class="mono">${escapeHtml(v)}</td></tr>
+  `).join('');
+}
+
+function renderStages(gap, finalizer, preview) {
+  const done = Number(gap?.done || 0);
+  const eligible = Number(gap?.eligible || 0);
+  const pending = Number(gap?.pending || 0);
+  const stages = [
+    {
+      name: 'Discover live MRF targets',
+      tone: 'green',
+      badge: 'ready',
+      body: `${fmtNum(eligible)} target hospitals are queued from the current live-preview gap list.`,
+    },
+    {
+      name: 'Ingest and parse live MRFs',
+      tone: pending > 0 ? 'amber' : 'green',
+      badge: pending > 0 ? 'running' : 'complete',
+      body: `${fmtNum(done)} done · ${fmtNum(pending)} pending · ${fmtNum(gap?.success)} with rows · ${fmtNum(gap?.failed)} failures so far.`,
+    },
+    {
+      name: 'Retry failures with newer parser fixes',
+      tone: finalizer?.phase === 'retrying_failures' ? 'amber' : (finalizer?.phase && finalizer.phase !== 'waiting_for_gap_backfill' ? 'green' : 'cyan'),
+      badge: finalizer?.phase === 'retrying_failures' ? 'running' : (finalizer?.phase && finalizer.phase !== 'waiting_for_gap_backfill' ? 'armed' : 'waiting'),
+      body: `Current finalizer phase: ${finalizer?.phase || 'not started'}. This lane waits for the gap run, then retries failed CCNs automatically.`,
+    },
+    {
+      name: 'Rebuild local standardized previews',
+      tone: preview.usable > 0 ? 'green' : 'cyan',
+      badge: preview.usable > 0 ? 'materialized' : 'waiting',
+      body: `${fmtNum(preview.usable)} local preview files currently have standardized rows. ${fmtNum(preview.zero)} still render as empty previews locally.`,
+    },
+    {
+      name: 'Upload preview artifacts to R2',
+      tone: finalizer?.phase === 'uploading_r2' ? 'amber' : (finalizer?.verify ? 'green' : 'cyan'),
+      badge: finalizer?.phase === 'uploading_r2' ? 'running' : (finalizer?.verify ? 'verified later' : 'pending'),
+      body: 'The automatic finalizer will run the R2 refresh after retries and preview rebuilds finish.',
+    },
+    {
+      name: 'Redeploy production and verify live counts',
+      tone: finalizer?.verify ? 'green' : 'cyan',
+      badge: finalizer?.verify ? 'verified' : 'pending',
+      body: finalizer?.verify
+        ? `Last verified live snapshot: ${fmtNum(finalizer.verify.usable)} usable previews out of ${fmtNum(finalizer.verify.entries)}.`
+        : 'This stays pending until the finalizer finishes its verify step against hospital-ledger.pages.dev.',
+    },
+  ];
+  document.getElementById('stage-list').innerHTML = stages.map((stage) => `
+    <div class="stage">
+      <div class="stage-top">
+        <div class="stage-name">${escapeHtml(stage.name)}</div>
+        ${badge(stage.badge, stage.tone)}
+      </div>
+      <div class="stage-body">${escapeHtml(stage.body)}</div>
+    </div>
+  `).join('');
+}
+
+async function renderSamples() {
+  const rows = [];
+  for (const ccn of SAMPLE_CCNS) {
+    const data = await fetchOptionalJson(`/site/data/prices/${ccn}.json`);
+    const n = Number(data?.n_slim || 0);
+    const tone = n > 0 ? 'good' : 'bad';
+    const status = n > 0 ? 'Recovered locally' : 'Still empty locally';
+    rows.push(`
+      <tr>
+        <td class="mono">${ccn}</td>
+        <td>${escapeHtml(SAMPLE_NAMES[ccn] || '')}</td>
+        <td class="num mono ${tone}">${fmtNum(n)}</td>
+        <td class="${tone}">${status}</td>
+        <td class="mono small">${escapeHtml(data?.source_url || 'no preview file yet')}</td>
+      </tr>
+    `);
+  }
+  document.getElementById('sample-table').innerHTML = rows.join('');
+}
+
+function tailLines(text, count = 40) {
+  const lines = text.split('\n').filter(Boolean);
+  return lines.slice(-count).join('\n') || 'No log lines yet.';
+}
+
+async function load() {
+  if (location.protocol === 'file:') {
+    document.getElementById('file-warning').style.display = 'block';
+  }
+  const [gapSharded, gapLegacy, supervisor, finalizer, priceIndex, gapFailures, gapLog, finalizerLog] = await Promise.all([
+    fetchOptionalJson('/data/gap_backfill_sharded.status.json'),
+    fetchOptionalJson('/data/gap_backfill.status.json'),
+    fetchOptionalJson('/data/gap_shard_supervisor.status.json'),
+    fetchOptionalJson('/data/finalize_gap_backfill.status.json'),
+    fetchOptionalJson('/site/data/prices/index.json'),
+    fetchOptionalText('/data/gap_backfill.failures.jsonl'),
+    fetchOptionalText('/data/gap_backfill.log'),
+    fetchOptionalText('/data/finalize_gap_backfill.log'),
+  ]);
+
+  const gap = gapSharded || gapLegacy;
+  const preview = summarizePreviewIndex(priceIndex);
+  const failureSummary = parseFailureSummary(gapFailures || '');
+  const finishEstimate = estimateFinish(gap || {}, finalizer || {}, failureSummary);
+  const now = new Date();
+  document.getElementById('last-refresh').textContent = now.toLocaleTimeString();
+  document.getElementById('gap-progress').textContent = gap ? `${fmtNum(gap.done)} / ${fmtNum(gap.eligible)}` : '-';
+  document.getElementById('gap-meta').textContent = gap
+    ? `${fmtPct(Number(gap.done || 0), Number(gap.eligible || 0))} complete · ${fmtNum(gap.pending)} pending · eta ${fmtEta(gap.eta_seconds)}`
+    : 'Gap status file not available yet.';
+  document.getElementById('preview-usable').textContent = fmtNum(preview.usable);
+  document.getElementById('preview-meta').textContent = `${fmtNum(preview.entries)} local preview entries · ${fmtNum(preview.zero)} still empty locally`;
+  document.getElementById('finalizer-phase').textContent = finalizer?.phase || '-';
+  document.getElementById('finalizer-meta').textContent = finalizer
+    ? `updated ${fmtWhen(finalizer.updated_at)}`
+    : 'Finalizer status file not available yet.';
+  document.getElementById('supervisor-state').textContent = supervisor?.state || '-';
+  document.getElementById('supervisor-meta').textContent = supervisor
+    ? `${fmtNum(supervisor.shard_count)} shards watched · stale>${fmtEta(supervisor.stale_seconds)} · missing ${fmtNum(supervisor.missing_count)}`
+    : 'Shard supervisor status file not available yet.';
+  document.getElementById('finish-window').textContent = finishEstimate.label;
+  document.getElementById('finish-meta').textContent = finishEstimate.detail;
+  document.getElementById('gap-updated-pill').textContent = `gap: ${gap?.updated_at || '-'}`;
+  document.getElementById('finalizer-updated-pill').textContent = `finalizer: ${finalizer?.updated_at || '-'}`;
+  document.getElementById('gap-bar').style.width = gap?.eligible ? `${Math.max(0, Math.min(100, (gap.done / gap.eligible) * 100))}%` : '0%';
+
+  renderGapTable(gap || {});
+  renderFinalizerTable(finalizer || {}, finishEstimate);
+  renderSupervisorTable(supervisor || {});
+  renderFailureBreakdown(failureSummary);
+  renderStages(gap || {}, finalizer || {}, preview);
+  document.getElementById('gap-log').textContent = tailLines(gapLog || '');
+  document.getElementById('finalizer-log').textContent = tailLines(finalizerLog || '');
+  await renderSamples();
+}
+
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>

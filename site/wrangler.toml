@@ -1,0 +1,14 @@
+name = "hospital-ledger"
+compatibility_date = "2026-05-11"
+pages_build_output_dir = "."
+
+[vars]
+SITE_NAME = "Hospital Ledger"
+
+[[r2_buckets]]
+binding = "HL_MRF_RAW"
+bucket_name = "hl-mrf-raw"
+
+[[r2_buckets]]
+binding = "HL_MRF_PARSED"
+bucket_name = "hl-mrf-parsed"

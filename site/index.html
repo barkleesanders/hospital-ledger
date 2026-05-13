@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="en" class="bg-zinc-950 text-zinc-100">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hospital Ledger — what the law required, what hospitals delivered</title>
+<meta name="description" content="A free public database of every U.S. hospital's federally-mandated price transparency machine-readable file. Built from CMS data + live verification. CC0 licensed.">
+<meta property="og:title" content="Hospital Ledger">
+<meta property="og:description" content="Federal law requires every U.S. hospital to publish a machine-readable price file. We checked all 4,625. Only 86.2% complied.">
+<meta property="og:type" content="website">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: ui-sans-serif, -apple-system, system-ui, sans-serif; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .tab-num { font-variant-numeric: tabular-nums; }
+  .fade-in { animation: fade .4s ease-out; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  details[open] summary svg { transform: rotate(180deg); }
+  summary { list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  @media print { body { background: white; color: black; } .no-print { display: none; } }
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
+  <div class="mx-auto max-w-6xl px-6 py-12">
+    <div class="flex items-center gap-3 text-xs uppercase tracking-widest text-emerald-400">
+      <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span>Open · CC0 · Updated 2026-05-11</span>
+    </div>
+    <h1 class="mt-3 text-4xl md:text-6xl font-semibold tracking-tight">
+      Hospital Ledger
+    </h1>
+    <p class="mt-4 text-xl md:text-2xl text-zinc-300 max-w-3xl leading-snug">
+      Federal law has required <em>every</em> U.S. hospital to publish a machine-readable price file since 2021. We checked all <span id="hero-required" class="font-semibold text-white">4,625</span>.
+    </p>
+    <div class="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
+        <div class="text-xs uppercase text-zinc-500">Compliance</div>
+        <div id="kpi-compliance" class="mt-1 text-3xl font-semibold tab-num text-emerald-400">—</div>
+        <div class="text-xs text-zinc-500 mt-1">have a live MRF</div>
+      </div>
+      <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
+        <div class="text-xs uppercase text-zinc-500">Missing</div>
+        <div id="kpi-missing" class="mt-1 text-3xl font-semibold tab-num text-rose-400">—</div>
+        <div class="text-xs text-zinc-500 mt-1">no findable file</div>
+      </div>
+      <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
+        <div class="text-xs uppercase text-zinc-500">Under CMS enforcement</div>
+        <div id="kpi-enforcement" class="mt-1 text-3xl font-semibold tab-num text-amber-400">—</div>
+        <div class="text-xs text-zinc-500 mt-1">hospitals notified by CMS</div>
+      </div>
+      <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
+        <div class="text-xs uppercase text-zinc-500">Total CMS actions</div>
+        <div id="kpi-actions" class="mt-1 text-3xl font-semibold tab-num text-white">—</div>
+        <div class="text-xs text-zinc-500 mt-1">since 2021</div>
+      </div>
+    </div>
+    <div class="mt-6 flex flex-wrap gap-3 text-sm">
+      <a href="#search" class="rounded-md bg-emerald-500 px-4 py-2 font-medium text-zinc-950 hover:bg-emerald-400">Search a hospital →</a>
+      <a href="#why" class="rounded-md border border-zinc-700 px-4 py-2 text-zinc-200 hover:bg-zinc-800">Why this matters</a>
+      <a href="/data/hospitals.json" class="rounded-md border border-zinc-700 px-4 py-2 text-zinc-200 hover:bg-zinc-800">Download raw JSON</a>
+      <a href="#methodology" class="rounded-md border border-zinc-700 px-4 py-2 text-zinc-200 hover:bg-zinc-800">Sources / methodology</a>
+    </div>
+  </div>
+</header>
+
+<main class="mx-auto max-w-6xl px-6 py-10 space-y-12">
+
+  <section id="why" class="grid md:grid-cols-3 gap-6">
+    <div class="md:col-span-2 prose prose-invert max-w-none">
+      <h2 class="text-2xl font-semibold tracking-tight">What the law required</h2>
+      <p class="text-zinc-300 leading-relaxed">
+        Under <a href="https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-E/part-180" class="text-emerald-400 underline">45 CFR § 180</a>, since January 1, 2021 every U.S. hospital must publish a single machine-readable file (MRF) containing standard charges, payer-specific negotiated rates, discounted cash prices, and de-identified min/max negotiated charges. The file must be free, public, and easily accessible without registration, authentication, or PII.
+      </p>
+      <p class="text-zinc-300 leading-relaxed">
+        Mark Cuban, in launching <a href="https://costplusdrugs.com" class="text-emerald-400 underline">Cost Plus Drugs</a>, has spent two years pushing for exactly this kind of price transparency. The law's already on the books. What's missing is the database.
+      </p>
+      <p class="text-zinc-300 leading-relaxed">
+        This is that database. Every CMS-required hospital, cross-referenced with the live MRF URL (where it exists) and the CMS enforcement record (where the hospital failed to comply).
+      </p>
+    </div>
+    <aside class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+      <div class="text-xs uppercase text-zinc-500 tracking-wider">Penalty for non-compliance</div>
+      <div class="mt-2 text-zinc-100">
+        <strong>$300/day</strong> for hospitals ≤30 beds.<br>
+        <strong>Up to $5,500/day</strong> for hospitals &gt;550 beds.<br>
+        <span class="text-zinc-400 text-sm">42 USC § 300gg-18 · 45 CFR § 180.90</span>
+      </div>
+      <hr class="my-4 border-zinc-800">
+      <div class="text-xs uppercase text-zinc-500 tracking-wider">CMS escalation ladder</div>
+      <ol class="mt-2 text-sm text-zinc-300 space-y-1 list-decimal pl-4">
+        <li>Warning Notice</li>
+        <li>Corrective Action Plan (CAP) Request</li>
+        <li>Civil Monetary Penalty (CMP)</li>
+        <li>Closure Notice</li>
+      </ol>
+    </aside>
+  </section>
+
+  <section id="search">
+    <h2 class="text-2xl font-semibold tracking-tight">Search every hospital</h2>
+    <p class="text-sm text-zinc-400 mt-1">Real-time filter across all <span id="hosp-count">5,426</span> facilities</p>
+    <div class="mt-4 grid md:grid-cols-[1fr_180px_160px] gap-3">
+      <input id="q" type="search" placeholder="Hospital name, city, or CCN…"
+        class="rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 px-4 py-3 text-base focus:border-emerald-500 focus:outline-none">
+      <select id="state" class="rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 px-3 py-3"></select>
+      <select id="status" class="rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 px-3 py-3">
+        <option value="">All statuses</option>
+        <option value="compliant">✓ Compliant (live MRF)</option>
+        <option value="missing">⚠ Missing MRF</option>
+        <option value="enforcement">⛔ Under CMS enforcement</option>
+        <option value="missing-enforcement">🚨 Missing + Cited</option>
+      </select>
+    </div>
+    <div id="results-count" class="mt-3 text-sm text-zinc-500"></div>
+    <div id="results" class="mt-4 space-y-2"></div>
+  </section>
+
+  <section id="worst">
+    <h2 class="text-2xl font-semibold tracking-tight">Top 25 worst offenders</h2>
+    <p class="text-sm text-zinc-400 mt-1">CMS-required hospitals with the most enforcement actions <em>and</em> no findable MRF.</p>
+    <div class="mt-4 rounded-lg border border-zinc-800 overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-zinc-900 text-zinc-400">
+          <tr><th class="px-4 py-2 text-left font-medium">CCN</th><th class="px-4 py-2 text-left font-medium">Hospital</th><th class="px-4 py-2 text-left font-medium">City, State</th><th class="px-4 py-2 text-right font-medium">CMS actions</th></tr>
+        </thead>
+        <tbody id="worst-tbody" class="divide-y divide-zinc-800"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="states" class="grid md:grid-cols-2 gap-8">
+    <div>
+      <h2 class="text-2xl font-semibold tracking-tight">Worst states</h2>
+      <p class="text-sm text-zinc-400 mt-1">By share of CMS-required hospitals with a live MRF.</p>
+      <div class="mt-4 rounded-lg border border-zinc-800">
+        <table class="min-w-full text-sm">
+          <thead class="bg-zinc-900 text-zinc-400">
+            <tr><th class="px-4 py-2 text-left font-medium">State</th><th class="px-4 py-2 text-right font-medium">Total</th><th class="px-4 py-2 text-right font-medium">Live</th><th class="px-4 py-2 text-right font-medium">% live</th></tr>
+          </thead>
+          <tbody id="state-bottom-tbody" class="divide-y divide-zinc-800"></tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <h2 class="text-2xl font-semibold tracking-tight">By facility type</h2>
+      <p class="text-sm text-zinc-400 mt-1">Rural Emergency Hospitals (the newest category) lag furthest.</p>
+      <div class="mt-4 space-y-3" id="type-bars"></div>
+    </div>
+  </section>
+
+  <section id="methodology" class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-6">
+    <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+      <div>
+        <h2 class="text-2xl font-semibold tracking-tight">Sources / methodology</h2>
+        <p class="text-sm text-zinc-400 mt-1">The inputs, checks, and limits are listed here on the site, not just in the repo.</p>
+      </div>
+      <a href="/data/summary.json" class="text-sm text-emerald-400 underline underline-offset-4 hover:text-emerald-300">Open the current summary JSON</a>
+    </div>
+    <div class="mt-6 grid gap-4 md:grid-cols-3">
+      <div class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4">
+        <div class="text-xs uppercase tracking-wider text-emerald-400">Primary sources</div>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-300">
+          <li><a href="https://data.cms.gov/provider-data/dataset/xubh-q36u" class="underline hover:text-zinc-100">CMS Hospital General Information</a> supplies the hospital universe and CCNs.</li>
+          <li><a href="https://github.com/TPAFS/transparency-data" class="underline hover:text-zinc-100">TPAFS/transparency-data</a> supplies the initial MRF seed URLs.</li>
+          <li><a href="https://data.cms.gov/provider-characteristics/hospitals-and-other-facilities/hospital-price-transparency-enforcement-activities-and-outcomes" class="underline hover:text-zinc-100">CMS Enforcement Activities</a> supplies warning, CAP, CMP, and closure records.</li>
+          <li><a href="https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-E/part-180" class="underline hover:text-zinc-100">45 CFR § 180</a> defines what hospitals are required to publish.</li>
+        </ul>
+      </div>
+      <div class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4">
+        <div class="text-xs uppercase tracking-wider text-emerald-400">How this was built</div>
+        <ol class="mt-3 space-y-2 text-sm text-zinc-300 list-decimal pl-4">
+          <li>Start with all CMS-required hospitals.</li>
+          <li>Join known MRF links from the seed datasets.</li>
+          <li>Probe URLs live and follow redirects to verify which files actually respond.</li>
+          <li>Rediscover missing files from hospital transparency pages when the seed is dead.</li>
+          <li>Parse live CSV, JSON, XLSX, ZIP, and wrapper-page formats into one schema.</li>
+          <li>Generate the on-site standardized price previews from those parsed files.</li>
+        </ol>
+        <p class="mt-3 text-xs text-zinc-500">
+          Current on-site preview coverage: <span id="methodology-price-count" class="tab-num text-zinc-300">—</span> hospitals with standardized price rows.
+        </p>
+      </div>
+      <div class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4">
+        <div class="text-xs uppercase tracking-wider text-emerald-400">What the numbers mean</div>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-300">
+          <li><strong>Compliant</strong> means a live machine-readable file was found and verified.</li>
+          <li><strong>Missing</strong> means no live public MRF was found after automated discovery and probing.</li>
+          <li><strong>Under CMS enforcement</strong> means the hospital appears in CMS's public enforcement record.</li>
+          <li><strong>Standardized price preview</strong> appears when parsed rows were actually generated for that hospital.</li>
+        </ul>
+        <p class="mt-3 text-xs text-zinc-500">Current limits: some hospitals are behind bot-defense or publish malformed files. Missing rows can mean non-compliance, anti-bot blocking, or broken vendor output.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="prices" class="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6">
+    <h2 class="text-2xl font-semibold tracking-tight">🩺 Live prices — standardized, on-site</h2>
+    <p class="text-sm text-zinc-400 mt-1">
+      Parsed directly from each hospital's MRF into a unified schema. No external links — search prices by CPT or HCPCS code below.
+    </p>
+    <div class="mt-4 grid grid-cols-1 gap-3 border-y border-zinc-800 py-4 text-sm md:grid-cols-3">
+      <div>
+        <div class="text-xs uppercase tracking-wider text-zinc-500">Hospital previews</div>
+        <div id="price-hospital-count" class="mt-1 text-2xl font-semibold tab-num text-emerald-300">—</div>
+      </div>
+      <div>
+        <div class="text-xs uppercase tracking-wider text-zinc-500">Standardized rows</div>
+        <div id="price-row-count" class="mt-1 text-2xl font-semibold tab-num text-zinc-100">—</div>
+      </div>
+      <div>
+        <div class="text-xs uppercase tracking-wider text-zinc-500">CPT / HCPCS codes</div>
+        <div id="price-code-count" class="mt-1 text-2xl font-semibold tab-num text-zinc-100">—</div>
+      </div>
+    </div>
+    <div class="mt-4 grid md:grid-cols-[1fr_180px] gap-3">
+      <input id="cpt-q" type="search" placeholder="CPT/HCPCS code or procedure (e.g. 99213, MRI, colonoscopy)…"
+        class="rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 px-4 py-3 text-base focus:border-emerald-500 focus:outline-none">
+      <select id="cpt-sort" class="rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 px-3 py-3">
+        <option value="coverage">Most hospitals</option>
+        <option value="code">By code</option>
+      </select>
+    </div>
+    <div id="cpt-status" class="mt-2 text-xs text-zinc-500"></div>
+    <div id="cpt-results" class="mt-3"></div>
+  </section>
+
+  <section id="api" class="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+    <h2 class="text-2xl font-semibold tracking-tight">Use it</h2>
+    <p class="text-zinc-300 mt-2">Everything here is <strong>CC0 / public domain</strong>. No attribution required. Build whatever you want on top.</p>
+    <div class="mt-4 grid md:grid-cols-2 gap-3 text-sm">
+      <a href="/data/hospitals.json" class="rounded-md border border-zinc-700 hover:bg-zinc-800 p-3">
+        <div class="mono text-emerald-400">/data/hospitals.json</div>
+        <div class="text-zinc-400 mt-1">Full dataset · 3.1 MB · 5,426 hospitals</div>
+      </a>
+      <a href="/data/summary.json" class="rounded-md border border-zinc-700 hover:bg-zinc-800 p-3">
+        <div class="mono text-emerald-400">/data/summary.json</div>
+        <div class="text-zinc-400 mt-1">Aggregate stats · 5.5 KB</div>
+      </a>
+      <a href="/api/cpt-index" class="rounded-md border border-zinc-700 hover:bg-zinc-800 p-3">
+        <div class="mono text-emerald-400">/api/cpt-index</div>
+        <div class="text-zinc-400 mt-1">Cross-hospital CPT price index when generated</div>
+      </a>
+      <a href="/api/prices/100072" class="rounded-md border border-zinc-700 hover:bg-zinc-800 p-3">
+        <div class="mono text-emerald-400">/api/prices/&lt;ccn&gt;</div>
+        <div class="text-zinc-400 mt-1">Per-hospital standardized prices via asset or R2 fallback</div>
+      </a>
+    </div>
+  </section>
+
+  <footer class="border-t border-zinc-800 pt-8 text-sm text-zinc-500 space-y-2">
+    <p><strong>License:</strong> Data CC0 1.0 Universal · Code AGPLv3 · Built from CMS Hospital General Information (public domain) + TPAFS/transparency-data (CC BY-SA 4.0, seed only) + live verification + CMS Hospital Price Transparency Enforcement Activities.</p>
+    <p><strong>Method:</strong> 11 stages (TPAFS seed → page parsing → Exa search → Claude agents → CMS-HPT marker files → email-domain expansion → Wayback fallback). 86.2% live MRFs found via automated probing. Updated quarterly.</p>
+    <p><strong>Limits:</strong> Some MRFs require browser bot-bypass (Akamai-walled hospitals). We don't claim 100% — and the 13.8% gap IS the policy artifact: federally-required, federally-cited, still not public.</p>
+    <p class="text-zinc-600">Not affiliated with CMS, HHS, Cost Plus Drugs, or any commercial transparency vendor. No warranty.</p>
+  </footer>
+
+</main>
+
+<!-- Hospital detail modal -->
+<div id="modal" class="fixed inset-0 bg-zinc-950/90 backdrop-blur-sm hidden z-50 p-4 overflow-y-auto" onclick="if(event.target===this) closeModal()">
+  <div class="mx-auto max-w-3xl rounded-xl bg-zinc-900 border border-zinc-800 p-6 mt-12">
+    <div class="flex items-start justify-between gap-4">
+      <div id="modal-content" class="flex-1"></div>
+      <button onclick="closeModal()" class="text-zinc-500 hover:text-zinc-200 text-2xl leading-none">✕</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let hospitals = [];
+let summary = null;
+let pricesIndex = null;
+let cptIndex = null;
+let cptIndexLoading = false;
+let cptIndexPromise = null;
+
+async function load() {
+  try {
+    summary = await (await fetch('/data/summary.json')).json();
+    renderSummary();
+  } catch (e) { console.error('summary load', e); }
+  try {
+    hospitals = await (await fetch('/data/hospitals.json')).json();
+    initSearch();
+    renderWorst();
+    renderStates();
+    renderTypes();
+    await loadPriceIndexes();
+    initCptSearch();
+    // Deep-link
+    if (location.hash.startsWith('#h/')) openCCN(decodeURIComponent(location.hash.slice(3)));
+  } catch (e) { console.error('hospitals load', e); }
+}
+
+async function fetchOptionalJson(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    console.warn('optional data load failed', url, e);
+    return null;
+  }
+}
+
+async function loadPriceIndexes() {
+  const priceData = await fetchOptionalJson('/api/prices-index');
+  pricesIndex = priceData || null;
+  renderPriceCoverage();
+}
+
+function renderSummary() {
+  if (!summary) return;
+  $('hero-required').textContent = summary.cms_required_total.toLocaleString();
+  $('kpi-compliance').textContent = summary.compliance_pct + '%';
+  $('kpi-missing').textContent = summary.missing.toLocaleString();
+  $('kpi-enforcement').textContent = summary.under_enforcement.toLocaleString();
+  $('kpi-actions').textContent = summary.enforcement_actions_total.toLocaleString();
+  // Worst offenders pre-populated from summary (smaller payload than hospitals)
+  const tb = $('worst-tbody');
+  summary.worst_offenders.forEach(h => {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-zinc-900/70 cursor-pointer';
+    tr.onclick = () => openCCN(h.ccn);
+    tr.innerHTML = `
+      <td class="px-4 py-2 mono text-xs text-zinc-500">${h.ccn}</td>
+      <td class="px-4 py-2">${escapeHtml(h.name)}</td>
+      <td class="px-4 py-2 text-zinc-400">${escapeHtml(h.city)}, ${h.state}</td>
+      <td class="px-4 py-2 text-right tab-num text-rose-400">${h.enforcement_count}</td>`;
+    tb.appendChild(tr);
+  });
+  // worst states
+  const ws = summary.states.slice(0, 12);
+  const stb = $('state-bottom-tbody');
+  ws.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="px-4 py-2 mono">${s.state}</td>
+      <td class="px-4 py-2 text-right tab-num">${s.total}</td>
+      <td class="px-4 py-2 text-right tab-num">${s.live}</td>
+      <td class="px-4 py-2 text-right tab-num ${s.pct < 70 ? 'text-rose-400' : s.pct < 85 ? 'text-amber-400' : 'text-emerald-400'}">${s.pct}%</td>`;
+    stb.appendChild(tr);
+  });
+  // types
+  const tb2 = $('type-bars');
+  summary.types.forEach(t => {
+    const color = t.pct < 70 ? 'bg-rose-500' : t.pct < 85 ? 'bg-amber-500' : 'bg-emerald-500';
+    tb2.innerHTML += `
+      <div>
+        <div class="flex justify-between text-sm">
+          <span>${escapeHtml(t.type)}</span>
+          <span class="tab-num text-zinc-400">${t.live.toLocaleString()} / ${t.total.toLocaleString()} <span class="text-zinc-500">(${t.pct}%)</span></span>
+        </div>
+        <div class="mt-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
+          <div class="h-full ${color}" style="width:${t.pct}%"></div>
+        </div>
+      </div>`;
+  });
+}
+
+function initSearch() {
+  $('hosp-count').textContent = hospitals.length.toLocaleString();
+  // populate state dropdown
+  const states = [...new Set(hospitals.map(h => h.state))].sort();
+  const sel = $('state');
+  sel.innerHTML = '<option value="">All states</option>' +
+    states.map(s => `<option value="${s}">${s}</option>`).join('');
+  $('q').addEventListener('input', debounce(render, 80));
+  $('state').addEventListener('change', render);
+  $('status').addEventListener('change', render);
+  render();
+}
+
+function initCptSearch() {
+  const q = $('cpt-q');
+  const sort = $('cpt-sort');
+  if (!q || !sort) return;
+  q.addEventListener('focus', () => {
+    if (!cptIndex && !cptIndexLoading) ensureCptIndex();
+  });
+  q.addEventListener('input', debounce(() => {
+    if (q.value.trim() && !cptIndex && !cptIndexLoading) ensureCptIndex();
+    renderCptSearch();
+  }, 120));
+  sort.addEventListener('change', () => {
+    if (!cptIndex && !cptIndexLoading) ensureCptIndex();
+    renderCptSearch();
+  });
+  renderCptSearch();
+}
+
+function getPriceIndexHospitals() {
+  if (!pricesIndex) return [];
+  if (Array.isArray(pricesIndex)) return pricesIndex;
+  if (Array.isArray(pricesIndex.hospitals)) return pricesIndex.hospitals;
+  return [];
+}
+
+function getPreviewHospitals() {
+  return getPriceIndexHospitals().filter(h => Number(h.n || h.count || h.items || 0) > 0);
+}
+
+function renderPriceCoverage() {
+  const previewHospitals = getPreviewHospitals();
+  const rows = previewHospitals.reduce((sum, h) => sum + Number(h.n || h.count || h.items || 0), 0);
+  const codeCount = cptIndex ? Object.keys(cptIndex).length : null;
+  const hospitalText = previewHospitals.length ? previewHospitals.length.toLocaleString() : '—';
+  const rowText = rows ? rows.toLocaleString() : '—';
+  const codeText = codeCount === null ? 'Load on search' : codeCount.toLocaleString();
+
+  if ($('price-hospital-count')) $('price-hospital-count').textContent = hospitalText;
+  if ($('methodology-price-count')) $('methodology-price-count').textContent = hospitalText;
+  if ($('price-row-count')) $('price-row-count').textContent = rowText;
+  if ($('price-code-count')) $('price-code-count').textContent = codeText;
+}
+
+async function ensureCptIndex() {
+  if (cptIndex || cptIndexLoading) return cptIndexPromise;
+  cptIndexLoading = true;
+  renderCptSearch();
+  cptIndexPromise = fetchOptionalJson('/api/cpt-index').then(data => {
+    cptIndex = data || null;
+    cptIndexLoading = false;
+    renderPriceCoverage();
+    renderCptSearch();
+    return cptIndex;
+  }).catch(e => {
+    cptIndexLoading = false;
+    console.warn('cpt index load failed', e);
+    renderCptSearch();
+    return null;
+  });
+  return cptIndexPromise;
+}
+
+function getHospital(ccn) {
+  return hospitals.find(h => String(h.ccn) === String(ccn));
+}
+
+function isCodeQuery(q) {
+  return /^[A-Z]?\d[A-Z0-9]{1,6}$/.test(q);
+}
+
+function renderCptSearch() {
+  const qEl = $('cpt-q');
+  const status = $('cpt-status');
+  const results = $('cpt-results');
+  if (!qEl || !status || !results) return;
+
+  const q = qEl.value.trim().toUpperCase();
+  const sort = $('cpt-sort').value;
+  const indexedHospitals = getPreviewHospitals();
+  const codeCount = cptIndex ? Object.keys(cptIndex).length : 0;
+  const hospitalCount = indexedHospitals.length;
+
+  if (!cptIndex) {
+    if (cptIndexLoading) {
+      status.textContent = `${hospitalCount.toLocaleString()} hospitals have standardized price previews. Loading the cross-hospital CPT/HCPCS comparison index…`;
+    } else {
+      status.textContent = `${hospitalCount.toLocaleString()} hospitals have standardized price previews. Enter a CPT/HCPCS code to load cross-hospital comparisons.`;
+    }
+    results.innerHTML = '';
+    return;
+  }
+
+  if (!q) {
+    status.textContent = `${codeCount.toLocaleString()} CPT/HCPCS codes indexed across ${hospitalCount.toLocaleString()} hospital${hospitalCount === 1 ? '' : 's'}. Enter a code such as 99213, J9271, or A9543.`;
+    results.innerHTML = renderTopCptCodes(sort);
+    return;
+  }
+
+  if (!isCodeQuery(q)) {
+    status.textContent = 'This compact CPT index currently supports exact or prefix CPT/HCPCS code searches. Try a code like 99213, J9271, or A9543.';
+    results.innerHTML = '';
+    return;
+  }
+
+  const matches = Object.keys(cptIndex).filter(code => code.startsWith(q));
+  if (sort === 'coverage') {
+    matches.sort((a, b) => (cptIndex[b] || []).length - (cptIndex[a] || []).length || a.localeCompare(b));
+  } else {
+    matches.sort((a, b) => a.localeCompare(b));
+  }
+
+  if (!matches.length) {
+    status.textContent = `No standardized price rows found for code prefix ${q}.`;
+    results.innerHTML = '';
+    return;
+  }
+
+  status.textContent = `${matches.length.toLocaleString()} matching code${matches.length === 1 ? '' : 's'} for ${q}. Showing hospital price rows from the standardized index.`;
+  results.innerHTML = matches.slice(0, 20).map(code => renderCptCodeResult(code, cptIndex[code])).join('');
+}
+
+function renderTopCptCodes(sort) {
+  const codes = Object.keys(cptIndex || {});
+  if (sort === 'coverage') {
+    codes.sort((a, b) => (cptIndex[b] || []).length - (cptIndex[a] || []).length || a.localeCompare(b));
+  } else {
+    codes.sort((a, b) => a.localeCompare(b));
+  }
+  return codes.slice(0, 10).map(code => renderCptCodeResult(code, cptIndex[code], true)).join('');
+}
+
+function renderCptCodeResult(code, rows, compact = false) {
+  const safeCode = escapeHtml(code);
+  const shown = (rows || []).slice(0, compact ? 5 : 25);
+  const body = shown.map(row => {
+    const h = getHospital(row.ccn) || {};
+    const name = h.name || row.name || `CCN ${row.ccn}`;
+    const place = [h.city, h.state].filter(Boolean).join(', ');
+    return `
+      <tr class="border-t border-zinc-800 hover:bg-zinc-900/70 cursor-pointer" onclick="openCCN('${escapeHtml(escapeJs(row.ccn))}')">
+        <td class="px-3 py-2 mono text-xs text-zinc-500">${escapeHtml(row.ccn)}</td>
+        <td class="px-3 py-2">
+          <div class="font-medium text-zinc-100">${escapeHtml(name)}</div>
+          <div class="text-xs text-zinc-500">${escapeHtml(place || h.type || '')}</div>
+        </td>
+        <td class="px-3 py-2 text-right tab-num">${formatMoney(row.gross)}</td>
+        <td class="px-3 py-2 text-right tab-num">${formatMoney(row.cash)}</td>
+        <td class="px-3 py-2 text-right tab-num">${formatMoney(row.min)}</td>
+        <td class="px-3 py-2 text-right tab-num">${formatMoney(row.max)}</td>
+        <td class="px-3 py-2 text-right tab-num">
+          ${formatMoney(firstValue(row.payer_max, row.payerMax))}
+          ${Number(row.pc || row.payer_count || 0) ? `<div class="text-xs text-zinc-600">${Number(row.pc || row.payer_count).toLocaleString()} rates</div>` : ''}
+        </td>
+      </tr>`;
+  }).join('');
+  const more = (rows || []).length > shown.length
+    ? `<div class="px-3 py-2 text-xs text-zinc-500">+ ${((rows || []).length - shown.length).toLocaleString()} more hospital${(rows || []).length - shown.length === 1 ? '' : 's'} for this code.</div>`
+    : '';
+  return `
+    <div class="rounded-md border border-zinc-800 bg-zinc-950/40 overflow-hidden mb-3">
+      <div class="px-3 py-2 flex items-center justify-between gap-3 bg-zinc-900/80">
+        <div>
+          <div class="mono text-emerald-300">${safeCode}</div>
+          <div class="text-xs text-zinc-500">${(rows || []).length.toLocaleString()} hospital${(rows || []).length === 1 ? '' : 's'} with standardized prices</div>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="text-xs uppercase tracking-wider text-zinc-500">
+            <tr><th class="px-3 py-2 text-left font-medium">CCN</th><th class="px-3 py-2 text-left font-medium">Hospital</th><th class="px-3 py-2 text-right font-medium">Gross</th><th class="px-3 py-2 text-right font-medium">Cash</th><th class="px-3 py-2 text-right font-medium">Min</th><th class="px-3 py-2 text-right font-medium">Max</th><th class="px-3 py-2 text-right font-medium">Payer max</th></tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+      ${more}
+    </div>`;
+}
+
+function render() {
+  const q = $('q').value.toLowerCase().trim();
+  const st = $('state').value;
+  const status = $('status').value;
+  let out = hospitals;
+  if (q) {
+    out = out.filter(h =>
+      h.name.toLowerCase().includes(q) || h.city.toLowerCase().includes(q) || h.ccn.includes(q));
+  }
+  if (st) out = out.filter(h => h.state === st);
+  if (status === 'compliant') out = out.filter(h => h.has_live_mrf);
+  else if (status === 'missing') out = out.filter(h => !h.has_live_mrf && h.required);
+  else if (status === 'enforcement') out = out.filter(h => (h.enforcement_count || 0) > 0);
+  else if (status === 'missing-enforcement') out = out.filter(h => !h.has_live_mrf && (h.enforcement_count || 0) > 0);
+
+  $('results-count').textContent = `${out.length.toLocaleString()} hospital${out.length === 1 ? '' : 's'}`;
+  const container = $('results');
+  container.innerHTML = '';
+  // Render first 200
+  out.slice(0, 200).forEach(h => container.appendChild(card(h)));
+  if (out.length > 200) {
+    const more = document.createElement('div');
+    more.className = 'text-center text-sm text-zinc-500 py-3';
+    more.textContent = `+ ${(out.length - 200).toLocaleString()} more — refine your search`;
+    container.appendChild(more);
+  }
+}
+
+function card(h) {
+  const div = document.createElement('div');
+  div.className = 'rounded-md border border-zinc-800 bg-zinc-900/50 p-3 flex items-center gap-3 hover:border-zinc-700 cursor-pointer fade-in';
+  div.onclick = () => openCCN(h.ccn);
+  const status = badge(h);
+  div.innerHTML = `
+    <div class="flex-1 min-w-0">
+      <div class="font-medium text-zinc-100 truncate">${escapeHtml(h.name)}</div>
+      <div class="text-xs text-zinc-500 mt-0.5">
+        <span class="mono">${h.ccn}</span> · ${escapeHtml(h.city)}, ${h.state} · ${escapeHtml(h.type)}
+      </div>
+    </div>
+    <div class="flex flex-col items-end gap-1 shrink-0">${status}</div>`;
+  return div;
+}
+
+function badge(h) {
+  const parts = [];
+  if (h.has_live_mrf) {
+    parts.push(`<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">✓ Live MRF</span>`);
+  } else if (h.required) {
+    parts.push(`<span class="text-xs px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">✗ Missing</span>`);
+  }
+  if ((h.enforcement_count || 0) > 0) {
+    parts.push(`<span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">${h.enforcement_count} CMS action${h.enforcement_count === 1 ? '' : 's'}</span>`);
+  }
+  return parts.join(' ');
+}
+
+function renderWorst() { /* already done in renderSummary */ }
+function renderStates() { /* already done in renderSummary */ }
+function renderTypes() { /* already done in renderSummary */ }
+
+function openCCN(ccn) {
+  const h = hospitals.find(x => x.ccn === ccn);
+  if (!h) return;
+  history.replaceState(null, '', '#h/' + ccn);
+  const enfHtml = (h.enforcement_actions || []).map(a =>
+    `<li class="py-1 border-l-2 border-amber-500/40 pl-3 text-sm">
+       <span class="text-zinc-400 mono text-xs">${a.date}</span>
+       <span class="ml-2">${escapeHtml(a.action)}</span>
+     </li>`).join('');
+  const mrfHtml = h.has_live_mrf ? `
+    <div class="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 mt-4">
+      <div class="text-xs uppercase tracking-wider text-emerald-400">Live machine-readable file</div>
+      <a href="${escapeHtml(h.mrf_url)}" target="_blank" rel="noopener" class="mono text-sm text-emerald-300 hover:underline break-all block mt-1">${escapeHtml(h.mrf_url)}</a>
+      <div class="text-xs text-zinc-500 mt-2">
+        Source: ${escapeHtml(h.mrf_source || 'unknown')} · Last verified ${(h.mrf_verified || '').slice(0,10) || '—'}
+        ${h.mrf_bytes ? ' · ' + formatBytes(h.mrf_bytes) : ''}
+      </div>
+    </div>` : `
+    <div class="rounded-md border border-rose-500/30 bg-rose-500/5 p-4 mt-4">
+      <div class="text-xs uppercase tracking-wider text-rose-400">No live MRF found</div>
+      <p class="text-sm text-zinc-300 mt-1">
+        This hospital is required by <a href="https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-E/part-180" class="underline text-rose-300">45 CFR § 180</a> to publish a machine-readable file.
+        After exhaustive automated probing (CMS-HPT marker files, page parsing, Exa search, Claude agents, Wayback Machine), no live file was found.
+      </p>
+    </div>`;
+  $('modal-content').innerHTML = `
+    <div class="text-xs uppercase tracking-widest text-zinc-500">CCN <span class="mono">${escapeHtml(h.ccn)}</span></div>
+    <h3 class="text-2xl font-semibold tracking-tight mt-1">${escapeHtml(h.name)}</h3>
+    <div class="text-zinc-400 mt-1">${escapeHtml(h.city)}, ${escapeHtml(h.state)} · ${escapeHtml(h.type)} · ${escapeHtml(h.ownership || '')}</div>
+    ${mrfHtml}
+    <div id="price-preview" class="rounded-md border border-zinc-800 bg-zinc-950/40 p-4 mt-4">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="text-xs uppercase tracking-wider text-emerald-400">Standardized price preview</div>
+          <div class="text-sm text-zinc-400 mt-1">Loading on-site price rows…</div>
+        </div>
+      </div>
+    </div>
+    ${enfHtml ? `<div class="mt-5">
+      <div class="text-xs uppercase tracking-wider text-amber-400">CMS enforcement history</div>
+      <ol class="mt-2 space-y-0">${enfHtml}</ol>
+    </div>` : ''}
+    <div class="mt-5 text-xs text-zinc-500">
+      <a href="https://npiregistry.cms.hhs.gov/search?keyword=${encodeURIComponent(h.name)}&state=${encodeURIComponent(h.state)}" target="_blank" class="underline hover:text-zinc-300">NPI Registry</a> ·
+      <a href="https://data.cms.gov/provider-data/dataset/xubh-q36u" target="_blank" class="underline hover:text-zinc-300">CMS Hospital Compare</a> ·
+      <a href="https://data.cms.gov/provider-characteristics/hospitals-and-other-facilities/hospital-price-transparency-enforcement-activities-and-outcomes" target="_blank" class="underline hover:text-zinc-300">CMS Enforcement record</a>
+    </div>`;
+  $('modal').classList.remove('hidden');
+  renderHospitalPricePreview(ccn);
+}
+function closeModal() {
+  $('modal').classList.add('hidden');
+  history.replaceState(null, '', location.pathname);
+}
+document.addEventListener('keydown', e => e.key === 'Escape' && closeModal());
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeJs(s) {
+  return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+}
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+  return (b/1024/1024).toFixed(1) + ' MB';
+}
+function formatMoney(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '—';
+  return '$' + n.toLocaleString(undefined, { maximumFractionDigits: n < 100 ? 2 : 0 });
+}
+function firstValue(...values) {
+  return values.find(v => v !== undefined && v !== null);
+}
+async function renderHospitalPricePreview(ccn) {
+  const el = $('price-preview');
+  if (!el) return;
+  const data = await fetchOptionalJson(`/api/prices/${encodeURIComponent(ccn)}`);
+  if (!el || location.hash !== '#h/' + ccn) return;
+  if (!el || !data || !Array.isArray(data.items) || !data.items.length) {
+    el.innerHTML = `
+      <div class="text-xs uppercase tracking-wider text-zinc-500">Standardized price preview</div>
+      <p class="text-sm text-zinc-400 mt-1">No standardized price rows have been generated for this hospital yet.</p>`;
+    return;
+  }
+
+  const rows = data.items.slice(0, 25).map(item => {
+    const payers = Array.isArray(item.payers) ? item.payers.slice(0, 3) : [];
+    const payerHtml = payers.length
+      ? payers.map(p => `<div class="truncate">${escapeHtml(p.p || p.payer || 'Payer')} <span class="text-zinc-500">${formatMoney(firstValue(p.r, p.rate, p.rate_dollar))}</span></div>`).join('')
+      : '<span class="text-zinc-600">—</span>';
+    return `
+      <tr class="border-t border-zinc-800 align-top">
+        <td class="px-3 py-2 mono text-xs text-emerald-300">${escapeHtml(item.code)}</td>
+        <td class="px-3 py-2 text-xs text-zinc-500">${escapeHtml(item.type || item.code_type || '')}</td>
+        <td class="px-3 py-2 min-w-64">${escapeHtml(item.desc || item.description || '')}</td>
+        <td class="px-3 py-2 text-right tab-num">${formatMoney(firstValue(item.gross, item.gross_charge))}</td>
+        <td class="px-3 py-2 text-right tab-num">${formatMoney(firstValue(item.cash, item.cash_discount))}</td>
+        <td class="px-3 py-2 text-right tab-num">${formatMoney(firstValue(item.min, item.min_negotiated))}</td>
+        <td class="px-3 py-2 text-right tab-num">${formatMoney(firstValue(item.max, item.max_negotiated))}</td>
+        <td class="px-3 py-2 text-xs text-zinc-400 max-w-56">${payerHtml}</td>
+      </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <div class="text-xs uppercase tracking-wider text-emerald-400">Standardized price preview</div>
+        <div class="text-sm text-zinc-400 mt-1">${escapeHtml(data.hospital_name || '')} · ${firstValue(data.n_slim, data.items.length).toLocaleString()} standardized row${firstValue(data.n_slim, data.items.length) === 1 ? '' : 's'}</div>
+      </div>
+      <div class="text-xs text-zinc-500 shrink-0">First ${Math.min(25, data.items.length).toLocaleString()}</div>
+    </div>
+    <div class="mt-3 overflow-x-auto rounded-md border border-zinc-800">
+      <table class="min-w-full text-sm">
+        <thead class="bg-zinc-900 text-xs uppercase tracking-wider text-zinc-500">
+          <tr><th class="px-3 py-2 text-left font-medium">Code</th><th class="px-3 py-2 text-left font-medium">Type</th><th class="px-3 py-2 text-left font-medium">Description</th><th class="px-3 py-2 text-right font-medium">Gross</th><th class="px-3 py-2 text-right font-medium">Cash</th><th class="px-3 py-2 text-right font-medium">Min</th><th class="px-3 py-2 text-right font-medium">Max</th><th class="px-3 py-2 text-left font-medium">Payer examples</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+function debounce(fn, ms) {
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+load();
+</script>
+
+</body>
+</html>

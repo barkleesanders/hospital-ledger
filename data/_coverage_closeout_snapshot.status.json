@@ -1,0 +1,137 @@
+{
+  "coverage_pct": 41.52,
+  "effective_target_total": 3986,
+  "failure_clusters": [
+    {
+      "count": 42,
+      "error": "unknown",
+      "example_ccn": "060022",
+      "fmt": "-",
+      "host": "sthpiprd.blob.core.windows.net"
+    },
+    {
+      "count": 38,
+      "error": "unknown",
+      "example_ccn": "051324",
+      "fmt": "-",
+      "host": "apps.para-hcfs.com"
+    },
+    {
+      "count": 25,
+      "error": "unknown",
+      "example_ccn": "210027",
+      "fmt": "-",
+      "host": "dam.upmc.com"
+    },
+    {
+      "count": 23,
+      "error": "unknown",
+      "example_ccn": "160032",
+      "fmt": "-",
+      "host": "hpt.trinity-health.org"
+    },
+    {
+      "count": 22,
+      "error": "unknown",
+      "example_ccn": "050135",
+      "fmt": "-",
+      "host": "search.hospitalpriceindex.com"
+    },
+    {
+      "count": 14,
+      "error": "unknown",
+      "example_ccn": "061308",
+      "fmt": "-",
+      "host": "mrf.panaceainc.com"
+    },
+    {
+      "count": 13,
+      "error": "unknown",
+      "example_ccn": "131302",
+      "fmt": "-",
+      "host": "mrfs.hyvehealthcare.com"
+    },
+    {
+      "count": 11,
+      "error": "unknown",
+      "example_ccn": "100350",
+      "fmt": "-",
+      "host": "stctrprodsnsvc00455826e6.blob.core.windows.net"
+    },
+    {
+      "count": 10,
+      "error": "unknown",
+      "example_ccn": "210002",
+      "fmt": "-",
+      "host": "www.umms.org"
+    },
+    {
+      "count": 9,
+      "error": "unknown",
+      "example_ccn": "170016",
+      "fmt": "-",
+      "host": "cdn.ardenthealthservices.com"
+    },
+    {
+      "count": 9,
+      "error": "unknown",
+      "example_ccn": "111336",
+      "fmt": "-",
+      "host": "machine-readable-files.com"
+    },
+    {
+      "count": 9,
+      "error": "unknown",
+      "example_ccn": "161323",
+      "fmt": "-",
+      "host": "secure.claraprice.net"
+    },
+    {
+      "count": 9,
+      "error": "unknown",
+      "example_ccn": "360001",
+      "fmt": "-",
+      "host": "www.mercy.com"
+    },
+    {
+      "count": 9,
+      "error": "unknown",
+      "example_ccn": "110016",
+      "fmt": "-",
+      "host": "www.wellstar.org"
+    },
+    {
+      "count": 8,
+      "error": "unknown",
+      "example_ccn": "200008",
+      "fmt": "-",
+      "host": "northernlighthealth.org"
+    }
+  ],
+  "gap_file": "data/_coverage_gap_ccns.txt",
+  "live_target_total": 3986,
+  "loop": 1,
+  "missing_parsed": 843,
+  "missing_preview": 2331,
+  "parse_gap_file": "data/_coverage_parse_gap_ccns.txt",
+  "parsed_not_preview_total": 1489,
+  "parsed_positive": 3143,
+  "parsed_positive_total": 3143,
+  "phase": "snapshot",
+  "preview_gap_file": "data/_coverage_preview_gap_ccns.txt",
+  "preview_index_entries": 1728,
+  "preview_not_parsed_total": 1,
+  "preview_positive": 1655,
+  "preview_positive_total": 1655,
+  "preview_rows": 27836349,
+  "sample_preview_ccns": [
+    "010095",
+    "451362",
+    "300011"
+  ],
+  "target_gap_total": 2331,
+  "terminal_exception_candidate_total": 66,
+  "terminal_exceptions": 66,
+  "terminal_exceptions_file": "data/_coverage_terminal_exceptions.json",
+  "updated_at": "2026-05-13T06:29:45+00:00"
+}

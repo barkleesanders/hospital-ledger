@@ -1,0 +1,9 @@
+{
+  "aggregate_done": 1631,
+  "aggregate_pending": 2355,
+  "aggregate_total": 3986,
+  "aggregate_updated_at": "2026-05-11T11:14:24+00:00",
+  "phase": "waiting_for_full",
+  "updated_at": "2026-05-11T11:14:24+00:00",
+  "wait_mode": "remaining"
+}

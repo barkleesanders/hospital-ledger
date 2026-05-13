@@ -1,0 +1,79 @@
+{
+  "all": false,
+  "done": 12,
+  "eligible": 12,
+  "eta_seconds": 0,
+  "failed": 11,
+  "pending": 0,
+  "rate_per_second": 0.044,
+  "recent_failures": [
+    {
+      "ccn": "180043",
+      "error": "seed:json:zero_items:5.5s",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "190779",
+      "error": "rediscovered:csv:zero_items:2.2s",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "260034",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "491300",
+      "error": "rediscovered:csv:zero_items:0.4s",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "220030",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "371322",
+      "error": "seed:csv:zero_items:0.3s",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "271340",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "181308",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "180138",
+      "error": "rediscovered:csv:zero_items:9.9s",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "451310",
+      "error": "rediscovered:csv:zero_items:1.4s",
+      "fmt": "",
+      "items": 0
+    }
+  ],
+  "resume": false,
+  "skipped_existing": 0,
+  "started_at": "2026-05-11T17:28:41+00:00",
+  "state": "",
+  "success": 1,
+  "total_items": 5147,
+  "updated_at": "2026-05-11T17:33:13+00:00",
+  "workers": 4
+}

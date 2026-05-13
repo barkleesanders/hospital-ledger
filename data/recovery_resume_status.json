@@ -1,0 +1,79 @@
+{
+  "all": true,
+  "done": 60,
+  "eligible": 3986,
+  "eta_seconds": 15178,
+  "failed": 53,
+  "pending": 2262,
+  "rate_per_second": 0.149,
+  "recent_failures": [
+    {
+      "ccn": "141351",
+      "error": "rediscovered:-:subprocess:1:141351 CLAY COUNTY HOSPITAL                                      0 items  ERR: p",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "451310",
+      "error": "rediscovered:-:subprocess:1:451310 BALLINGER MEMORIAL HOSPITAL              csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "330799",
+      "error": "rediscovered:-:subprocess:1:330799 CLIFTON-FINE HOSPITAL                    csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "231322",
+      "error": "rediscovered:-:subprocess:1:231322 CHARLEVOIX AREA HOSPITAL                 csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "110164",
+      "error": "rediscovered:-:subprocess:1:110164 COLISEUM MEDICAL CENTERS, LLC, DBA       csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "050543",
+      "error": "rediscovered:-:subprocess:1:050543 COLLEGE HOSPITAL COSTA MESA              csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "150075",
+      "error": "rediscovered:-:subprocess:1:150075 BLUFFTON REGIONAL MEDICAL CENTER                          0 items  ERR: p",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "330094",
+      "error": "seed:-:subprocess:1:330094 COLUMBIA MEMORIAL HOSPITAL               csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "381320",
+      "error": "seed:-:subprocess:1:381320 COLUMBIA MEMORIAL HOSPITAL               json             0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "150125",
+      "error": "rediscovered:-:subprocess:1:150125 COMMUNITY HOSPITAL                       csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    }
+  ],
+  "resume": true,
+  "skipped_existing": 1664,
+  "started_at": "2026-05-11T15:57:09+00:00",
+  "state": "",
+  "success": 7,
+  "total_items": 154227,
+  "updated_at": "2026-05-11T16:03:51+00:00",
+  "workers": 4
+}

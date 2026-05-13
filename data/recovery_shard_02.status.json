@@ -1,0 +1,73 @@
+{
+  "all": false,
+  "done": 10,
+  "eligible": 997,
+  "eta_seconds": 16460,
+  "failed": 9,
+  "pending": 626,
+  "rate_per_second": 0.038,
+  "recent_failures": [
+    {
+      "ccn": "443303",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "110142",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "341328",
+      "error": "seed:-:subprocess:1:341328 ERLANGER MURPHY MEDICAL CENTER                            0 items  ERR: f",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "110125",
+      "error": "seed:-:subprocess:1:110125 FAIRVIEW PARK HOSPITAL                                    0 items  ERR: f",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "141324",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "461301",
+      "error": "seed:-:subprocess:1:461301 FILLMORE COMMUNITY HOSPITAL              csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "101312",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "100298",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "161368",
+      "error": "rediscovered:-:subprocess:1:161368 FLOYD VALLEY HEALTHCARE                  csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    }
+  ],
+  "resume": true,
+  "skipped_existing": 361,
+  "started_at": "2026-05-11T16:06:32+00:00",
+  "state": "",
+  "success": 1,
+  "total_items": 10987,
+  "updated_at": "2026-05-11T16:10:55+00:00",
+  "workers": 2
+}

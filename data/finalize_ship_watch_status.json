@@ -1,0 +1,10 @@
+{
+  "aggregate_done": 1700,
+  "aggregate_eta_seconds": 5307,
+  "aggregate_pending": 2245,
+  "aggregate_rate_per_second": 0.423,
+  "aggregate_total": 3986,
+  "aggregate_updated_at": "2026-05-11T11:15:02+00:00",
+  "phase": "waiting_for_full",
+  "updated_at": "2026-05-11T11:15:13+00:00"
+}

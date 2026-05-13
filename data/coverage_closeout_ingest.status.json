@@ -1,0 +1,67 @@
+{
+  "all": false,
+  "done": 49,
+  "eligible": 872,
+  "eta_seconds": 5019,
+  "failed": 8,
+  "pending": 823,
+  "rate_per_second": 0.164,
+  "recent_failures": [
+    {
+      "ccn": "010044",
+      "error": "rediscovered:-:subprocess:1:010044 MARION REGIONAL MEDICAL CENTER           csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "010150",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "010087",
+      "error": "rediscovered:-:subprocess:1:010087 USA HEALTH UNIVERSITY HOSPITAL                            0 items  ERR: f",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "030138",
+      "error": "seed:-:subprocess:1:030138 CITY OF HOPE CANCER CENTER PHOENIX                        0 items  ERR: f",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "040011",
+      "error": "seed:-:subprocess:1:040011 CHAMBERS MEMORIAL HOSPITAL               csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "040088",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "050135",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "050145",
+      "error": "rediscovered:-:subprocess:1:050145 COMMUNITY HOSPITAL OF THE MONTEREY PENIN zip-error        0 items  OK",
+      "fmt": "",
+      "items": 0
+    }
+  ],
+  "resume": true,
+  "skipped_existing": 0,
+  "started_at": "2026-05-13T06:24:42+00:00",
+  "state": "",
+  "success": 41,
+  "total_items": 955861,
+  "updated_at": "2026-05-13T06:29:41+00:00",
+  "workers": 4
+}

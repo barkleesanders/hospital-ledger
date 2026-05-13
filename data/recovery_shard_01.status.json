@@ -1,0 +1,73 @@
+{
+  "all": false,
+  "done": 10,
+  "eligible": 997,
+  "eta_seconds": 6894,
+  "failed": 9,
+  "pending": 226,
+  "rate_per_second": 0.033,
+  "recent_failures": [
+    {
+      "ccn": "380005",
+      "error": "rediscovered:-:subprocess:1:380005 ASANTE ASHLAND COMMUNITY HOSPITAL                         0 items  ERR: f",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "190779",
+      "error": "rediscovered:-:subprocess:1:190779 ASSUMPTION COMMUNITY HOSPITAL            csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "180043",
+      "error": "seed:-:subprocess:1:180043 AdventHealthManchester                   json             0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "180138",
+      "error": "rediscovered:-:subprocess:1:180138 BAPTIST HEALTH LAGRANGE                  csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "451310",
+      "error": "rediscovered:-:subprocess:1:451310 BALLINGER MEMORIAL HOSPITAL              csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "260034",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "491300",
+      "error": "rediscovered:-:subprocess:1:491300 BATH COMMUNITY HOSPITAL                  csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "220030",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "371322",
+      "error": "seed:-:subprocess:1:371322 BEAVER COUNTY MEMORIAL HOSPITAL          csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    }
+  ],
+  "resume": true,
+  "skipped_existing": 761,
+  "started_at": "2026-05-11T16:06:33+00:00",
+  "state": "",
+  "success": 1,
+  "total_items": 11232,
+  "updated_at": "2026-05-11T16:11:38+00:00",
+  "workers": 2
+}

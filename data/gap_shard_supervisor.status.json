@@ -1,0 +1,63 @@
+{
+  "item_timeout_seconds": 600,
+  "missing_count": 0,
+  "poll_seconds": 30.0,
+  "recent_actions": [
+    {
+      "action": "restart",
+      "age_seconds": 922,
+      "at": "2026-05-11T19:52:12+00:00",
+      "reason": "no_updates_for_922s",
+      "session": "hospital-ledger-gap-shard-02",
+      "shard": "remaining-shard-02"
+    }
+  ],
+  "restart_cooldown_seconds": 900,
+  "shard_count": 2,
+  "shards": [
+    {
+      "age_seconds": 137,
+      "cooldown_left_seconds": null,
+      "done": 864,
+      "failed": 140,
+      "freshest_at": "2026-05-11T22:37:39+00:00",
+      "freshest_file": "remaining-shard-01.status.json",
+      "last_action": null,
+      "limit": 1145,
+      "pending": 281,
+      "session": "hospital-ledger-gap-shard-01",
+      "session_exists": true,
+      "shard": "remaining-shard-01",
+      "skipped_existing": 0,
+      "state": "healthy",
+      "success": 724,
+      "updated_at": "2026-05-11T22:37:39+00:00",
+      "workers": 2
+    },
+    {
+      "age_seconds": 273,
+      "cooldown_left_seconds": 0,
+      "done": 760,
+      "failed": 65,
+      "freshest_at": "2026-05-11T22:35:32+00:00",
+      "freshest_file": "remaining-shard-02.log",
+      "last_action": null,
+      "limit": 1145,
+      "pending": 385,
+      "session": "hospital-ledger-gap-shard-02",
+      "session_exists": true,
+      "shard": "remaining-shard-02",
+      "skipped_existing": 22,
+      "state": "healthy",
+      "success": 673,
+      "updated_at": "2026-05-11T22:35:31+00:00",
+      "workers": 2
+    }
+  ],
+  "stale_count": 0,
+  "stale_seconds": 900,
+  "started_at": "2026-05-11T18:50:09+00:00",
+  "state": "watching",
+  "updated_at": "2026-05-11T22:40:06+00:00",
+  "workers_per_shard": 2
+}

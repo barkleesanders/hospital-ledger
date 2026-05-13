@@ -1,0 +1,8 @@
+{"ccn":"010044","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:010044 MARION REGIONAL MEDICAL CENTER           csv              0 items  OK"}
+{"ccn":"010150","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"010087","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:010087 USA HEALTH UNIVERSITY HOSPITAL                            0 items  ERR: f"}
+{"ccn":"030138","fmt":"","items":0,"error":"seed:-:subprocess:1:030138 CITY OF HOPE CANCER CENTER PHOENIX                        0 items  ERR: f"}
+{"ccn":"040011","fmt":"","items":0,"error":"seed:-:subprocess:1:040011 CHAMBERS MEMORIAL HOSPITAL               csv              0 items  OK"}
+{"ccn":"040088","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"050135","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"050145","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:050145 COMMUNITY HOSPITAL OF THE MONTEREY PENIN zip-error        0 items  OK"}

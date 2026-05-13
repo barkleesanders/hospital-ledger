@@ -1,0 +1,102 @@
+{
+  "all": false,
+  "done": 1624,
+  "eligible": 2290,
+  "eta_seconds": 4897,
+  "failed": 205,
+  "pending": 666,
+  "rate_per_second": 0.136,
+  "recent_failures": [
+    {
+      "ccn": "070006",
+      "error": "rediscovered:-:subprocess:1:070006 STAMFORD HOSPITAL                                         0 items  ERR: f",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "100071",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "100249",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "141339",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "440035",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "010150",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "360016",
+      "error": "seed:-:subprocess:1:360016 THE JEWISH HOSPITAL-MERCY HEALTH         csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "520028",
+      "error": "seed:-:subprocess:1:520028 THE MONROE CLINIC                        csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "510029",
+      "error": "seed:-:subprocess:1:510029 THOMAS MEMORIAL HOSPITAL                 csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "351331",
+      "error": "rediscovered:-:subprocess:1:351331 TOWNER COUNTY MEDICAL CENTER             csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    }
+  ],
+  "resume": true,
+  "shards": [
+    {
+      "done": 864,
+      "failed": 140,
+      "limit": 1145,
+      "pending": 281,
+      "rate_per_second": 0.061,
+      "shard": "remaining-shard-01",
+      "skipped_existing": 0,
+      "success": 724,
+      "updated_at": "2026-05-11T22:37:39+00:00"
+    },
+    {
+      "done": 738,
+      "failed": 65,
+      "limit": 1145,
+      "pending": 385,
+      "rate_per_second": 0.075,
+      "shard": "remaining-shard-02",
+      "skipped_existing": 22,
+      "success": 673,
+      "updated_at": "2026-05-11T22:35:31+00:00"
+    }
+  ],
+  "skipped_existing": 22,
+  "started_at": "2026-05-11T18:50:09+00:00",
+  "success": 1397,
+  "total_items": 57789661,
+  "updated_at": "2026-05-11T22:40:01+00:00",
+  "workers": 4
+}

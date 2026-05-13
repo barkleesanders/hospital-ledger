@@ -1,0 +1,25 @@
+{
+  "all": false,
+  "done": 3,
+  "eligible": 3,
+  "eta_seconds": 0,
+  "failed": 1,
+  "pending": 0,
+  "rate_per_second": 0.272,
+  "recent_failures": [
+    {
+      "ccn": "341328",
+      "error": "seed:csv:zero_items:0.3s",
+      "fmt": "",
+      "items": 0
+    }
+  ],
+  "resume": false,
+  "skipped_existing": 0,
+  "started_at": "2026-05-11T15:43:46+00:00",
+  "state": "",
+  "success": 2,
+  "total_items": 15479,
+  "updated_at": "2026-05-11T15:43:57+00:00",
+  "workers": 1
+}

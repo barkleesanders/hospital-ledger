@@ -1,0 +1,10 @@
+{
+  "done": 1624,
+  "eligible": 2290,
+  "failed": 205,
+  "gap_updated_at": "2026-05-11T22:39:30+00:00",
+  "pending": 666,
+  "phase": "waiting_for_gap_backfill",
+  "success": 1397,
+  "updated_at": "2026-05-11T22:39:37+00:00"
+}

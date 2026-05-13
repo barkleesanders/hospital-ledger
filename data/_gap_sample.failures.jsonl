@@ -1,0 +1,23 @@
+{"ccn":"380005","fmt":"","items":0,"error":"rediscovered:-:fetch:ConnectError:[Errno 8] nodename nor servname provided, or not known"}
+{"ccn":"190779","fmt":"","items":0,"error":"rediscovered:-:fetch:ConnectError:[Errno 8] nodename nor servname provided, or not known"}
+{"ccn":"180138","fmt":"","items":0,"error":"rediscovered:-:fetch:ConnectError:[Errno 8] nodename nor servname provided, or not known"}
+{"ccn":"100008","fmt":"","items":0,"error":"rediscovered:-:fetch:ConnectError:[Errno 8] nodename nor servname provided, or not known"}
+{"ccn":"260034","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"491300","fmt":"","items":0,"error":"rediscovered:-:fetch:ConnectError:[Errno 8] nodename nor servname provided, or not known"}
+{"ccn":"220030","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"271340","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"371322","fmt":"","items":0,"error":"seed:-:fetch:ConnectError:[Errno 8] nodename nor servname provided, or not known"}
+{"ccn":"180043","fmt":"","items":0,"error":"seed:-:fetch:ConnectError:[Errno 8] nodename nor servname provided, or not known"}
+{"ccn":"181308","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"451310","fmt":"","items":0,"error":"rediscovered:-:fetch:ConnectError:[Errno 8] nodename nor servname provided, or not known"}
+{"ccn":"380005","fmt":"","items":0,"error":"rediscovered:-:fetch:HTTPStatusError:Client error '403 Forbidden' for url 'https://www.asante.org/patients-visitors/b"}
+{"ccn":"180043","fmt":"","items":0,"error":"seed:json:zero_items:5.5s"}
+{"ccn":"190779","fmt":"","items":0,"error":"rediscovered:csv:zero_items:2.2s"}
+{"ccn":"260034","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"491300","fmt":"","items":0,"error":"rediscovered:csv:zero_items:0.4s"}
+{"ccn":"220030","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"371322","fmt":"","items":0,"error":"seed:csv:zero_items:0.3s"}
+{"ccn":"271340","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"181308","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"180138","fmt":"","items":0,"error":"rediscovered:csv:zero_items:9.9s"}
+{"ccn":"451310","fmt":"","items":0,"error":"rediscovered:csv:zero_items:1.4s"}

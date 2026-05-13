@@ -1,0 +1,18 @@
+{
+  "all": false,
+  "done": 1,
+  "eligible": 1,
+  "eta_seconds": 0,
+  "failed": 0,
+  "pending": 0,
+  "rate_per_second": 1.153,
+  "recent_failures": [],
+  "resume": false,
+  "skipped_existing": 0,
+  "started_at": "2026-05-11T17:46:52+00:00",
+  "state": "",
+  "success": 1,
+  "total_items": 22890,
+  "updated_at": "2026-05-11T17:46:53+00:00",
+  "workers": 1
+}

@@ -1,0 +1,17 @@
+{
+  "free_gb": 64.93,
+  "handoff": "/Users/barkleesanders/projects/hospital-ledger/data/openclaw_ship_handoff.md",
+  "host": "Barklees-MacBook-Pro.local",
+  "phase": "done",
+  "plan": {
+    "cpu_count": 16,
+    "memory_gb": 48.0,
+    "parser_gb_per_worker": 5.0,
+    "resource_percent": 70,
+    "shards": 4,
+    "total_workers": 4,
+    "workers_per_shard": 1
+  },
+  "root": "/Users/barkleesanders/projects/hospital-ledger",
+  "updated_at": "2026-05-11T22:59:40+00:00"
+}

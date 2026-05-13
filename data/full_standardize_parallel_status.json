@@ -1,0 +1,53 @@
+{
+  "done": 1700,
+  "eta_seconds": 5307,
+  "failed": 259,
+  "pending": 2245,
+  "rate_per_second": 0.423,
+  "shards": [
+    {
+      "done": 775,
+      "failed": 113,
+      "limit": 997,
+      "offset": 0,
+      "pending": 188,
+      "rate_per_second": 0.138,
+      "shard": 1,
+      "success": 662
+    },
+    {
+      "done": 400,
+      "failed": 68,
+      "limit": 997,
+      "offset": 997,
+      "pending": 595,
+      "rate_per_second": 0.07,
+      "shard": 2,
+      "success": 332
+    },
+    {
+      "done": 175,
+      "failed": 31,
+      "limit": 997,
+      "offset": 1994,
+      "pending": 821,
+      "rate_per_second": 0.067,
+      "shard": 3,
+      "success": 144
+    },
+    {
+      "done": 350,
+      "failed": 47,
+      "limit": 995,
+      "offset": 2991,
+      "pending": 641,
+      "rate_per_second": 0.148,
+      "shard": 4,
+      "success": 303
+    }
+  ],
+  "started_at": "2026-05-11T09:35:32+00:00",
+  "success": 1441,
+  "total_items": 45892179,
+  "updated_at": "2026-05-11T11:15:25+00:00"
+}

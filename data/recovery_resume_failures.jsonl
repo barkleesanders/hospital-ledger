@@ -1,0 +1,105 @@
+{"ccn":"171382","fmt":"","items":0,"error":"seed:-:no_output:0.7s"}
+{"ccn":"380005","fmt":"","items":0,"error":"rediscovered:-:no_output:0.2s"}
+{"ccn":"190779","fmt":"","items":0,"error":"rediscovered:csv:zero_items:2.2s"}
+{"ccn":"180043","fmt":"","items":0,"error":"seed:json:zero_items:5.9s"}
+{"ccn":"171316","fmt":"","items":0,"error":"rediscovered:csv:zero_items:58.4s"}
+{"ccn":"180138","fmt":"","items":0,"error":"rediscovered:csv:zero_items:5.0s"}
+{"ccn":"100008","fmt":"","items":0,"error":"rediscovered:csv:zero_items:69.9s"}
+{"ccn":"260034","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"491300","fmt":"","items":0,"error":"rediscovered:csv:zero_items:0.6s"}
+{"ccn":"220065","fmt":"","items":0,"error":"seed:csv:zero_items:1.8s"}
+{"ccn":"220030","fmt":"","items":0,"error":"seed:csv:zero_items:1.7s"}
+{"ccn":"371322","fmt":"","items":0,"error":"seed:csv:zero_items:0.7s"}
+{"ccn":"220108","fmt":"","items":0,"error":"rediscovered:-:no_output:0.5s"}
+{"ccn":"220083","fmt":"","items":0,"error":"rediscovered:-:no_output:0.5s"}
+{"ccn":"220060","fmt":"","items":0,"error":"rediscovered:-:no_output:0.4s"}
+{"ccn":"220086","fmt":"","items":0,"error":"rediscovered:-:no_output:0.5s"}
+{"ccn":"271340","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"341329","fmt":"","items":0,"error":"rediscovered:csv:zero_items:3.6s"}
+{"ccn":"181308","fmt":"","items":0,"error":"seed:csv:zero_items:1.6s"}
+{"ccn":"451310","fmt":"","items":0,"error":"rediscovered:csv:zero_items:2.8s"}
+{"ccn":"333301","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"490017","fmt":"","items":0,"error":"seed:csv:zero_items:0.9s"}
+{"ccn":"490069","fmt":"","items":0,"error":"seed:csv:zero_items:0.9s"}
+{"ccn":"490094","fmt":"","items":0,"error":"seed:csv:zero_items:0.8s"}
+{"ccn":"490092","fmt":"","items":0,"error":"seed:csv:zero_items:0.8s"}
+{"ccn":"490097","fmt":"","items":0,"error":"seed:csv:zero_items:0.8s"}
+{"ccn":"490067","fmt":"","items":0,"error":"seed:csv:zero_items:0.8s"}
+{"ccn":"490059","fmt":"","items":0,"error":"seed:csv:zero_items:0.8s"}
+{"ccn":"180046","fmt":"","items":0,"error":"seed:csv:zero_items:0.6s"}
+{"ccn":"100276","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100086","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"220073","fmt":"","items":0,"error":"rediscovered:csv:zero_items:2.6s"}
+{"ccn":"010018","fmt":"","items":0,"error":"rediscovered:csv:zero_items:90.1s"}
+{"ccn":"510091","fmt":"","items":0,"error":"seed:csv:zero_items:1.0s"}
+{"ccn":"100177","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"340188","fmt":"","items":0,"error":"rediscovered:csv:zero_items:2.4s"}
+{"ccn":"341315","fmt":"","items":0,"error":"rediscovered:csv:zero_items:7.0s"}
+{"ccn":"310011","fmt":"","items":0,"error":"seed:csv:zero_items:0.5s"}
+{"ccn":"340113","fmt":"","items":0,"error":"seed:json:zero_items:38.4s"}
+{"ccn":"400140","fmt":"","items":0,"error":"rediscovered:csv:zero_items:0.4s"}
+{"ccn":"040011","fmt":"","items":0,"error":"seed:csv:zero_items:0.6s"}
+{"ccn":"341323","fmt":"","items":0,"error":"rediscovered:csv:zero_items:1.7s"}
+{"ccn":"150075","fmt":"","items":0,"error":"rediscovered:-:no_output:271.0s"}
+{"ccn":"341311","fmt":"","items":0,"error":"rediscovered:csv:zero_items:1.6s"}
+{"ccn":"393304","fmt":"","items":0,"error":"seed:csv:zero_items:5.5s"}
+{"ccn":"313300","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"521307","fmt":"","items":0,"error":"seed:json:zero_items:1.5s"}
+{"ccn":"330332","fmt":"","items":0,"error":"rediscovered:json:zero_items:21.8s"}
+{"ccn":"030138","fmt":"","items":0,"error":"seed:-:subprocess:1:030138 CITY OF HOPE CANCER CENTER PHOENIX                        0 items  ERR: f"}
+{"ccn":"180092","fmt":"","items":0,"error":"seed:-:subprocess:1:180092 CLARK REGIONAL MEDICAL CENTER            csv              0 items  OK"}
+{"ccn":"141351","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:141351 CLAY COUNTY HOSPITAL                                      0 items  ERR: p"}
+{"ccn":"380005","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:380005 ASANTE ASHLAND COMMUNITY HOSPITAL                         0 items  ERR: f"}
+{"ccn":"190779","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:190779 ASSUMPTION COMMUNITY HOSPITAL            csv              0 items  OK"}
+{"ccn":"180043","fmt":"","items":0,"error":"seed:-:subprocess:1:180043 AdventHealthManchester                   json             0 items  OK"}
+{"ccn":"180138","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:180138 BAPTIST HEALTH LAGRANGE                  csv              0 items  OK"}
+{"ccn":"260034","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"491300","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:491300 BATH COMMUNITY HOSPITAL                  csv              0 items  OK"}
+{"ccn":"220065","fmt":"","items":0,"error":"seed:-:subprocess:1:220065 BAYSTATE NOBLE HOSPITAL                  csv              0 items  OK"}
+{"ccn":"220030","fmt":"","items":0,"error":"seed:-:subprocess:1:220030 BAYSTATE WING HOSPITAL                   csv              0 items  OK"}
+{"ccn":"371322","fmt":"","items":0,"error":"seed:-:subprocess:1:371322 BEAVER COUNTY MEMORIAL HOSPITAL          csv              0 items  OK"}
+{"ccn":"100008","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:100008 BAPTIST HOSPITAL OF MIAMI                csv              0 items  OK"}
+{"ccn":"271340","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"171316","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:171316 ANDERSON COUNTY HOSPITAL                 csv              0 items  OK"}
+{"ccn":"181308","fmt":"","items":0,"error":"seed:-:subprocess:1:181308 BLUEGRASS COMMUNITY HOSPITAL             csv              0 items  OK"}
+{"ccn":"341329","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:341329 BLUE RIDGE REGIONAL HOSPITAL             csv              0 items  OK"}
+{"ccn":"333301","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"490017","fmt":"","items":0,"error":"seed:-:subprocess:1:490017 BON SECOURS MARYVIEW MEDICAL CENTER      csv              0 items  OK"}
+{"ccn":"490069","fmt":"","items":0,"error":"seed:-:subprocess:1:490069 BON SECOURS MEMORIAL REGIONAL MEDICAL CE csv              0 items  OK"}
+{"ccn":"490094","fmt":"","items":0,"error":"seed:-:subprocess:1:490094 BON SECOURS RICHMOND COMMUNITY HOSPITAL  csv              0 items  OK"}
+{"ccn":"490092","fmt":"","items":0,"error":"seed:-:subprocess:1:490092 BON SECOURS SOUTHAMPTON MEMORIAL HOSPITA csv              0 items  OK"}
+{"ccn":"490097","fmt":"","items":0,"error":"seed:-:subprocess:1:490097 BON SECOURS SOUTHERN VIRGINIA MEDICAL CE csv              0 items  OK"}
+{"ccn":"490067","fmt":"","items":0,"error":"seed:-:subprocess:1:490067 BON SECOURS SOUTHSIDE MEDICAL CENTER     csv              0 items  OK"}
+{"ccn":"490059","fmt":"","items":0,"error":"seed:-:subprocess:1:490059 BON SECOURS ST MARYS HOSPITAL            csv              0 items  OK"}
+{"ccn":"180046","fmt":"","items":0,"error":"seed:-:subprocess:1:180046 BOURBON COMMUNITY HOSPITAL               csv              0 items  OK"}
+{"ccn":"100276","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100086","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"220073","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:220073 BROWN UNIVERSITY HEALTH MORTON HOSPITAL  csv              0 items  OK"}
+{"ccn":"510091","fmt":"","items":0,"error":"seed:-:subprocess:1:510091 CAMC CHARLESTON SURGICAL HOSPITAL        csv              0 items  OK"}
+{"ccn":"100177","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"340188","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:340188 CAPE FEAR VALLEY HOKE HOSPITAL           csv              0 items  OK"}
+{"ccn":"341315","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:341315 CAPE FEAR VALLEY-BLADEN COUNTY HOSPITAL  csv              0 items  OK"}
+{"ccn":"310011","fmt":"","items":0,"error":"seed:-:subprocess:1:310011 CAPE REGIONAL MEDICAL CENTER INC         csv              0 items  OK"}
+{"ccn":"340113","fmt":"","items":0,"error":"seed:-:subprocess:1:340113 CAROLINAS MEDICAL CENTER/BEHAV HEALTH    json             0 items  OK"}
+{"ccn":"400140","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:400140 CENTRO MEDICO DEL NORESTE                csv              0 items  OK"}
+{"ccn":"040011","fmt":"","items":0,"error":"seed:-:subprocess:1:040011 CHAMBERS MEMORIAL HOSPITAL               csv              0 items  OK"}
+{"ccn":"341323","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:341323 CHARLES A CANNON JR MEMORIAL HOSPITAL    csv              0 items  OK"}
+{"ccn":"010018","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:010018 CALLAHAN EYE HOSPITAL                    csv              0 items  OK"}
+{"ccn":"341311","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:341311 CHATHAM HOSPITAL INC                     csv              0 items  OK"}
+{"ccn":"393304","fmt":"","items":0,"error":"seed:-:subprocess:1:393304 CHILDREN'S HOME OF PITTSBURGH            csv              0 items  OK"}
+{"ccn":"313300","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"521307","fmt":"","items":0,"error":"seed:-:subprocess:1:521307 CHIPPEWA VALLEY HOSPITAL                 json             0 items  OK"}
+{"ccn":"330332","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:330332 CHSLI ST JOSEPH HOSPITAL                 json             0 items  OK"}
+{"ccn":"030138","fmt":"","items":0,"error":"seed:-:subprocess:1:030138 CITY OF HOPE CANCER CENTER PHOENIX                        0 items  ERR: f"}
+{"ccn":"180092","fmt":"","items":0,"error":"seed:-:subprocess:1:180092 CLARK REGIONAL MEDICAL CENTER            csv              0 items  OK"}
+{"ccn":"141351","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:141351 CLAY COUNTY HOSPITAL                                      0 items  ERR: p"}
+{"ccn":"451310","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:451310 BALLINGER MEMORIAL HOSPITAL              csv              0 items  OK"}
+{"ccn":"330799","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:330799 CLIFTON-FINE HOSPITAL                    csv              0 items  OK"}
+{"ccn":"231322","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:231322 CHARLEVOIX AREA HOSPITAL                 csv              0 items  OK"}
+{"ccn":"110164","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:110164 COLISEUM MEDICAL CENTERS, LLC, DBA       csv              0 items  OK"}
+{"ccn":"050543","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:050543 COLLEGE HOSPITAL COSTA MESA              csv              0 items  OK"}
+{"ccn":"150075","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:150075 BLUFFTON REGIONAL MEDICAL CENTER                          0 items  ERR: p"}
+{"ccn":"330094","fmt":"","items":0,"error":"seed:-:subprocess:1:330094 COLUMBIA MEMORIAL HOSPITAL               csv              0 items  OK"}
+{"ccn":"381320","fmt":"","items":0,"error":"seed:-:subprocess:1:381320 COLUMBIA MEMORIAL HOSPITAL               json             0 items  OK"}
+{"ccn":"150125","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:150125 COMMUNITY HOSPITAL                       csv              0 items  OK"}
+{"ccn":"281363","fmt":"","items":0,"error":"seed:-:subprocess:1:281363 COMMUNITY HOSPITAL                       csv              0 items  OK"}

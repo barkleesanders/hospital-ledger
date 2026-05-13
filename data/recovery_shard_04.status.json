@@ -1,0 +1,79 @@
+{
+  "all": false,
+  "done": 18,
+  "eligible": 995,
+  "eta_seconds": 7177,
+  "failed": 15,
+  "pending": 615,
+  "rate_per_second": 0.086,
+  "recent_failures": [
+    {
+      "ccn": "040088",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "250095",
+      "error": "seed:-:subprocess:1:250095 SOUTH SUNFLOWER COUNTY HOSPITAL          xlsx             0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "050135",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "440058",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "360086",
+      "error": "seed:-:subprocess:1:360086 SPRINGFIELD REGIONAL MEDICAL CENTER      csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "061308",
+      "error": "seed:-:subprocess:1:061308 SAN LUIS VALLEY HEALTH CONEJOS COUNTY HO csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "190300",
+      "error": "seed:-:subprocess:1:190300 ST CHARLES SURGICAL HOSPITAL             xlsx             0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "240036",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "260200",
+      "error": "seed:-:subprocess:1:260200 SSM ST JOSEPH HOSPITAL WEST              csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "110043",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    }
+  ],
+  "resume": true,
+  "skipped_existing": 362,
+  "started_at": "2026-05-11T16:06:32+00:00",
+  "state": "",
+  "success": 3,
+  "total_items": 13368,
+  "updated_at": "2026-05-11T16:10:03+00:00",
+  "workers": 2
+}

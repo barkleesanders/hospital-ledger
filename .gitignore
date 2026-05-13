@@ -1,0 +1,27 @@
+__pycache__/
+*.pyc
+.beads/cache/
+.venv/
+chunks/
+results/
+/tmp/
+*.log
+*.db-journal
+
+# Generated crawler/parser bulk artifacts. These are uploaded to R2, not GitHub.
+data/parsed/
+data/raw/
+data/_pages_bundle*/
+data/full_standardize_shards/
+data/gap_shards/
+data/*.log
+
+# Cloudflare local cache.
+site/.wrangler/
+
+# Keep the slim preview index in Git, but not per-hospital preview payloads.
+site/data/prices/*.json
+!site/data/prices/index.json
+
+# Keep CPT indexes, but do not commit any future per-CPT payload directory.
+site/data/cpt/

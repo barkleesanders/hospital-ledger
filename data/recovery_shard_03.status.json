@@ -1,0 +1,55 @@
+{
+  "all": false,
+  "done": 10,
+  "eligible": 997,
+  "eta_seconds": 24580,
+  "failed": 6,
+  "pending": 799,
+  "rate_per_second": 0.033,
+  "recent_failures": [
+    {
+      "ccn": "241366",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "451309",
+      "error": "seed:-:subprocess:1:451309 MC CAMEY HOSPITAL                        csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "360092",
+      "error": "seed:-:subprocess:1:360092 MEMORIAL HOSPITAL                        csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "140148",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "361306",
+      "error": "seed:-:subprocess:1:361306 MERCY ALLEN HOSPITAL                     csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "360056",
+      "error": "seed:-:subprocess:1:360056 MERCY HEALTH - FAIRFIELD HOSPITAL        csv              0 items  OK",
+      "fmt": "",
+      "items": 0
+    }
+  ],
+  "resume": true,
+  "skipped_existing": 188,
+  "started_at": "2026-05-11T16:06:32+00:00",
+  "state": "",
+  "success": 4,
+  "total_items": 127801,
+  "updated_at": "2026-05-11T16:11:40+00:00",
+  "workers": 2
+}
