@@ -1,2 +1,8 @@
 /api/hospitals.json /data/hospitals.json 301
 /api/summary.json /data/summary.json 301
+
+# Patient-facing pretty URLs — rewrite to single-page templates that fetch
+# their data client-side from /api/{procedure,payer}/{slug} or /api/prices/{ccn}.
+/procedure/* /procedure.html 200
+/payer/* /payer.html 200
+/hospital/* /hospital.html 200

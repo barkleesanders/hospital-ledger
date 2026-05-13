@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en" class="bg-zinc-950 text-zinc-100">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title id="page-title">Procedure prices — Hospital Ledger</title>
+<meta name="description" id="page-desc" content="Compare what hospitals charge for a single procedure across the U.S., including gross prices, cash discounts, and negotiated rates by insurance.">
+<meta property="og:title" content="Procedure prices — Hospital Ledger">
+<meta property="og:type" content="website">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: ui-sans-serif, -apple-system, system-ui, sans-serif; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .tab-num { font-variant-numeric: tabular-nums; }
+  .fade-in { animation: fade .4s ease-out; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
+  <div class="mx-auto max-w-6xl px-6 py-8">
+    <div class="flex items-center justify-between">
+      <a href="/" class="text-sm text-zinc-400 hover:text-zinc-200">← Hospital Ledger</a>
+      <div class="text-xs uppercase tracking-widest text-emerald-400">Procedure</div>
+    </div>
+    <h1 class="mt-4 text-3xl md:text-4xl font-semibold" id="proc-title">Loading…</h1>
+    <p class="mt-2 text-zinc-400" id="proc-subtitle">Cross-hospital price comparison.</p>
+  </div>
+</header>
+
+<main class="mx-auto max-w-6xl px-6 py-8">
+  <section class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
+      <div class="text-xs uppercase tracking-wider text-zinc-500">Hospitals</div>
+      <div class="mt-1 text-2xl font-semibold tab-num text-emerald-300" id="kpi-hospitals">—</div>
+    </div>
+    <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
+      <div class="text-xs uppercase tracking-wider text-zinc-500">Median cash price</div>
+      <div class="mt-1 text-2xl font-semibold tab-num text-zinc-100" id="kpi-cash-p50">—</div>
+    </div>
+    <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
+      <div class="text-xs uppercase tracking-wider text-zinc-500">Cheapest cash</div>
+      <div class="mt-1 text-2xl font-semibold tab-num text-emerald-300" id="kpi-cash-min">—</div>
+    </div>
+    <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
+      <div class="text-xs uppercase tracking-wider text-zinc-500">Most expensive cash</div>
+      <div class="mt-1 text-2xl font-semibold tab-num text-rose-300" id="kpi-cash-max">—</div>
+    </div>
+  </section>
+
+  <section class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 mb-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div>
+        <label class="text-xs uppercase tracking-wider text-zinc-500">Filter by state</label>
+        <select id="filter-state" class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm">
+          <option value="">All states</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs uppercase tracking-wider text-zinc-500">Filter by your insurance</label>
+        <select id="filter-payer" class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm">
+          <option value="">All insurers</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs uppercase tracking-wider text-zinc-500">Sort</label>
+        <select id="sort-by" class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm">
+          <option value="cash-asc">Cheapest cash first</option>
+          <option value="gross-asc">Cheapest gross first</option>
+          <option value="payer-asc">Lowest your-insurer rate first</option>
+          <option value="state">By state</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div id="status" class="text-sm text-zinc-400 mb-2"></div>
+    <div class="overflow-x-auto rounded-lg border border-zinc-800">
+      <table class="w-full text-sm">
+        <thead class="bg-zinc-900 text-xs uppercase tracking-wider text-zinc-400">
+          <tr>
+            <th class="px-3 py-2 text-left">Hospital</th>
+            <th class="px-3 py-2 text-left">State</th>
+            <th class="px-3 py-2 text-right">Gross</th>
+            <th class="px-3 py-2 text-right">Cash price</th>
+            <th class="px-3 py-2 text-right">Min negotiated</th>
+            <th class="px-3 py-2 text-right">Max negotiated</th>
+            <th class="px-3 py-2 text-right">Your insurer</th>
+          </tr>
+        </thead>
+        <tbody id="results" class="divide-y divide-zinc-800"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="mt-6 text-xs text-zinc-500">
+    Data straight from each hospital's federally-mandated machine-readable file (45 CFR § 180).
+    Prices reflect what the hospital published; what you actually pay depends on your specific plan, deductible, and other factors.
+    "Cash price" is the discounted self-pay rate hospitals are required to publish for uninsured patients.
+  </p>
+</main>
+
+<footer class="border-t border-zinc-800 mt-12 py-6 text-center text-xs text-zinc-500">
+  <a href="/" class="hover:text-zinc-300">Hospital Ledger</a> · CC0 · No tracking
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmtMoney = n => n == null ? '—' : '$' + Number(n).toLocaleString(undefined, {maximumFractionDigits: 0});
+const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const code = location.pathname.replace(/^\/procedure\//, '').replace(/\/$/, '').toUpperCase();
+let DATA = null;
+
+async function load() {
+  if (!code) {
+    $('proc-title').textContent = 'No procedure code';
+    $('status').textContent = 'Visit /procedure/{CPT-or-HCPCS} (e.g. /procedure/45378 for colonoscopy).';
+    return;
+  }
+  try {
+    const r = await fetch('/api/procedure/' + encodeURIComponent(code));
+    if (!r.ok) {
+      $('proc-title').textContent = 'Procedure ' + code;
+      $('status').textContent = r.status === 404 ? `No data for procedure code ${code} yet.` : 'Failed to load.';
+      return;
+    }
+    DATA = await r.json();
+    render();
+  } catch (e) {
+    $('status').textContent = 'Failed to load: ' + e.message;
+  }
+}
+
+function render() {
+  if (!DATA) return;
+  const desc = DATA.desc || '';
+  $('proc-title').textContent = `${DATA.code} ${desc ? '— ' + desc : ''}`;
+  $('proc-subtitle').textContent = `${DATA.type || 'Procedure'} code · ${DATA.stats.hospital_count.toLocaleString()} hospitals`;
+  $('page-title').textContent = `${DATA.code} ${desc} — Hospital Ledger`;
+  $('page-desc').setAttribute('content', `Compare prices for ${DATA.code} (${desc}) across ${DATA.stats.hospital_count} U.S. hospitals.`);
+
+  $('kpi-hospitals').textContent = DATA.stats.hospital_count.toLocaleString();
+  $('kpi-cash-p50').textContent = fmtMoney(DATA.stats.cash_p50);
+  $('kpi-cash-min').textContent = fmtMoney(DATA.stats.cash_min);
+  $('kpi-cash-max').textContent = fmtMoney(DATA.stats.cash_max);
+
+  // Build state + payer filter options from the data
+  const states = new Set(), payerSet = new Map();
+  DATA.hospitals.forEach(h => {
+    if (h.state) states.add(h.state);
+    (h.payers || []).forEach(p => { if (p.slug) payerSet.set(p.slug, p.display); });
+  });
+  const stateSel = $('filter-state');
+  [...states].sort().forEach(s => stateSel.insertAdjacentHTML('beforeend', `<option value="${s}">${s}</option>`));
+  const payerSel = $('filter-payer');
+  [...payerSet].sort((a, b) => a[1].localeCompare(b[1]))
+    .forEach(([slug, name]) => payerSel.insertAdjacentHTML('beforeend', `<option value="${slug}">${escapeHtml(name)}</option>`));
+
+  ['filter-state', 'filter-payer', 'sort-by'].forEach(id => $(id).addEventListener('change', renderTable));
+  renderTable();
+}
+
+function renderTable() {
+  const stateF = $('filter-state').value;
+  const payerF = $('filter-payer').value;
+  const sortBy = $('sort-by').value;
+  let rows = DATA.hospitals.filter(h => !stateF || h.state === stateF);
+  if (payerF) rows = rows.filter(h => (h.payers || []).some(p => p.slug === payerF));
+
+  const payerRate = h => {
+    if (!payerF) return null;
+    const p = (h.payers || []).find(p => p.slug === payerF);
+    return p ? p.rate : null;
+  };
+
+  const sortFns = {
+    'cash-asc': (a, b) => (a.cash ?? Infinity) - (b.cash ?? Infinity),
+    'gross-asc': (a, b) => (a.gross ?? Infinity) - (b.gross ?? Infinity),
+    'payer-asc': (a, b) => (payerRate(a) ?? Infinity) - (payerRate(b) ?? Infinity),
+    'state': (a, b) => (a.state || '').localeCompare(b.state || '') || a.name.localeCompare(b.name),
+  };
+  rows.sort(sortFns[sortBy] || sortFns['cash-asc']);
+
+  $('status').textContent = `${rows.length.toLocaleString()} hospitals` + (stateF ? ` in ${stateF}` : '') + (payerF ? ` accepting selected insurer` : '');
+
+  const html = rows.slice(0, 500).map(h => {
+    const insurerCell = payerF
+      ? fmtMoney(payerRate(h))
+      : `<span class="text-zinc-500">${(h.payers || []).length} insurers</span>`;
+    return `<tr class="hover:bg-zinc-900/50">
+      <td class="px-3 py-2"><a href="/hospital/${h.ccn}" class="text-emerald-300 hover:underline">${escapeHtml(h.name)}</a></td>
+      <td class="px-3 py-2 text-zinc-400">${escapeHtml(h.state)}</td>
+      <td class="px-3 py-2 text-right tab-num text-zinc-300">${fmtMoney(h.gross)}</td>
+      <td class="px-3 py-2 text-right tab-num text-emerald-300 font-medium">${fmtMoney(h.cash)}</td>
+      <td class="px-3 py-2 text-right tab-num text-zinc-400">${fmtMoney(h.min)}</td>
+      <td class="px-3 py-2 text-right tab-num text-zinc-400">${fmtMoney(h.max)}</td>
+      <td class="px-3 py-2 text-right tab-num text-zinc-200">${insurerCell}</td>
+    </tr>`;
+  }).join('');
+  $('results').innerHTML = html || `<tr><td colspan="7" class="px-3 py-6 text-center text-zinc-500">No matches.</td></tr>`;
+}
+
+load();
+</script>
+</body>
+</html>
