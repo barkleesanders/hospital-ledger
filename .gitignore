@@ -18,18 +18,27 @@ data/*.log
 
 # Cloudflare local cache.
 site/.wrangler/
+.wrangler/
 
 # Keep the slim preview index in Git, but not per-hospital preview payloads.
 site/data/prices/*.json
 !site/data/prices/index.json
+public/data/prices/*.json
+!public/data/prices/index.json
 
 # Keep CPT indexes, but do not commit any future per-CPT payload directory.
 site/data/cpt/
+public/data/cpt/
 
 # Large preview artifacts (use R2)
 site/data/cpt-index.json
 site/data/prices/*.json
 !site/data/prices/index.json
+public/data/cpt-index.json
+public/data/cpt-detail/
+public/data/payer/
+public/data/payers-index.json
+public/data/compliance-ranking.json
 
 # Beads / Dolt files (added by bd init)
 .dolt/

@@ -1,0 +1,4 @@
+Contact: mailto:security@barkleesanders.com
+Expires: 2027-12-31T00:00:00Z
+Preferred-Languages: en
+Canonical: https://hospital-ledger.pages.dev/.well-known/security.txt
