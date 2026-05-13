@@ -1,9 +1,7 @@
 /api/hospitals.json /data/hospitals.json 301
 /api/summary.json /data/summary.json 301
 
-# Patient-facing pretty URLs — rewrite to single-page templates that fetch
-# their data client-side from /api/{procedure,payer}/{slug} or /api/prices/{ccn}.
-# Templates use _-prefix so CF Pages doesn't serve them directly at the parent path.
-/procedure/* /_procedure_template.html 200
-/payer/* /_payer_template.html 200
-/hospital/* /_hospital_template.html 200
+# /procedure/{code}, /payer/{slug}, /hospital/{ccn} are handled by
+# Pages Functions in functions/procedure|payer|hospital/[*].js — they take
+# precedence over CF Pages' built-in path normalization, which otherwise
+# 308-redirects /procedure/45378 → /procedure when procedure.html exists.

@@ -8,16 +8,39 @@
 <meta property="og:title" content="Hospital Ledger">
 <meta property="og:description" content="Federal law requires every U.S. hospital to publish a machine-readable price file. We checked all 4,625. Only 86.2% complied.">
 <meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  body { font-family: ui-sans-serif, -apple-system, system-ui, sans-serif; }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .tab-num { font-variant-numeric: tabular-nums; }
+  :root {
+    --bg: #09090b;       /* zinc-950 */
+    --bg-card: #18181b;  /* zinc-900 */
+    --line: #27272a;     /* zinc-800 */
+    --ink: #fafafa;      /* zinc-50 */
+    --mute: #a1a1aa;     /* zinc-400 */
+    --dim:  #71717a;     /* zinc-500 */
+    --emerald: #34d399;  /* emerald-400 */
+  }
+  body { font-family: 'Inter', ui-sans-serif, -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .serif { font-family: 'Instrument Serif', Georgia, ui-serif, serif; font-weight: 400; letter-spacing: -0.01em; }
+  .mono, .tab-num { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .num-step { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 500; color: var(--emerald); }
   .fade-in { animation: fade .4s ease-out; }
   @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
   details[open] summary svg { transform: rotate(180deg); }
   summary { list-style: none; }
   summary::-webkit-details-marker { display: none; }
+  /* Patient card hover lift */
+  .lift { transition: transform .15s ease, border-color .15s ease, background .15s ease; }
+  .lift:hover { transform: translateY(-2px); border-color: rgba(52,211,153,0.35); background: rgba(24,24,27,0.85); }
+  /* Focus ring */
+  input:focus, select:focus, button:focus-visible { outline: 2px solid var(--emerald); outline-offset: 1px; }
+  /* Section heading rule */
+  .section-rule { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.5rem; }
+  .section-rule .num { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--dim); letter-spacing: 0.1em; }
+  .section-rule .label { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--mute); }
+  .section-rule .line { flex: 1; height: 1px; background: var(--line); }
   @media print { body { background: white; color: black; } .no-print { display: none; } }
 </style>
 </head>
