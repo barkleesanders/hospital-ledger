@@ -19,8 +19,76 @@ SRC = os.path.join(ROOT, 'data', 'parsed')
 OUT_DIR = os.path.join(ROOT, 'site', 'data', 'prices')
 INDEX = os.path.join(OUT_DIR, 'index.json')
 CPT_INDEX = os.path.join(ROOT, 'site', 'data', 'cpt-index.json')
+# Side-car accumulators consumed by scripts/build_aggregates.py.
+# JSONL = one record per (ccn, raw_payer) tuple; rebuilt every full slim run.
+PAYER_RAW_JSONL = os.path.join(ROOT, 'data', '_payer_raw.jsonl')
+COMPLIANCE_JSONL = os.path.join(ROOT, 'data', '_compliance_per_hospital.jsonl')
 
 os.makedirs(OUT_DIR, exist_ok=True)
+os.makedirs(os.path.dirname(PAYER_RAW_JSONL), exist_ok=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 45 CFR § 180 compliance scoring
+#
+# Six required elements per the regulation. We weight them so the compliance
+# grade reflects what's actually useful to a patient: presence of MRF, the four
+# price types (gross / cash / payer-specific / min-max), and free public access.
+# ─────────────────────────────────────────────────────────────────────────────
+COMPLIANCE_WEIGHTS = {
+    'mrf':         25,  # MRF file exists and is machine-readable
+    'gross':       15,  # Standard charges (gross) present on >= 80% of items
+    'cash':        15,  # Discounted cash price present on >= 50% of items
+    'payer_rates': 20,  # Payer-specific negotiated rates present on >= 50% of items
+    'min_max':     15,  # De-identified min AND max negotiated charges on >= 50% of items
+    'free_access': 10,  # Source URL responded 200 without auth/PII
+}
+
+
+def grade_for(score):
+    if score >= 90: return 'A'
+    if score >= 80: return 'B'
+    if score >= 70: return 'C'
+    if score >= 60: return 'D'
+    return 'F'
+
+
+def compute_compliance(slim_items, mrf_alive=True, free_access=True):
+    """Return a compliance dict per 45 CFR § 180."""
+    n = len(slim_items)
+    if n == 0:
+        return {
+            'score': 0,
+            'grade': 'F',
+            'elements': {k: False for k in COMPLIANCE_WEIGHTS},
+            'item_count': 0,
+        }
+    gross_n = sum(1 for it in slim_items if it.get('gross') is not None)
+    cash_n = sum(1 for it in slim_items if it.get('cash') is not None)
+    payers_n = sum(1 for it in slim_items if (it.get('pc') or 0) > 0)
+    minmax_n = sum(1 for it in slim_items if it.get('min') is not None and it.get('max') is not None)
+
+    elements = {
+        'mrf': bool(mrf_alive) and n > 0,
+        'gross': gross_n / n >= 0.80,
+        'cash': cash_n / n >= 0.50,
+        'payer_rates': payers_n / n >= 0.50,
+        'min_max': minmax_n / n >= 0.50,
+        'free_access': bool(free_access),
+    }
+    score = sum(w for k, w in COMPLIANCE_WEIGHTS.items() if elements.get(k))
+    return {
+        'score': score,
+        'grade': grade_for(score),
+        'elements': elements,
+        'coverage': {
+            'gross_pct':  round(100 * gross_n / n, 1),
+            'cash_pct':   round(100 * cash_n / n, 1),
+            'payer_pct':  round(100 * payers_n / n, 1),
+            'minmax_pct': round(100 * minmax_n / n, 1),
+        },
+        'item_count': n,
+    }
 
 # Codes worth surfacing in per-hospital display files. Blank code_type rows
 # from current parsers are hospital charge-master lines, so expose them as CDM.
@@ -118,6 +186,15 @@ if merge_index and os.path.exists(INDEX):
 cpt_index = defaultdict(list)
 generated_ccns = set()
 
+# Side-car accumulators. Truncate on full runs (no CCN filter) so we don't
+# carry stale records across rebuilds. On targeted runs (CCNS=...), append.
+_full_run = not requested_ccns
+if _full_run:
+    open(PAYER_RAW_JSONL, 'w').close()
+    open(COMPLIANCE_JSONL, 'w').close()
+payer_raw_handle = open(PAYER_RAW_JSONL, 'a')
+compliance_handle = open(COMPLIANCE_JSONL, 'a')
+
 parsed_paths = sorted(glob.glob(os.path.join(SRC, '*.json')))
 if requested_ccns:
     parsed_paths = [
@@ -193,6 +270,13 @@ for path in parsed_paths:
     # Sort by gross desc for "most expensive" view
     slim.sort(key=lambda x: -(x['gross'] or 0))
     cpt_indexed = sum(1 for it in slim if it['type'] in CPT_INDEX_TYPES)
+
+    # 45 CFR § 180 compliance score for this hospital.
+    # mrf_alive: we got here via parsed/<ccn>.json so the MRF was live at parse time.
+    # free_access: assume true unless source HTTP recorded a challenge; refined later
+    # by build_aggregates.py joining mrf_probe.alive flags.
+    compliance = compute_compliance(slim, mrf_alive=True, free_access=True)
+
     out = {
         'ccn': ccn,
         'hospital_name': data.get('hospital_name', ''),
@@ -201,6 +285,7 @@ for path in parsed_paths:
         'format': data.get('format_detected', ''),
         'n_total_raw': data.get('row_count', 0),
         'n_slim': len(slim),
+        'compliance': compliance,
         'counts': {
             'raw': len(items),
             'source_rows': data.get('row_count', 0),
@@ -220,7 +305,7 @@ for path in parsed_paths:
         json.dump(out, f, separators=(',', ':'))
     generated_ccns.add(ccn)
     sz = os.path.getsize(out_path)
-    print(f"  {ccn}: {len(slim):>6} items, {sz/1024:.1f} KB")
+    print(f"  {ccn}: {len(slim):>6} items {compliance['grade']}/{compliance['score']:>3}, {sz/1024:.1f} KB")
 
     summary_by_ccn[ccn] = {
         'ccn': ccn,
@@ -228,15 +313,49 @@ for path in parsed_paths:
         'name': out['hospital_name'],
         'counts': out['counts']['by_type'],
         'cpt_indexed': cpt_indexed,
+        'compliance': compliance,
     }
 
-    # Add to CPT index
+    # Compliance side-car (one line per hospital), consumed by build_aggregates.py
+    compliance_handle.write(json.dumps({
+        'ccn': ccn,
+        'name': out['hospital_name'],
+        'compliance': compliance,
+    }) + '\n')
+
+    # Per-payer raw aggregate: emit one line per (ccn, raw_payer) pair with
+    # rate stats. build_aggregates.py canonicalizes the raw_payer string.
+    payer_acc = defaultdict(lambda: {'n_items': 0, 'rates': []})
+    for it in slim:
+        for p in (it.get('payers') or []):
+            raw_name = p.get('p') or ''
+            rate = p.get('r')
+            agg = payer_acc[raw_name]
+            agg['n_items'] += 1
+            if isinstance(rate, (int, float)) and rate > 0:
+                agg['rates'].append(rate)
+    for raw_name, agg in payer_acc.items():
+        rates = sorted(agg['rates'])
+        rec = {
+            'ccn': ccn,
+            'raw_payer': raw_name,
+            'n_items': agg['n_items'],
+            'n_rates': len(rates),
+        }
+        if rates:
+            rec['min'] = rates[0]
+            rec['max'] = rates[-1]
+            rec['median'] = rates[len(rates) // 2]
+        payer_raw_handle.write(json.dumps(rec) + '\n')
+
+    # Add to CPT index. Keep payer_max scalar for backwards compat with the
+    # current cpt-index.json shape, AND attach top-5 raw payer rates so
+    # build_aggregates.py can emit cpt-detail/{code}.json with payer breakdowns.
     for it in slim:
         if it['type'] not in CPT_INDEX_TYPES:
             continue
-        payer_max = None
-        if it.get('payers'):
-            payer_max = max((p.get('r') for p in it['payers'] if p.get('r') is not None), default=None)
+        payers_full = it.get('payers') or []
+        payer_max = max((p.get('r') for p in payers_full if p.get('r') is not None), default=None)
         cpt_index[it['code']].append({
             'ccn': ccn,
             'gross': it.get('gross'),
@@ -246,6 +365,8 @@ for path in parsed_paths:
             'type': it.get('type'),
             'pc': it.get('pc', 0),
             'payer_max': payer_max,
+            'desc': it.get('desc', ''),
+            'payers_top5': payers_full[:5],  # consumed by build_aggregates.py
         })
 
 if index_from_prices:
@@ -300,11 +421,33 @@ if not keep_stale:
         os.remove(stale_path)
         print(f"  removed stale preview {stale_ccn}.json")
 
-# Trim CPT index to top codes by coverage
+# Trim CPT index to top codes by coverage. Strip the heavy payers_top5/desc
+# fields here — they live in cpt-detail/{code}.json (built by build_aggregates.py).
 cpt_arr = sorted(cpt_index.items(), key=lambda kv: -len(kv[1]))
-trimmed = {c: vs for c, vs in cpt_arr[:5000]}
+trimmed = {}
+for code, entries in cpt_arr[:5000]:
+    trimmed[code] = [
+        {k: v for k, v in e.items() if k not in ('payers_top5', 'desc')}
+        for e in entries
+    ]
 with open(CPT_INDEX, 'w') as f:
     json.dump(trimmed, f, separators=(',', ':'))
 
+# Dump the FULL cpt_index (with payers_top5 + desc) to a side-car JSONL the
+# build_aggregates.py script consumes to produce per-code detail files. Keeps
+# the top 10,000 codes by coverage so the search-by-procedure feature has more
+# than just the headline 5,000.
+CPT_DETAIL_RAW = os.path.join(ROOT, 'data', '_cpt_detail_raw.jsonl')
+with open(CPT_DETAIL_RAW, 'w') as f:
+    for code, entries in cpt_arr[:10000]:
+        f.write(json.dumps({'code': code, 'entries': entries}) + '\n')
+
+# Close side-cars
+payer_raw_handle.close()
+compliance_handle.close()
+
 print(f"\nindex: {INDEX} ({os.path.getsize(INDEX)/1024:.1f} KB)")
 print(f"cpt-index: {CPT_INDEX} ({os.path.getsize(CPT_INDEX)/1024:.1f} KB, {len(trimmed)} CPTs)")
+print(f"cpt-detail-raw: {CPT_DETAIL_RAW} ({os.path.getsize(CPT_DETAIL_RAW)/1024:.1f} KB)")
+print(f"payer-raw:     {PAYER_RAW_JSONL} ({os.path.getsize(PAYER_RAW_JSONL)/1024:.1f} KB)")
+print(f"compliance:    {COMPLIANCE_JSONL} ({os.path.getsize(COMPLIANCE_JSONL)/1024:.1f} KB)")
