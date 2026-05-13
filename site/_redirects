@@ -3,6 +3,7 @@
 
 # Patient-facing pretty URLs — rewrite to single-page templates that fetch
 # their data client-side from /api/{procedure,payer}/{slug} or /api/prices/{ccn}.
-/procedure/* /procedure.html 200
-/payer/* /payer.html 200
-/hospital/* /hospital.html 200
+# Templates use _-prefix so CF Pages doesn't serve them directly at the parent path.
+/procedure/* /_procedure_template.html 200
+/payer/* /_payer_template.html 200
+/hospital/* /_hospital_template.html 200
