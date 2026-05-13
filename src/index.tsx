@@ -6,6 +6,9 @@ import { payersIndexHandler } from "./routes/api/payers-index";
 import { pricesHandler } from "./routes/api/prices";
 import { pricesIndexHandler } from "./routes/api/prices-index";
 import { procedureHandler } from "./routes/api/procedure";
+import { hospitalPageHandler } from "./routes/hospital";
+import { payerPageHandler } from "./routes/payer";
+import { procedurePageHandler } from "./routes/procedure";
 
 export type Env = {
   Bindings: {
@@ -43,6 +46,11 @@ app.get("/api/procedure/:code", procedureHandler);
 // Legacy /api/{hospitals,summary}.json shorthands → /data fallback.
 app.get("/api/hospitals.json", (c) => c.redirect("/data/hospitals.json", 301));
 app.get("/api/summary.json", (c) => c.redirect("/data/summary.json", 301));
+
+// SSR pages — preserve original URLs (/procedure/:code, /payer/:slug, /hospital/:ccn).
+app.get("/procedure/:code", procedurePageHandler);
+app.get("/payer/:slug", payerPageHandler);
+app.get("/hospital/:ccn", hospitalPageHandler);
 
 // Placeholder root — replaced by SSR home in Phase 4.
 app.get("/", (c) => c.text("ok"));
