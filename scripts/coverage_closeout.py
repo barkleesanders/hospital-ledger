@@ -41,7 +41,7 @@ SKIP_FAILURE_TOKENS = ("sample", "test", "benchmark", "_candidate_retry_")
 
 
 def now_utc() -> str:
-    return dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
+    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
 
 
 def read_json(path: Path) -> object | None:

@@ -147,7 +147,7 @@ type_arr = [{'type': t, **st, 'pct': round(100 * st['live'] / st['total'], 1)}
 type_arr.sort(key=lambda x: -x['total'])
 
 summary = {
-    'generated_at': datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds').replace('+00:00', 'Z'),
+    'generated_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z'),
     'cms_required_total': len(required),
     'compliant': len(compliant),
     'compliance_pct': round(100 * len(compliant) / len(required), 1),

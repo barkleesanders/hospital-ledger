@@ -118,7 +118,7 @@ def aggregate_status(shard_specs, started_at):
     eta = int(pending / rate) if rate > 0 and pending > 0 else 0 if pending == 0 else None
     return {
         'started_at': started_at,
-        'updated_at': datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds'),
+        'updated_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'),
         'done': done,
         'success': success,
         'failed': failed,
@@ -140,7 +140,7 @@ def run_sharded_ingest(args):
 
     ranges = shard_ranges(total, args.shards)
     os.makedirs(SHARD_DIR, exist_ok=True)
-    started_at = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
+    started_at = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
     print(f"launching {len(ranges)} shards over {total} target hospitals "
           f"(workers per shard={args.workers})", flush=True)
 

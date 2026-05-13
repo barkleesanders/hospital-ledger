@@ -1357,7 +1357,7 @@ def ingest_one(ccn, name, url, save_raw=False):
             items, streamed_final_url, streamed_type = streamed
             record = {
                 'ccn': ccn, 'hospital_name': name, 'source_url': streamed_final_url,
-                'fetched_at': datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds') + 'Z',
+                'fetched_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds') + 'Z',
                 'format_detected': 'json-stream', 'row_count': len(items),
                 'items': items,
             }
@@ -1383,7 +1383,7 @@ def ingest_one(ccn, name, url, save_raw=False):
             f.write(raw)
     record = {
         'ccn': ccn, 'hospital_name': name, 'source_url': resolved_url,
-        'fetched_at': datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds') + 'Z',
+        'fetched_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds') + 'Z',
         'format_detected': fmt, 'row_count': len(items),
         'items': items,
     }

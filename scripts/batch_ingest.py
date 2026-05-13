@@ -571,7 +571,7 @@ def main():
     print(f"ingesting {len(ccns)} hospitals (workers={args.workers}, eligible={eligible}, skipped_existing={skipped})...", flush=True)
     os.makedirs(os.path.dirname(args.status_file), exist_ok=True)
     os.makedirs(os.path.dirname(args.failures_file), exist_ok=True)
-    start_iso = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
+    start_iso = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
     started = time.time()
     last_status_write = started
     done = succ = fail = total_items = 0
@@ -628,7 +628,7 @@ def main():
             if should_write_status:
                 write_status(args.status_file, {
                     'started_at': start_iso,
-                    'updated_at': datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds'),
+                    'updated_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'),
                     'state': args.state or '',
                     'all': args.all,
                     'resume': args.resume,
