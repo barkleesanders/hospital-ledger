@@ -35,3 +35,9 @@ site/data/prices/*.json
 .dolt/
 *.db
 .beads-credential-key
+
+# Hono migration: Node + build outputs
+node_modules/
+dist/
+.wrangler/
+.dev.vars

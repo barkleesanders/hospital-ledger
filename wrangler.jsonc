@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hospital-ledger",
+  "main": "dist/index.js",
+  "compatibility_date": "2025-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "SITE_NAME": "Hospital Ledger"
+  },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "none"
+  },
+  "r2_buckets": [
+    {
+      "binding": "HL_MRF_RAW",
+      "bucket_name": "hl-mrf-raw"
+    },
+    {
+      "binding": "HL_MRF_PARSED",
+      "bucket_name": "hl-mrf-parsed"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
