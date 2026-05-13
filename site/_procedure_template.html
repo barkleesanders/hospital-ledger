@@ -7,46 +7,75 @@
 <meta name="description" id="page-desc" content="Compare what hospitals charge for a single procedure across the U.S., including gross prices, cash discounts, and negotiated rates by insurance.">
 <meta property="og:title" content="Procedure prices — Hospital Ledger">
 <meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="/cpt-names.js" defer></script>
 <style>
-  body { font-family: ui-sans-serif, -apple-system, system-ui, sans-serif; }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .tab-num { font-variant-numeric: tabular-nums; }
+  body { font-family: 'Inter', ui-sans-serif, -apple-system, system-ui, sans-serif; }
+  .mono, .tab-num { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .serif { font-family: 'Instrument Serif', ui-serif, Georgia, serif; font-style: italic; letter-spacing: -0.01em; }
   .fade-in { animation: fade .4s ease-out; }
   @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .label-eyebrow { font-family: 'Inter', sans-serif; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: #a1a1aa; }
+  .editorial-rule { border-top: 1px solid #27272a; }
 </style>
 </head>
 <body class="min-h-screen">
 
-<header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
-  <div class="mx-auto max-w-6xl px-6 py-8">
+<header class="border-b border-zinc-800">
+  <div class="mx-auto max-w-6xl px-6 pt-8 pb-4">
     <div class="flex items-center justify-between">
       <a href="/" class="text-sm text-zinc-400 hover:text-zinc-200">← Hospital Ledger</a>
-      <div class="text-xs uppercase tracking-widest text-emerald-400">Procedure</div>
+      <div class="label-eyebrow text-emerald-300">Procedure</div>
     </div>
-    <h1 class="mt-4 text-3xl md:text-4xl font-semibold" id="proc-title">Loading…</h1>
-    <p class="mt-2 text-zinc-400" id="proc-subtitle">Cross-hospital price comparison.</p>
   </div>
 </header>
 
 <main class="mx-auto max-w-6xl px-6 py-8">
-  <section class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-    <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
-      <div class="text-xs uppercase tracking-wider text-zinc-500">Hospitals</div>
-      <div class="mt-1 text-2xl font-semibold tab-num text-emerald-300" id="kpi-hospitals">—</div>
+
+  <!-- Editorial hero: procedure name as massive italic serif -->
+  <section class="pb-10 mb-8 editorial-rule" style="border-bottom-style: solid;">
+    <div class="label-eyebrow mb-3" id="proc-eyebrow">CPT — · — hospitals reporting</div>
+    <h1 class="serif text-5xl md:text-7xl leading-[1.05] text-zinc-50" id="proc-name-display">Loading…</h1>
+    <p class="mt-6 max-w-3xl text-lg md:text-xl text-zinc-300 leading-relaxed" id="proc-lede">
+      <!-- Editorial sentence built from data -->
+    </p>
+  </section>
+
+  <!-- Three narrative number cards (editorial, not KPI tiles) -->
+  <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+    <div>
+      <div class="label-eyebrow">Cheapest published</div>
+      <div class="mt-2 serif text-4xl md:text-5xl text-amber-300" id="kpi-cash-min">—</div>
+      <div class="mt-2 text-sm text-zinc-400 leading-snug" id="kpi-cash-min-note">—</div>
     </div>
-    <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
-      <div class="text-xs uppercase tracking-wider text-zinc-500">Median cash price</div>
-      <div class="mt-1 text-2xl font-semibold tab-num text-zinc-100" id="kpi-cash-p50">—</div>
+    <div>
+      <div class="label-eyebrow">Median across <span id="kpi-hospitals" class="tab-num">—</span> hospitals</div>
+      <div class="mt-2 serif text-4xl md:text-5xl text-emerald-300" id="kpi-cash-p50">—</div>
+      <div class="mt-2 text-sm text-zinc-400 leading-snug">The realistic middle of the cash-price distribution. Use this as your benchmark.</div>
     </div>
-    <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
-      <div class="text-xs uppercase tracking-wider text-zinc-500">Cheapest cash</div>
-      <div class="mt-1 text-2xl font-semibold tab-num text-emerald-300" id="kpi-cash-min">—</div>
+    <div>
+      <div class="label-eyebrow">Most expensive</div>
+      <div class="mt-2 serif text-4xl md:text-5xl text-rose-300" id="kpi-cash-max">—</div>
+      <div class="mt-2 text-sm text-zinc-400 leading-snug" id="kpi-cash-max-note">—</div>
     </div>
-    <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
-      <div class="text-xs uppercase tracking-wider text-zinc-500">Most expensive cash</div>
-      <div class="mt-1 text-2xl font-semibold tab-num text-rose-300" id="kpi-cash-max">—</div>
+  </section>
+
+  <!-- Distribution histogram (the missing data viz) -->
+  <section class="mb-12">
+    <div class="flex items-baseline justify-between mb-4">
+      <h2 class="serif text-3xl text-zinc-100">Price distribution</h2>
+      <div class="label-eyebrow" id="dist-subtitle">Cash prices · log scale</div>
     </div>
+    <div id="histogram-container" class="rounded-md border border-zinc-800 bg-zinc-900/30 p-4">
+      <!-- SVG injected by JS -->
+    </div>
+    <p class="mt-3 text-xs text-zinc-500 leading-relaxed">
+      Each bar = number of hospitals charging in that price range. <span class="text-emerald-300">Emerald</span> bar contains the median.
+      <span class="text-amber-300">Amber</span> dots = entries we flagged as likely partial-cost line items (excluded from the table below).
+    </p>
   </section>
 
   <section class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 mb-4">
@@ -66,10 +95,12 @@
       <div>
         <label class="text-xs uppercase tracking-wider text-zinc-500">Sort</label>
         <select id="sort-by" class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm">
-          <option value="cash-asc">Cheapest cash first</option>
+          <option value="median-first">Most representative (near median)</option>
+          <option value="state">By state</option>
+          <option value="cash-asc">Cheapest cash first ⚠</option>
+          <option value="cash-desc">Most expensive cash first</option>
           <option value="gross-asc">Cheapest gross first</option>
           <option value="payer-asc">Lowest your-insurer rate first</option>
-          <option value="state">By state</option>
         </select>
       </div>
     </div>
@@ -131,16 +162,18 @@ let DATA = null;
 
 async function load() {
   if (!code) {
-    $('proc-title').textContent = 'No procedure code';
-    $('proc-subtitle').textContent = '';
-    $('status').innerHTML = `Visit <code class="mono text-emerald-300">/procedure/{CPT-or-HCPCS}</code> (e.g. <a href="/procedure/45378" class="text-emerald-300 hover:underline">/procedure/45378</a> for colonoscopy). Or <a href="/" class="text-emerald-300 hover:underline">go back home</a> to search by name.`;
+    $('proc-name-display').textContent = 'No procedure code';
+    $('proc-eyebrow').textContent = 'Visit /procedure/{CPT or HCPCS}';
+    $('proc-lede').innerHTML = `Visit <code class="mono text-emerald-300">/procedure/{CPT-or-HCPCS}</code> (e.g. <a href="/procedure/45378" class="text-emerald-300 hover:underline">/procedure/45378</a> for colonoscopy). Or <a href="/" class="text-emerald-300 hover:underline">go back home</a> to search by name.`;
     return;
   }
   try {
     const r = await fetch('/api/procedure/' + encodeURIComponent(code));
     if (!r.ok) {
-      $('proc-title').textContent = 'Procedure ' + code + ' not in our index';
-      $('proc-subtitle').textContent = '';
+      const fallbackName = (window.CPT_NAMES && window.CPT_NAMES[code]) || ('Procedure ' + code);
+      $('proc-name-display').textContent = fallbackName;
+      $('proc-eyebrow').innerHTML = `<span class="mono text-zinc-300">${escapeHtml(code)}</span> · not in our top-10,000 index`;
+      $('proc-lede').textContent = '';
       if (r.status === 404) {
         $('status').innerHTML = `
           <div class="rounded-lg border border-amber-700/40 bg-amber-900/15 p-4 text-amber-100">
@@ -171,16 +204,35 @@ async function load() {
 
 function render() {
   if (!DATA) return;
-  const desc = DATA.desc || '';
-  $('proc-title').textContent = `${DATA.code} ${desc ? '— ' + desc : ''}`;
-  $('proc-subtitle').textContent = `${DATA.type || 'Procedure'} code · ${DATA.stats.hospital_count.toLocaleString()} hospitals`;
-  $('page-title').textContent = `${DATA.code} ${desc} — Hospital Ledger`;
-  $('page-desc').setAttribute('content', `Compare prices for ${DATA.code} (${desc}) across ${DATA.stats.hospital_count} U.S. hospitals.`);
+  const desc = DATA.desc || (window.CPT_NAMES && window.CPT_NAMES[DATA.code]) || '';
+  const cleanDesc = desc.replace(/\s+/g, ' ').trim();
+  const procName = cleanDesc || DATA.code;
+  const min = DATA.stats.cash_min, max = DATA.stats.cash_max, med = DATA.stats.cash_p50;
 
+  // Editorial hero
+  $('proc-name-display').textContent = procName.charAt(0).toUpperCase() + procName.slice(1).toLowerCase();
+  $('proc-eyebrow').innerHTML = `${escapeHtml(DATA.type || 'CPT')} <span class="mono text-zinc-300">${escapeHtml(DATA.code)}</span> · <span class="tab-num">${DATA.stats.hospital_count.toLocaleString()}</span> hospitals reporting`;
+  if (min && max && med) {
+    const spread = (max / min).toFixed(0);
+    $('proc-lede').innerHTML = `The same procedure costs <span class="text-amber-300 tab-num">${fmtMoney(min)}</span> at one hospital and <span class="text-rose-300 tab-num">${fmtMoney(max)}</span> at another — a <strong class="text-zinc-100">${spread}× spread</strong> for what's billed under the same code. Median: <span class="text-emerald-300 tab-num">${fmtMoney(med)}</span>.`;
+  }
+
+  $('page-title').textContent = `${procName} (${DATA.code}) — Hospital Ledger`;
+  $('page-desc').setAttribute('content', `Compare ${procName} (${DATA.code}) prices across ${DATA.stats.hospital_count} U.S. hospitals.`);
+
+  // KPI narrative
   $('kpi-hospitals').textContent = DATA.stats.hospital_count.toLocaleString();
-  $('kpi-cash-p50').textContent = fmtMoney(DATA.stats.cash_p50);
-  $('kpi-cash-min').textContent = fmtMoney(DATA.stats.cash_min);
-  $('kpi-cash-max').textContent = fmtMoney(DATA.stats.cash_max);
+  $('kpi-cash-p50').textContent = fmtMoney(med);
+  $('kpi-cash-min').textContent = fmtMoney(min);
+  $('kpi-cash-max').textContent = fmtMoney(max);
+  const flaggedLow = DATA.stats?.flagged_low || 0;
+  $('kpi-cash-min-note').innerHTML = flaggedLow > 0
+    ? `${flaggedLow} entries below $50 already filtered. Remaining low values usually reflect <em>partial-cost line items</em> (professional fee only), not full bills.`
+    : `Lowest published price across all reporting hospitals.`;
+  $('kpi-cash-max-note').innerHTML = `Highest published price. Often a gross-charge "list price" rarely actually paid.`;
+
+  // Histogram
+  drawHistogram();
 
   // Build state + payer filter options from the data
   const states = new Set(), payerSet = new Map();
@@ -211,13 +263,25 @@ function renderTable() {
     return p ? p.rate : null;
   };
 
+  const med = DATA.stats?.cash_p50 || 0;
   const sortFns = {
+    'median-first': (a, b) => {
+      // Quality-normal entries first, then by distance from median
+      const qOrder = { 'normal': 0, 'low_outlier': 1, 'high_outlier': 1 };
+      const qa = qOrder[a.quality || 'normal'] || 0;
+      const qb = qOrder[b.quality || 'normal'] || 0;
+      if (qa !== qb) return qa - qb;
+      const da = a.cash != null ? Math.abs(a.cash - med) : Infinity;
+      const db = b.cash != null ? Math.abs(b.cash - med) : Infinity;
+      return da - db;
+    },
     'cash-asc': (a, b) => (a.cash ?? Infinity) - (b.cash ?? Infinity),
+    'cash-desc': (a, b) => (b.cash ?? -Infinity) - (a.cash ?? -Infinity),
     'gross-asc': (a, b) => (a.gross ?? Infinity) - (b.gross ?? Infinity),
     'payer-asc': (a, b) => (payerRate(a) ?? Infinity) - (payerRate(b) ?? Infinity),
     'state': (a, b) => (a.state || '').localeCompare(b.state || '') || a.name.localeCompare(b.name),
   };
-  rows.sort(sortFns[sortBy] || sortFns['cash-asc']);
+  rows.sort(sortFns[sortBy] || sortFns['median-first']);
 
   const flaggedLow = (DATA.stats?.flagged_low || 0);
   const flaggedHigh = (DATA.stats?.flagged_high || 0);
@@ -249,6 +313,85 @@ function renderTable() {
     </tr>`;
   }).join('');
   $('results').innerHTML = html || `<tr><td colspan="7" class="px-3 py-6 text-center text-zinc-500">No matches.</td></tr>`;
+}
+
+function drawHistogram() {
+  if (!DATA || !DATA.hospitals?.length) return;
+  const container = $('histogram-container');
+  const cashVals = DATA.hospitals
+    .filter(h => h.quality === 'normal' && h.cash != null && h.cash > 0)
+    .map(h => h.cash);
+  if (cashVals.length < 5) { container.innerHTML = '<div class="text-zinc-500 text-sm py-8 text-center">Not enough data to chart.</div>'; return; }
+
+  const W = 1100, H = 220, P = { l: 50, r: 30, t: 20, b: 38 };
+  const innerW = W - P.l - P.r, innerH = H - P.t - P.b;
+  const med = DATA.stats.cash_p50;
+
+  // Log-scale bins
+  const lo = Math.max(1, Math.min(...cashVals));
+  const hi = Math.max(...cashVals);
+  const logLo = Math.log10(lo), logHi = Math.log10(hi);
+  const NBINS = 32;
+  const step = (logHi - logLo) / NBINS;
+  const bins = new Array(NBINS).fill(0);
+  cashVals.forEach(v => {
+    const i = Math.min(NBINS - 1, Math.floor((Math.log10(v) - logLo) / step));
+    bins[i]++;
+  });
+  const maxCount = Math.max(...bins);
+  const medBin = Math.min(NBINS - 1, Math.floor((Math.log10(med) - logLo) / step));
+
+  const xFor = i => P.l + (i / NBINS) * innerW;
+  const xWidth = innerW / NBINS - 2;
+  const yFor = c => P.t + innerH - (c / maxCount) * innerH;
+
+  // Outlier dots (low and high) on the strip below the bars
+  const lowOutliers = DATA.hospitals.filter(h => h.quality === 'low_outlier' && h.cash != null);
+  const highOutliers = DATA.hospitals.filter(h => h.quality === 'high_outlier' && h.cash != null);
+  const allValues = [...cashVals, ...lowOutliers.map(h => h.cash), ...highOutliers.map(h => h.cash)];
+  const fullLo = Math.max(1, Math.min(...allValues));
+  const fullHi = Math.max(...allValues);
+  const fullLogLo = Math.log10(fullLo), fullLogHi = Math.log10(fullHi);
+  const xForVal = v => P.l + ((Math.log10(Math.max(1, v)) - fullLogLo) / (fullLogHi - fullLogLo)) * innerW;
+
+  // Tick labels — powers of 10
+  const ticks = [];
+  for (let p = Math.ceil(logLo); p <= Math.floor(logHi); p++) {
+    const v = Math.pow(10, p);
+    ticks.push({ x: P.l + ((p - logLo) / (logHi - logLo)) * innerW, label: '$' + (v >= 1000 ? (v / 1000).toLocaleString() + 'K' : v.toLocaleString()) });
+  }
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;font-family:'Inter',sans-serif">`;
+  // Axis line
+  svg += `<line x1="${P.l}" y1="${P.t + innerH}" x2="${W - P.r}" y2="${P.t + innerH}" stroke="#3f3f46" stroke-width="1"/>`;
+  // Bars
+  bins.forEach((c, i) => {
+    if (c === 0) return;
+    const isMed = i === medBin;
+    svg += `<rect x="${xFor(i)}" y="${yFor(c)}" width="${xWidth}" height="${(c / maxCount) * innerH}" fill="${isMed ? '#6ee7b7' : '#52525b'}" opacity="${isMed ? 1 : 0.85}"/>`;
+  });
+  // Median line annotation
+  const medX = xForVal(med);
+  svg += `<line x1="${medX}" y1="${P.t}" x2="${medX}" y2="${P.t + innerH + 6}" stroke="#6ee7b7" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>`;
+  svg += `<text x="${medX}" y="${P.t - 6}" text-anchor="middle" fill="#6ee7b7" font-size="11" font-family="'JetBrains Mono',monospace">median ${fmtMoney(med)}</text>`;
+  // Outlier dots strip
+  const stripY = P.t + innerH + 14;
+  lowOutliers.forEach(h => {
+    svg += `<circle cx="${xForVal(h.cash)}" cy="${stripY}" r="2.5" fill="#fcd34d" opacity="0.7"><title>${escapeHtml(h.name)} — ${fmtMoney(h.cash)} (low outlier)</title></circle>`;
+  });
+  highOutliers.forEach(h => {
+    svg += `<circle cx="${xForVal(h.cash)}" cy="${stripY}" r="2.5" fill="#fda4af" opacity="0.7"><title>${escapeHtml(h.name)} — ${fmtMoney(h.cash)} (high outlier)</title></circle>`;
+  });
+  // X-axis ticks
+  ticks.forEach(t => {
+    svg += `<line x1="${t.x}" y1="${P.t + innerH}" x2="${t.x}" y2="${P.t + innerH + 4}" stroke="#52525b" stroke-width="1"/>`;
+    svg += `<text x="${t.x}" y="${P.t + innerH + 28}" text-anchor="middle" fill="#71717a" font-size="11" font-family="'JetBrains Mono',monospace">${t.label}</text>`;
+  });
+  svg += `<text x="${P.l}" y="${P.t - 6}" fill="#71717a" font-size="10" font-family="'Inter',sans-serif" letter-spacing="0.1em">HOSPITALS →</text>`;
+  svg += `</svg>`;
+  container.innerHTML = svg;
+
+  $('dist-subtitle').textContent = `${cashVals.length.toLocaleString()} hospitals · log-scale x-axis`;
 }
 
 load();
