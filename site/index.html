@@ -1026,16 +1026,22 @@ load();
         if (procMsg) procMsg.textContent = msg;
         return;
       }
-      // Optional pre-flight: HEAD the api endpoint, warn if 404.
+      // Pre-flight: GET the api endpoint, warn inline if 404.
+      // (HEAD doesn't work — CF Pages serves Early Hints (103) for HEAD on
+      // Pages Functions instead of running the function, so we'd never see 404.)
       if (procMsg) procMsg.textContent = `Checking ${code}…`;
       try {
-        const r = await fetch('/api/procedure/' + encodeURIComponent(code), { method: 'HEAD' });
+        const r = await fetch('/api/procedure/' + encodeURIComponent(code), { cache: 'no-store' });
         if (r.status === 404) {
           procMsg.textContent = `Code ${code} isn't in our top 10,000 indexed procedures yet. Try a more common procedure or browse hospital prices directly.`;
           return;
         }
+        if (!r.ok) {
+          procMsg.textContent = `Couldn't load ${code} (HTTP ${r.status}). Try again.`;
+          return;
+        }
       } catch (err) {
-        // Network errors fall through — let the page handle it
+        // Network error — let the destination page handle it (it has its own 404 panel)
       }
       location.href = '/procedure/' + encodeURIComponent(code);
     });
