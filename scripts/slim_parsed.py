@@ -385,13 +385,34 @@ if index_from_prices:
         counts = price_data.get('counts') or {}
         by_type = counts.get('by_type') or {}
         cpt_indexed = sum(1 for item in items if item.get('type') in CPT_INDEX_TYPES)
-        summary_by_ccn[ccn] = {
+        summary = {
             'ccn': ccn,
             'n': len(items),
             'name': price_data.get('hospital_name', ''),
             'counts': by_type,
             'cpt_indexed': cpt_indexed,
         }
+        # Surface compliance (added 2026-05-13). Authoritative source: per-hospital
+        # slim file. Falls back to recomputing from items if the file was produced
+        # by an older slim_parsed run that didn't emit it.
+        compliance = price_data.get('compliance')
+        if not compliance:
+            compliance = compute_compliance(items, mrf_alive=True, free_access=True)
+            # Backfill compliance into the slim file in place so future reads are cheap.
+            try:
+                price_data['compliance'] = compliance
+                with open(price_path, 'w') as wh:
+                    json.dump(price_data, wh, separators=(',', ':'))
+            except OSError:
+                pass
+        summary['compliance'] = compliance
+        # Also write to compliance side-car so build_aggregates.py sees it.
+        compliance_handle.write(json.dumps({
+            'ccn': ccn,
+            'name': price_data.get('hospital_name', ''),
+            'compliance': compliance,
+        }) + '\n')
+        summary_by_ccn[ccn] = summary
         for item in items:
             if item.get('type') not in CPT_INDEX_TYPES:
                 continue
