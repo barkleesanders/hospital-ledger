@@ -541,7 +541,7 @@
       return { code: upper, msg: "" };
     }
     const lower = q.toLowerCase();
-    const matches = Object.entries(COMMON_PROCEDURES).filter(([code, desc]) => desc.toLowerCase().includes(lower));
+    const matches = Object.entries(COMMON_PROCEDURES).filter(([, desc]) => desc.toLowerCase().includes(lower));
     if (matches.length === 1) return { code: matches[0][0], msg: `Matched: ${matches[0][1]}` };
     if (matches.length > 1)
       return {

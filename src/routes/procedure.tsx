@@ -11,7 +11,6 @@
 
 import type { Context } from "hono";
 import type { Env } from "../index";
-import { GradeBadge } from "../components/ComplianceBar";
 import { EditorialHero } from "../components/EditorialHero";
 import { Layout, PageHeader } from "../components/Layout";
 import { PriceHistogram } from "../components/PriceHistogram";
