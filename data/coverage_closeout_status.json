@@ -1,131 +1,137 @@
 {
-  "coverage_pct": 41.52,
+  "coverage_pct": 48.75,
   "effective_target_total": 3986,
   "failure_clusters": [
     {
-      "count": 151,
+      "count": 30,
       "error": "unknown",
-      "example_ccn": "010062",
-      "fmt": "-",
-      "host": "apps.para-hcfs.com"
-    },
-    {
-      "count": 94,
-      "error": "unknown",
-      "example_ccn": "030006",
+      "example_ccn": "160001",
       "fmt": "-",
       "host": "sthpiprd.blob.core.windows.net"
     },
     {
-      "count": 45,
+      "count": 29,
       "error": "unknown",
-      "example_ccn": "020001",
+      "example_ccn": "161337",
       "fmt": "-",
-      "host": "pricetransparency.providence.org"
+      "host": "apps.para-hcfs.com"
     },
     {
-      "count": 43,
-      "error": "unknown",
-      "example_ccn": "011302",
-      "fmt": "-",
-      "host": "healthy.kaiserpermanente.org"
-    },
-    {
-      "count": 42,
-      "error": "unknown",
-      "example_ccn": "030010",
-      "fmt": "-",
-      "host": "hpt.trinity-health.org"
-    },
-    {
-      "count": 38,
-      "error": "unknown",
-      "example_ccn": "050030",
-      "fmt": "-",
-      "host": "secure.claraprice.net"
-    },
-    {
-      "count": 38,
-      "error": "unknown",
-      "example_ccn": "131302",
-      "fmt": "-",
-      "host": "mrfs.hyvehealthcare.com"
-    },
-    {
-      "count": 35,
-      "error": "unknown",
-      "example_ccn": "010125",
-      "fmt": "-",
-      "host": "stctrprodsnsvc00455826e6.blob.core.windows.net"
-    },
-    {
-      "count": 31,
-      "error": "unknown",
-      "example_ccn": "010061",
-      "fmt": "-",
-      "host": "apim.services.craneware.com"
-    },
-    {
-      "count": 31,
-      "error": "unknown",
-      "example_ccn": "010089",
-      "fmt": "-",
-      "host": "hospitalpricedisclosure.com"
-    },
-    {
-      "count": 26,
+      "count": 25,
       "error": "unknown",
       "example_ccn": "210027",
       "fmt": "-",
       "host": "dam.upmc.com"
     },
     {
-      "count": 25,
-      "error": "unknown",
-      "example_ccn": "010011",
-      "fmt": "-",
-      "host": "healthcare.ascension.org"
-    },
-    {
-      "count": 25,
-      "error": "unknown",
-      "example_ccn": "041320",
-      "fmt": "-",
-      "host": "machine-readable-files.com"
-    },
-    {
       "count": 23,
       "error": "unknown",
-      "example_ccn": "130028",
+      "example_ccn": "160032",
       "fmt": "-",
-      "host": "cdn.ardenthealthservices.com"
+      "host": "hpt.trinity-health.org"
     },
     {
       "count": 22,
       "error": "unknown",
-      "example_ccn": "010006",
+      "example_ccn": "050135",
       "fmt": "-",
-      "host": "edge.sitecorecloud.io"
+      "host": "search.hospitalpriceindex.com"
+    },
+    {
+      "count": 14,
+      "error": "unknown",
+      "example_ccn": "061308",
+      "fmt": "-",
+      "host": "mrf.panaceainc.com"
+    },
+    {
+      "count": 12,
+      "error": "unknown",
+      "example_ccn": "190270",
+      "fmt": "-",
+      "host": "mrfs.hyvehealthcare.com"
+    },
+    {
+      "count": 10,
+      "error": "unknown",
+      "example_ccn": "151313",
+      "fmt": "-",
+      "host": "stctrprodsnsvc00455826e6.blob.core.windows.net"
+    },
+    {
+      "count": 10,
+      "error": "unknown",
+      "example_ccn": "210002",
+      "fmt": "-",
+      "host": "www.umms.org"
+    },
+    {
+      "count": 9,
+      "error": "unknown",
+      "example_ccn": "170016",
+      "fmt": "-",
+      "host": "cdn.ardenthealthservices.com"
+    },
+    {
+      "count": 9,
+      "error": "unknown",
+      "example_ccn": "161323",
+      "fmt": "-",
+      "host": "secure.claraprice.net"
+    },
+    {
+      "count": 9,
+      "error": "unknown",
+      "example_ccn": "360001",
+      "fmt": "-",
+      "host": "www.mercy.com"
+    },
+    {
+      "count": 8,
+      "error": "unknown",
+      "example_ccn": "141329",
+      "fmt": "-",
+      "host": "machine-readable-files.com"
+    },
+    {
+      "count": 8,
+      "error": "unknown",
+      "example_ccn": "200008",
+      "fmt": "-",
+      "host": "northernlighthealth.org"
+    },
+    {
+      "count": 7,
+      "error": "unknown",
+      "example_ccn": "061301",
+      "fmt": "-",
+      "host": "core.secure.ehc.com"
     }
   ],
   "gap_file": "data/coverage_gap_ccns.txt",
   "live_target_total": 3986,
   "loop": 1,
-  "missing_parsed": 872,
-  "missing_preview": 2331,
+  "missing_parsed": 716,
+  "missing_preview": 2043,
   "parse_gap_file": "data/coverage_parse_gap_ccns.txt",
-  "parsed_positive": 3114,
+  "parsed_not_preview_total": 1331,
+  "parsed_positive": 3270,
+  "parsed_positive_total": 3270,
   "phase": "snapshot",
   "preview_gap_file": "data/coverage_preview_gap_ccns.txt",
-  "preview_index_entries": 1728,
-  "preview_positive": 1655,
-  "preview_rows": 27836349,
+  "preview_index_entries": 2010,
+  "preview_not_parsed_total": 4,
+  "preview_positive": 1943,
+  "preview_positive_total": 1943,
+  "preview_rows": 34793083,
   "sample_preview_ccns": [
     "010095",
-    "451362",
+    "030088",
     "300011"
   ],
-  "terminal_exceptions": 0,
+  "target_gap_total": 2043,
+  "terminal_exception_candidate_total": 66,
+  "terminal_exceptions": 66,
   "terminal_exceptions_file": "data/coverage_terminal_exceptions.json",
-  "updated_at": "2026-05-13T06:24:39+00:00"
+  "updated_at": "2026-05-13T06:57:22+00:00"
 }

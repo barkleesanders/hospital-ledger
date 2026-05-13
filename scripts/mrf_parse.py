@@ -63,6 +63,11 @@ try:
 except ImportError:
     pl = None
 
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PARSED_DIR = os.path.join(ROOT, 'data', 'parsed')
 RAW_DIR = os.path.join(ROOT, 'data', 'raw')
@@ -128,6 +133,11 @@ FILE_HINT_RE = re.compile(
 )
 GDRIVE_VIEW_RE = re.compile(r'drive\.google\.com/file/d/([A-Za-z0-9_-]+)', re.IGNORECASE)
 URLDEFENSE_V3_RE = re.compile(r'urldefense\.com/v3/__(.+?)__;', re.IGNORECASE)
+GENERIC_NAME_TOKENS = {
+    'hospital', 'hosp', 'medical', 'center', 'centre', 'health', 'system',
+    'memorial', 'regional', 'community', 'county', 'district', 'saint',
+    'clinic', 'clinics', 'city', 'the', 'and', 'for', 'of', 'llc', 'inc',
+}
 
 
 def kw_match(col, kws):
@@ -297,6 +307,18 @@ def first_col(cols, hints):
 
 
 def first_code_col(cols):
+    priority_hints = [
+        'cpt hcpcs', 'cpt_hcpcs', 'hcpcs cpt', 'hcpcs_cpt',
+        'hcpcs', 'cpt', 'ms_drg', 'msdrg', 'drg', 'rev_code',
+        'revenue code', 'ndc',
+    ]
+    for hint in priority_hints:
+        for i, col in enumerate(cols):
+            lower = str(col).strip().lower()
+            if 'code type' in lower:
+                continue
+            if kw_match(col, [hint]):
+                return i
     for i, col in enumerate(cols):
         lower = str(col).strip().lower()
         if 'code type' in lower:
@@ -395,6 +417,11 @@ def canonicalize_code_type(label):
         'ICD-10': 'ICD-10',
         'CDM': 'CDM',
         'CHARGECODE': 'CDM',
+        'PROCEDURECODE': '',
+        'BILLINGCODE': '',
+        'CODE': '',
+        'CPTHCPCS': '',
+        'CPTHCPCSCODE': '',
     }
     return mapping.get(text, text)
 
@@ -891,6 +918,39 @@ def parse_xlsx(content_bytes, max_rows=200_000):
         return []
 
 
+def parse_xls_legacy(content_bytes, max_rows=200_000):
+    """Parse legacy BIFF .xls workbooks when xlrd is available."""
+    if xlrd is None:
+        return []
+    items = []
+    try:
+        wb = xlrd.open_workbook(file_contents=content_bytes)
+        for sheet in wb.sheets():
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            row_cap = min(sheet.nrows, max_rows)
+            for row_idx in range(row_cap):
+                row = []
+                for cell in sheet.row_values(row_idx):
+                    if cell is None:
+                        row.append('')
+                    else:
+                        row.append(str(cell))
+                writer.writerow(row)
+            csv_bytes = buf.getvalue().encode('utf-8')
+            preview = buf.getvalue()[:8192].lower()
+            if 'payer_name' in preview or 'payer ' in preview or 'negotiated_rate' in preview:
+                items.extend(parse_csv_tall(csv_bytes, max_rows=max_rows))
+            else:
+                items.extend(parse_csv_wide(csv_bytes, max_rows=max_rows))
+            if len(items) > max_rows:
+                break
+        items = [item for item in items if item.get('code') or (item.get('gross_charge') is not None)]
+        return items
+    except Exception:
+        return []
+
+
 def detect_format(content_bytes, url):
     """Return (format_str, normalized_bytes_or_inner_zip)."""
     # Strip leading whitespace / BOM. Some hospital JSON files are served behind
@@ -901,9 +961,6 @@ def detect_format(content_bytes, url):
         head = head[3:]
     head = head.lstrip()
     url_lower = normalize_source_url(url).lower()
-    # URL hint takes priority for XLSX (which has ZIP magic but is NOT a zip archive)
-    if '.xlsx' in url_lower or '.xls' in url_lower:
-        return 'xlsx', content_bytes
     # JSON detection
     if head.startswith(b'{') or head.startswith(b'['):
         return 'json', content_bytes
@@ -923,10 +980,16 @@ def detect_format(content_bytes, url):
     # XLS legacy
     if content_bytes[:4] == b'\xd0\xcf\x11\xe0':
         return 'xls-legacy', content_bytes
+    if looks_like_html(content_bytes):
+        return 'html', content_bytes
     # Some hospitals serve CSV/TSV from a .json URL; prefer the content shape
     # over the path suffix when the bytes clearly look tabular.
     if looks_like_delimited_text(content_bytes):
         return 'csv', content_bytes
+    # Fall back to the URL hint only after content sniffing. Some hospitals
+    # serve real CSV bodies from .xlsx/.xls-looking URLs.
+    if '.xlsx' in url_lower or '.xls' in url_lower:
+        return 'xlsx', content_bytes
     # JSON hint by URL
     if '.json' in url_lower:
         return 'json', content_bytes
@@ -934,15 +997,31 @@ def detect_format(content_bytes, url):
     return 'csv', content_bytes
 
 
-def parse(content_bytes, url):
+def parse(content_bytes, url, hospital_name='', ccn=''):
     fmt, content = detect_format(content_bytes, url)
     if fmt == 'zip':
         try:
             zf = zipfile.ZipFile(io.BytesIO(content))
-            # Pick the largest non-directory member
             members = [m for m in zf.namelist() if not m.endswith('/')]
-            members.sort(key=lambda m: zf.getinfo(m).file_size, reverse=True)
-            for m in members[:3]:
+            scored = []
+            for member in members:
+                try:
+                    file_size = zf.getinfo(member).file_size
+                except KeyError:
+                    continue
+                member_score = score_zip_member(member, file_size, hospital_name=hospital_name, ccn=ccn)
+                if member_score is None:
+                    continue
+                token_hits, score = member_score
+                scored.append((token_hits, score, file_size, member))
+            scored.sort(key=lambda item: (-item[0], -item[1], -item[2], item[3]))
+            if len(members) > 10 and scored and scored[0][0] == 0:
+                return 'zip', []
+            selected = [member for _, _, _, member in scored[:12]] if scored else []
+            if not selected:
+                members.sort(key=lambda m: zf.getinfo(m).file_size, reverse=True)
+                selected = members[:3]
+            for m in selected:
                 inner = zf.read(m)
                 inner_fmt, inner_b = detect_format(inner, m)
                 if inner_fmt in ('csv', 'json', 'xlsx'):
@@ -958,6 +1037,8 @@ def parse_inner(fmt, content_bytes):
         return parse_json_v2(content_bytes)
     if fmt == 'xlsx':
         return parse_xlsx(content_bytes)
+    if fmt == 'xls-legacy':
+        return parse_xls_legacy(content_bytes)
     if fmt == 'csv':
         # Decide tall vs wide: tall has "payer" or "negotiated_rate" column, wide doesn't
         try:
@@ -967,6 +1048,8 @@ def parse_inner(fmt, content_bytes):
         except Exception:
             pass
         return parse_csv_wide(content_bytes)
+    if fmt == 'html':
+        return []
     return []
 
 
@@ -979,6 +1062,16 @@ def looks_like_html(raw, content_type=''):
         or head.startswith(b'<html')
         or b'<html' in head[:512]
     )
+
+
+def hospital_hint_tokens(name):
+    tokens = []
+    for raw in str(name or '').lower().replace("'", ' ').replace('-', ' ').split():
+        token = ''.join(ch for ch in raw if ch.isalnum())
+        if len(token) < 4 or token in GENERIC_NAME_TOKENS:
+            continue
+        tokens.append(token)
+    return tokens
 
 
 def score_candidate_url(url):
@@ -995,6 +1088,32 @@ def score_candidate_url(url):
     if '/view' in lower and 'drive.google.com/file/d/' in lower:
         score -= 2
     return score
+
+
+def score_zip_member(member_name, file_size, hospital_name='', ccn=''):
+    lower = normalize_source_url(member_name).lower()
+    filename = lower.rsplit('/', 1)[-1]
+    if filename.endswith(('.pdf', '.xml', '.txt', '.doc', '.docx')):
+        return None
+    if not DIRECT_FILE_RE.search(lower):
+        return None
+    score = 0
+    if FILE_HINT_RE.search(lower):
+        score += 20
+    if filename.endswith(('.csv', '.json', '.xlsx', '.xls')):
+        score += 12
+    if filename.endswith('.zip'):
+        score += 4
+    token_hits = 0
+    for token in hospital_hint_tokens(hospital_name):
+        if token in lower:
+            token_hits += 1
+    score += token_hits * 15
+    if ccn and ccn in lower:
+        score += 20
+    if file_size > 0:
+        score += min(file_size / (1024 * 1024), 40)
+    return (token_hits, score)
 
 
 def extract_hub_candidates(raw, base_url):
@@ -1186,6 +1305,38 @@ def stream_parse_large_json(url, max_items=200_000):
     return None
 
 
+def resolve_html_wrapper(raw, final_url, content_type, hospital_name, ccn, max_depth=2):
+    queue = [(raw, final_url, content_type, 0)]
+    visited = {normalize_source_url(final_url)}
+    while queue:
+        current_raw, current_url, current_type, depth = queue.pop(0)
+        if not looks_like_html(current_raw, current_type):
+            continue
+        for candidate in extract_hub_candidates(current_raw, current_url):
+            normalized = normalize_source_url(candidate)
+            if normalized in visited:
+                continue
+            visited.add(normalized)
+            try:
+                inner_raw, inner_final_url, inner_content_type, _ = fetch(candidate)
+            except Exception:
+                continue
+            try:
+                inner_fmt, inner_items = parse(
+                    inner_raw,
+                    inner_final_url,
+                    hospital_name=hospital_name,
+                    ccn=ccn,
+                )
+            except Exception:
+                continue
+            if inner_items:
+                return inner_raw, inner_final_url, inner_content_type, inner_fmt, inner_items, candidate
+            if depth + 1 < max_depth and looks_like_html(inner_raw, inner_content_type):
+                queue.append((inner_raw, inner_final_url, inner_content_type, depth + 1))
+    return None
+
+
 def ingest_one(ccn, name, url, save_raw=False):
     """Fetch + parse + write canonical JSON. Returns (ok, n_items, fmt, error)."""
     out_path = os.path.join(PARSED_DIR, f"{ccn}.json")
@@ -1216,7 +1367,7 @@ def ingest_one(ccn, name, url, save_raw=False):
         if stream_err:
             return False, 0, '', stream_err
     try:
-        fmt, items = parse(raw, final_url)
+        fmt, items = parse(raw, final_url, hospital_name=name, ccn=ccn)
     except Exception as e:
         return False, 0, '', f"parse:{type(e).__name__}:{str(e)[:80]}"
     resolved_url = final_url
@@ -1224,23 +1375,9 @@ def ingest_one(ccn, name, url, save_raw=False):
     # Some hospital "MRF URLs" are actually transparency landing pages or
     # Google Drive viewer pages. Follow the best candidate file link once.
     if not items and looks_like_html(raw, content_type):
-        for candidate in extract_hub_candidates(raw, final_url):
-            try:
-                inner_raw, inner_final_url, inner_content_type, _ = fetch(candidate)
-            except Exception:
-                continue
-            try:
-                inner_fmt, inner_items = parse(inner_raw, inner_final_url)
-            except Exception:
-                continue
-            if inner_items:
-                raw = inner_raw
-                final_url = inner_final_url
-                content_type = inner_content_type
-                fmt = inner_fmt
-                items = inner_items
-                resolved_url = candidate
-                break
+        resolved = resolve_html_wrapper(raw, final_url, content_type, name, ccn)
+        if resolved is not None:
+            raw, final_url, content_type, fmt, items, resolved_url = resolved
     if save_raw:
         with open(os.path.join(RAW_DIR, f"{ccn}.bin"), 'wb') as f:
             f.write(raw)

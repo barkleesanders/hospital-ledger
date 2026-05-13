@@ -11,7 +11,7 @@ Also builds:
  - site/data/prices/index.json   — CCN -> {n_items, top_codes}
  - site/data/cpt-index.json      — CPT code -> [{ccn, gross, cash, payers_count}]
 """
-import json, os, sys, glob
+import json, os, sys, glob, re
 from collections import defaultdict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,6 +26,40 @@ os.makedirs(OUT_DIR, exist_ok=True)
 # from current parsers are hospital charge-master lines, so expose them as CDM.
 DISPLAY_TYPES = {'CPT', 'HCPCS', 'DRG', 'MS-DRG', 'REV', 'CDM'}
 CPT_INDEX_TYPES = {'CPT', 'HCPCS'}
+
+
+def detect_code_type(code):
+    value = str(code or '').strip().upper()
+    if re.fullmatch(r'\d{5}', value):
+        return 'CPT'
+    if re.fullmatch(r'[A-Z]\d{4}', value):
+        return 'HCPCS'
+    if re.fullmatch(r'\d{3}', value):
+        return 'DRG'
+    if re.fullmatch(r'\d{1,4}-\d{1,4}', value):
+        return 'MS-DRG'
+    return 'CDM'
+
+
+def normalize_display_type(code, code_type):
+    normalized = str(code_type or '').strip().upper().replace(' ', '').replace('_', '-')
+    aliases = {
+        'CPT': 'CPT',
+        'HCPCS': 'HCPCS',
+        'DRG': 'DRG',
+        'MS-DRG': 'MS-DRG',
+        'MSDRG': 'MS-DRG',
+        'REV': 'REV',
+        'REVCODE': 'REV',
+        'RC': 'REV',
+        'CDM': 'CDM',
+        'CHARGECODE': 'CDM',
+    }
+    if normalized in aliases:
+        return aliases[normalized]
+    if normalized in {'', 'CODE', 'BILLINGCODE', 'PROCEDURECODE', 'CPT-HCPCS', 'CPTHCPCS', 'CPTHCPCSCODE'}:
+        return detect_code_type(code)
+    return code_type
 
 
 def env_bool(name, default=False):
@@ -58,6 +92,7 @@ def display_code_and_type(item):
     payer_rates = item.get('payer_rates') or []
     gross = item.get('gross_charge')
     cash = item.get('cash_discount')
+    code_type = normalize_display_type(code, code_type)
     if not code and desc and (gross is not None or cash is not None or payer_rates):
         code = desc[:48]
         code_type = 'CDM'

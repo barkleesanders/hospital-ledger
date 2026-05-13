@@ -4,7 +4,7 @@
 Picks BEST live MRF URL per CCN (preferring direct file URLs over hub pages).
 Supports resumable full-corpus runs by skipping already-parsed CCNs.
 """
-import sqlite3, os, sys, time, json, argparse, concurrent.futures, datetime, subprocess, re
+import sqlite3, os, sys, time, json, argparse, concurrent.futures, datetime, subprocess, re, urllib.request, urllib.error
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mrf_parse import ingest_one, normalize_source_url
 
@@ -35,6 +35,8 @@ EXPLICIT_FILE_SUFFIXES = ('.csv', '.json', '.xlsx', '.xls', '.zip')
 
 MAX_CANDIDATE_TRIES = 6
 ROW_COUNT_RE = re.compile(rb'"row_count":(\d+)')
+LIVE_PROBE_BYTES = 2048
+LIVE_PROBE_TIMEOUT_SECONDS = 20
 
 GENERIC_NAME_TOKENS = {
     'hospital', 'hosp', 'medical', 'center', 'centre', 'health', 'system',
@@ -128,6 +130,8 @@ def filelike_content_type(content_type):
 def reject_candidate(url, content_type):
     lower_url = normalize_source_url(url).lower()
     lower_type = (content_type or '').lower()
+    if 'cms.gov/hospital-price-transparency' in lower_url:
+        return True
     if '.pdf' in lower_url or 'application/pdf' in lower_type:
         return True
     if '/innetwork/' in lower_url or 'cms_in-network-rates' in lower_url or 'in-network-rates' in lower_url:
@@ -150,6 +154,42 @@ def reject_candidate(url, content_type):
     if 'search.hospitalpriceindex.com/hpi2/machinereadable/' in lower_url and 'text/html' in lower_type:
         return True
     return False
+
+
+def probe_candidate_url(url):
+    request = urllib.request.Request(
+        url,
+        headers={
+            'User-Agent': 'HospitalLedgerBot/0.1 (+https://hospital-ledger.pages.dev)',
+            'Range': f'bytes=0-{LIVE_PROBE_BYTES - 1}',
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=LIVE_PROBE_TIMEOUT_SECONDS) as response:
+            final_url = response.geturl()
+            content_type = response.headers.get('Content-Type', '')
+            status = getattr(response, 'status', 200) or 200
+            body = response.read(LIVE_PROBE_BYTES)
+    except urllib.error.HTTPError as exc:
+        return False, f'probe_http:{exc.code}'
+    except Exception as exc:
+        return False, f'probe:{type(exc).__name__}'
+
+    if reject_candidate(final_url, content_type):
+        return False, f'probe_reject:{status}:{content_type[:40]}'
+
+    lower_type = (content_type or '').lower()
+    body_prefix = body[:512].lstrip().lower()
+    if 'text/html' in lower_type and not (is_html_wrapper_url(final_url) or is_protected_wrapper_url(final_url)):
+        return False, f'probe_html:{status}:{content_type[:40]}'
+    if (
+        b'<html' in body_prefix
+        or b'<!doctype html' in body_prefix
+        or b'<meta http-equiv="refresh"' in body_prefix
+    ) and not (is_html_wrapper_url(final_url) or is_protected_wrapper_url(final_url)):
+        return False, f'probe_html_body:{status}:{content_type[:40]}'
+
+    return True, f'probe_ok:{status}:{content_type[:40]}'
 
 
 def candidate_priority(candidate):
@@ -411,6 +451,10 @@ def ingest_ccn(ccn, timeout_seconds=0):
     attempts = []
     max_tries = min(len(candidates), MAX_CANDIDATE_TRIES)
     for index, candidate in enumerate(candidates[:MAX_CANDIDATE_TRIES], start=1):
+        live_ok, probe_detail = probe_candidate_url(candidate['url'])
+        if not live_ok:
+            attempts.append(f"{candidate.get('source') or 'candidate'}:-:{probe_detail}")
+            continue
         if timeout_seconds and timeout_seconds > 0:
             ok, n, fmt, detail = ingest_candidate_subprocess(ccn, candidate, timeout_seconds)
         else:

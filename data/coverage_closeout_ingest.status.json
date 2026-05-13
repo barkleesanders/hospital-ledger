@@ -1,57 +1,69 @@
 {
   "all": false,
-  "done": 49,
+  "done": 232,
   "eligible": 872,
-  "eta_seconds": 5019,
-  "failed": 8,
-  "pending": 823,
-  "rate_per_second": 0.164,
+  "eta_seconds": 10151,
+  "failed": 63,
+  "pending": 640,
+  "rate_per_second": 0.063,
   "recent_failures": [
     {
-      "ccn": "010044",
-      "error": "rediscovered:-:subprocess:1:010044 MARION REGIONAL MEDICAL CENTER           csv              0 items  OK",
+      "ccn": "141313",
+      "error": "seed:-:subprocess:1:141313 MASON DISTRICT HOSPITAL                  xlsx             0 items  OK",
       "fmt": "",
       "items": 0
     },
     {
-      "ccn": "010150",
+      "ccn": "141329",
+      "error": "rediscovered:-:subprocess:1:141329 MORRISON COMMUNITY HOSPITAL                               0 items  ERR: f",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "141330",
       "error": "no_live_mrf",
       "fmt": "",
       "items": 0
     },
     {
-      "ccn": "010087",
-      "error": "rediscovered:-:subprocess:1:010087 USA HEALTH UNIVERSITY HOSPITAL                            0 items  ERR: f",
-      "fmt": "",
-      "items": 0
-    },
-    {
-      "ccn": "030138",
-      "error": "seed:-:subprocess:1:030138 CITY OF HOPE CANCER CENTER PHOENIX                        0 items  ERR: f",
-      "fmt": "",
-      "items": 0
-    },
-    {
-      "ccn": "040011",
-      "error": "seed:-:subprocess:1:040011 CHAMBERS MEMORIAL HOSPITAL               csv              0 items  OK",
-      "fmt": "",
-      "items": 0
-    },
-    {
-      "ccn": "040088",
+      "ccn": "141339",
       "error": "no_live_mrf",
       "fmt": "",
       "items": 0
     },
     {
-      "ccn": "050135",
+      "ccn": "141352",
       "error": "no_live_mrf",
       "fmt": "",
       "items": 0
     },
     {
-      "ccn": "050145",
-      "error": "rediscovered:-:subprocess:1:050145 COMMUNITY HOSPITAL OF THE MONTEREY PENIN zip-error        0 items  OK",
+      "ccn": "150048",
+      "error": "rediscovered:-:subprocess:1:150048 REID HEALTH                              html             0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "150051",
+      "error": "rediscovered:-:subprocess:1:150051 INDIANA UNIVERSITY HEALTH BLOOMINGTON HO html             0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "150056",
+      "error": "rediscovered:-:subprocess:1:150056 INDIANA UNIVERSITY HEALTH                html             0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "150075",
+      "error": "rediscovered:-:subprocess:1:150075 BLUFFTON REGIONAL MEDICAL CENTER                          0 items  ERR: p",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "150007",
+      "error": "rediscovered:-:subprocess:1:150007 COMMUNITY HOWARD REGIONAL HEALTH INC.                     0 items  ERR: f",
       "fmt": "",
       "items": 0
     }
@@ -60,8 +72,8 @@
   "skipped_existing": 0,
   "started_at": "2026-05-13T06:24:42+00:00",
   "state": "",
-  "success": 41,
-  "total_items": 955861,
-  "updated_at": "2026-05-13T06:29:41+00:00",
+  "success": 169,
+  "total_items": 5930922,
+  "updated_at": "2026-05-13T07:26:02+00:00",
   "workers": 4
 }

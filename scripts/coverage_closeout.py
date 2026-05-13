@@ -274,6 +274,69 @@ def exception_http_summary(seed_rows: list[dict[str, object]], rediscovered: lis
     return "; ".join(parts) or "no seed or rediscovery probe rows"
 
 
+def clean_reason_text(reasons: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    for reason in reasons:
+        value = str(reason or "").strip()
+        if not value:
+            continue
+        if re.fullmatch(r"\d+(\.\d+)?s", value):
+            continue
+        cleaned.append(value)
+    return cleaned
+
+
+def row_reason(label: str, row: dict[str, object] | None) -> str | None:
+    if not row:
+        return None
+    status = row.get("http_status")
+    content_type = str(row.get("content_type") or "")
+    alive = row.get("alive")
+    if "head_status" in row:
+        status = row.get("head_status")
+        content_type = str(row.get("head_content_type") or "")
+    lower_type = content_type.lower()
+    if isinstance(status, int) and status >= 400:
+        return f"{label}_http_{status}"
+    if "text/html" in lower_type:
+        return f"{label}_serves_html_not_machine_readable"
+    if "text/xml" in lower_type or lower_type.endswith("/xml"):
+        return f"{label}_serves_xml_not_machine_readable"
+    if "application/pdf" in lower_type:
+        return f"{label}_serves_pdf_not_machine_readable"
+    if alive == 0:
+        return f"{label}_not_alive"
+    return None
+
+
+def best_exception_reason(
+    reasons: list[str],
+    seed_rows: list[dict[str, object]],
+    rediscovered: list[dict[str, object]],
+) -> str:
+    cleaned = clean_reason_text(reasons)
+    for reason in cleaned:
+        if "no_live_mrf" in reason:
+            return "no_live_mrf_after_rediscovery"
+        if "probe_http:" in reason:
+            return reason.replace("probe_http:", "candidate_http_")
+        if "probe_html" in reason:
+            return "candidate_serves_html_not_machine_readable"
+        if "probe_reject" in reason:
+            return "candidate_rejected_after_live_probe"
+        if "zip-error" in reason:
+            return "downloaded_zip_did_not_yield_parseable_rows"
+        if "fetch:" in reason or "ReadError" in reason or "ConnectError" in reason:
+            return "transient_fetch_failure_on_otherwise_live_candidate"
+    for reason in (
+        row_reason("seed_url", seed_rows[0] if seed_rows else None),
+        row_reason("rediscovered_candidate", rediscovered[0] if rediscovered else None),
+    ):
+        if reason:
+            return reason
+    return cleaned[0] if cleaned else "no_longer_usable_live_mrf"
+
+
 def build_terminal_exceptions(
     target_gap: list[str],
     names_by_ccn: dict[str, str],
@@ -304,7 +367,7 @@ def build_terminal_exceptions(
                     "rediscovery_attempts": rediscovered,
                     "seed_probe_history": seed_rows,
                     "http_content_result": exception_http_summary(seed_rows, rediscovered),
-                    "reason": reasons[0] if reasons else "no_live_mrf",
+                    "reason": best_exception_reason(reasons, seed_rows, rediscovered),
                     "failure_logs": list(bucket.get("failure_logs") or []),
                     "provisional": True,
                 }

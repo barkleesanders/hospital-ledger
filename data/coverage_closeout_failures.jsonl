@@ -6,3 +6,58 @@
 {"ccn":"040088","fmt":"","items":0,"error":"no_live_mrf"}
 {"ccn":"050135","fmt":"","items":0,"error":"no_live_mrf"}
 {"ccn":"050145","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:050145 COMMUNITY HOSPITAL OF THE MONTEREY PENIN zip-error        0 items  OK"}
+{"ccn":"050471","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:050471 PIH HEALTH GOOD SAMARITAN HOSPITAL       csv              0 items  OK"}
+{"ccn":"050543","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:050543 COLLEGE HOSPITAL COSTA MESA              csv              0 items  OK"}
+{"ccn":"010033","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:010033 UNIVERSITY OF ALABAMA HOSPITAL           csv              0 items  OK"}
+{"ccn":"050546","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:050546 PORTERVILLE DEVELOPMENTAL CENTER         zip-error        0 items  OK"}
+{"ccn":"050779","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"050780","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:050780 FOOTHILL REGIONAL MEDICAL CENTER         csv              0 items  OK"}
+{"ccn":"051339","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:051339 PALO VERDE HOSPITAL                      csv              0 items  OK"}
+{"ccn":"060116","fmt":"","items":0,"error":"parsed-cache:-:subprocess:1:060116 GOOD SAMARITAN MEDICAL CENTER LLC        csv              0 items  OK"}
+{"ccn":"061301","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:061301 RIO GRANDE HOSPITAL                      json             0 items  OK"}
+{"ccn":"061308","fmt":"","items":0,"error":"seed:-:subprocess:1:061308 SAN LUIS VALLEY HEALTH CONEJOS COUNTY HO csv              0 items  OK"}
+{"ccn":"061309","fmt":"","items":0,"error":"seed:-:subprocess:1:061309 WRAY COMMUNITY DISTRICT HOSPITAL         xlsx             0 items  OK"}
+{"ccn":"070004","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:070004 SHARON HOSPITAL                                           0 items  ERR: f"}
+{"ccn":"070006","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:070006 STAMFORD HOSPITAL                                         0 items  ERR: f"}
+{"ccn":"070034","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100047","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100071","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100086","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100113","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:100113 UF HEALTH SHANDS HOSPITAL                xlsx             0 items  OK"}
+{"ccn":"100177","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:100177 CAPE CANAVERAL HOSPITAL                  xlsx             0 items  OK"}
+{"ccn":"100249","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100276","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100277","fmt":"","items":0,"error":"seed:-:subprocess:1:100277 DOUGLAS GARDENS HOSPITAL                 csv              0 items  OK"}
+{"ccn":"100287","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:100287 GOOD SAMARITAN MEDICAL CENTER            csv              0 items  OK"}
+{"ccn":"100298","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:100298 FLORIDA STATE HOSPITAL UNIT 31 MED       xlsx             0 items  OK"}
+{"ccn":"101312","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:101312 FISHERMEN'S COMMUNITY HOSPITAL           xlsx             0 items  OK"}
+{"ccn":"110043","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"110086","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:110086 WASHINGTON COUNTY REGIONAL MEDICAL CENTE xlsx             0 items  OK"}
+{"ccn":"110142","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"110087","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:110087 NORTHSIDE HOSPITAL GWINNETT                               0 items  ERR: f"}
+{"ccn":"110161","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:110161 NORTHSIDE HOSPITAL                       json             0 items  OK"}
+{"ccn":"110194","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:110194 DONALSONVILLE HOSPITAL INC               csv              0 items  OK"}
+{"ccn":"110779","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:110779 IRWIN COUNTY HOSPITAL                    csv              0 items  OK"}
+{"ccn":"111305","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:111305 MILLER COUNTY HOSPITAL                                    0 items  ERR: f"}
+{"ccn":"111318","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:111318 MONROE COUNTY HOSPITAL                   csv              0 items  OK"}
+{"ccn":"121300","fmt":"","items":0,"error":"seed:-:subprocess:1:121300 KAUAI VETERANS MEMORIAL HOSPITAL         csv              0 items  OK"}
+{"ccn":"131319","fmt":"","items":0,"error":"seed:-:subprocess:1:131319 MINIDOKA MEMORIAL HOSPITAL               xlsx             0 items  OK"}
+{"ccn":"131327","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:131327 GRITMAN MEDICAL CENTER                   html             0 items  OK"}
+{"ccn":"140046","fmt":"","items":0,"error":"seed:-:subprocess:1:140046 GOOD SAMARITAN REGIONAL HLTH CENTER      html             0 items  OK"}
+{"ccn":"140054","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:140054 MACNEAL  HOSPITAL                        html             0 items  OK"}
+{"ccn":"140100","fmt":"","items":0,"error":"seed:-:subprocess:1:140100 MIDWESTERN REGION MED CENTER, INC                         0 items  ERR: f"}
+{"ccn":"140011","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:140011 HERRIN HOSPITAL                          json             0 items  OK"}
+{"ccn":"140135","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"140148","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"140228","fmt":"","items":0,"error":"seed:-:subprocess:1:140228 UW HEALTH                                xlsx             0 items  OK"}
+{"ccn":"141324","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"141313","fmt":"","items":0,"error":"seed:-:subprocess:1:141313 MASON DISTRICT HOSPITAL                  xlsx             0 items  OK"}
+{"ccn":"141329","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:141329 MORRISON COMMUNITY HOSPITAL                               0 items  ERR: f"}
+{"ccn":"141330","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"141339","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"141352","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"150048","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:150048 REID HEALTH                              html             0 items  OK"}
+{"ccn":"150051","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:150051 INDIANA UNIVERSITY HEALTH BLOOMINGTON HO html             0 items  OK"}
+{"ccn":"150056","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:150056 INDIANA UNIVERSITY HEALTH                html             0 items  OK"}
+{"ccn":"150075","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:150075 BLUFFTON REGIONAL MEDICAL CENTER                          0 items  ERR: p"}
+{"ccn":"150007","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:150007 COMMUNITY HOWARD REGIONAL HEALTH INC.                     0 items  ERR: f"}

@@ -25,3 +25,8 @@ site/data/prices/*.json
 
 # Keep CPT indexes, but do not commit any future per-CPT payload directory.
 site/data/cpt/
+
+# Large preview artifacts (use R2)
+site/data/cpt-index.json
+site/data/prices/*.json
+!site/data/prices/index.json
