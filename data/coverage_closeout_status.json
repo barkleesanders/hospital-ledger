@@ -1,137 +1,137 @@
 {
-  "coverage_pct": 48.75,
+  "coverage_pct": 77.52,
   "effective_target_total": 3986,
   "failure_clusters": [
     {
-      "count": 30,
+      "count": 273,
       "error": "unknown",
-      "example_ccn": "160001",
-      "fmt": "-",
-      "host": "sthpiprd.blob.core.windows.net"
-    },
-    {
-      "count": 29,
-      "error": "unknown",
-      "example_ccn": "161337",
+      "example_ccn": "010062",
       "fmt": "-",
       "host": "apps.para-hcfs.com"
     },
     {
-      "count": 25,
+      "count": 176,
       "error": "unknown",
-      "example_ccn": "210027",
+      "example_ccn": "010022",
       "fmt": "-",
-      "host": "dam.upmc.com"
+      "host": "sthpiprd.blob.core.windows.net"
     },
     {
-      "count": 23,
+      "count": 97,
       "error": "unknown",
-      "example_ccn": "160032",
-      "fmt": "-",
-      "host": "hpt.trinity-health.org"
-    },
-    {
-      "count": 22,
-      "error": "unknown",
-      "example_ccn": "050135",
-      "fmt": "-",
-      "host": "search.hospitalpriceindex.com"
-    },
-    {
-      "count": 14,
-      "error": "unknown",
-      "example_ccn": "061308",
-      "fmt": "-",
-      "host": "mrf.panaceainc.com"
-    },
-    {
-      "count": 12,
-      "error": "unknown",
-      "example_ccn": "190270",
-      "fmt": "-",
-      "host": "mrfs.hyvehealthcare.com"
-    },
-    {
-      "count": 10,
-      "error": "unknown",
-      "example_ccn": "151313",
+      "example_ccn": "020017",
       "fmt": "-",
       "host": "stctrprodsnsvc00455826e6.blob.core.windows.net"
     },
     {
-      "count": 10,
+      "count": 92,
       "error": "unknown",
-      "example_ccn": "210002",
+      "example_ccn": "010011",
       "fmt": "-",
-      "host": "www.umms.org"
+      "host": "healthcare.ascension.org"
     },
     {
-      "count": 9,
+      "count": 68,
       "error": "unknown",
-      "example_ccn": "170016",
+      "example_ccn": "010091",
       "fmt": "-",
-      "host": "cdn.ardenthealthservices.com"
+      "host": "mrfs.hyvehealthcare.com"
     },
     {
-      "count": 9,
+      "count": 62,
       "error": "unknown",
-      "example_ccn": "161323",
+      "example_ccn": "050378",
       "fmt": "-",
       "host": "secure.claraprice.net"
     },
     {
-      "count": 9,
+      "count": 61,
       "error": "unknown",
-      "example_ccn": "360001",
+      "example_ccn": "031313",
       "fmt": "-",
-      "host": "www.mercy.com"
+      "host": "hpt.trinity-health.org"
     },
     {
-      "count": 8,
+      "count": 56,
       "error": "unknown",
-      "example_ccn": "141329",
+      "example_ccn": "010016",
+      "fmt": "-",
+      "host": "hospitalpricedisclosure.com"
+    },
+    {
+      "count": 54,
+      "error": "unknown",
+      "example_ccn": "010061",
+      "fmt": "-",
+      "host": "apim.services.craneware.com"
+    },
+    {
+      "count": 50,
+      "error": "unknown",
+      "example_ccn": "041320",
       "fmt": "-",
       "host": "machine-readable-files.com"
     },
     {
-      "count": 8,
+      "count": 49,
       "error": "unknown",
-      "example_ccn": "200008",
+      "example_ccn": "020001",
       "fmt": "-",
-      "host": "northernlighthealth.org"
+      "host": "pricetransparency.providence.org"
     },
     {
-      "count": 7,
+      "count": 45,
       "error": "unknown",
-      "example_ccn": "061301",
+      "example_ccn": "010083",
+      "fmt": "-",
+      "host": "healthy.kaiserpermanente.org"
+    },
+    {
+      "count": 45,
+      "error": "unknown",
+      "example_ccn": "060064",
+      "fmt": "-",
+      "host": "urldefense.com"
+    },
+    {
+      "count": 38,
+      "error": "unknown",
+      "example_ccn": "050380",
       "fmt": "-",
       "host": "core.secure.ehc.com"
+    },
+    {
+      "count": 38,
+      "error": "unknown",
+      "example_ccn": "010006",
+      "fmt": "-",
+      "host": "edge.sitecorecloud.io"
     }
   ],
   "gap_file": "data/coverage_gap_ccns.txt",
   "live_target_total": 3986,
   "loop": 1,
-  "missing_parsed": 716,
-  "missing_preview": 2043,
+  "missing_parsed": 3956,
+  "missing_preview": 896,
   "parse_gap_file": "data/coverage_parse_gap_ccns.txt",
-  "parsed_not_preview_total": 1331,
-  "parsed_positive": 3270,
-  "parsed_positive_total": 3270,
+  "parsed_not_preview_total": 2,
+  "parsed_positive": 30,
+  "parsed_positive_total": 30,
   "phase": "snapshot",
   "preview_gap_file": "data/coverage_preview_gap_ccns.txt",
-  "preview_index_entries": 2010,
-  "preview_not_parsed_total": 4,
-  "preview_positive": 1943,
-  "preview_positive_total": 1943,
-  "preview_rows": 34793083,
+  "preview_index_entries": 3156,
+  "preview_not_parsed_total": 3062,
+  "preview_positive": 3090,
+  "preview_positive_total": 3090,
+  "preview_rows": 57707922,
   "sample_preview_ccns": [
     "010095",
-    "030088",
+    "060117",
     "300011"
   ],
-  "target_gap_total": 2043,
-  "terminal_exception_candidate_total": 66,
-  "terminal_exceptions": 66,
+  "target_gap_total": 896,
+  "terminal_exception_candidate_total": 19,
+  "terminal_exceptions": 19,
   "terminal_exceptions_file": "data/coverage_terminal_exceptions.json",
-  "updated_at": "2026-05-13T06:57:22+00:00"
+  "updated_at": "2026-05-13T16:20:09+00:00"
 }
