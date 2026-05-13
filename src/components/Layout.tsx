@@ -16,8 +16,10 @@ export type LayoutProps = PropsWithChildren<{
   // Optional inline `<script>` body to ship below the rendered content.
   // Keep these tiny — heavy logic should live in /public/*.js.
   inlineScript?: string;
-  // Optional <script src="..."> to defer below the body.
-  scriptSrc?: string;
+  // Optional <script src="..."> to defer below the body. Pass an array
+  // when multiple ordered scripts are needed (e.g. cpt-names.js then
+  // home-client.js, where the latter reads window.CPT_NAMES).
+  scriptSrc?: string | string[];
 }>;
 
 export const Layout: FC<LayoutProps> = ({
@@ -80,7 +82,11 @@ export const Layout: FC<LayoutProps> = ({
         </a>{" "}
         · CC0 · No tracking
       </footer>
-      {scriptSrc ? <script src={scriptSrc} defer /> : null}
+      {Array.isArray(scriptSrc)
+        ? scriptSrc.map((src) => <script src={src} defer />)
+        : scriptSrc
+          ? <script src={scriptSrc} defer />
+          : null}
       {inlineScript ? (
         <script
           // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted SSR-emitted script

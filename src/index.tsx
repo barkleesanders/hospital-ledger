@@ -6,6 +6,7 @@ import { payersIndexHandler } from "./routes/api/payers-index";
 import { pricesHandler } from "./routes/api/prices";
 import { pricesIndexHandler } from "./routes/api/prices-index";
 import { procedureHandler } from "./routes/api/procedure";
+import { homePageHandler } from "./routes/home";
 import { hospitalPageHandler } from "./routes/hospital";
 import { payerPageHandler } from "./routes/payer";
 import { procedurePageHandler } from "./routes/procedure";
@@ -52,7 +53,7 @@ app.get("/procedure/:code", procedurePageHandler);
 app.get("/payer/:slug", payerPageHandler);
 app.get("/hospital/:ccn", hospitalPageHandler);
 
-// Placeholder root — replaced by SSR home in Phase 4.
-app.get("/", (c) => c.text("ok"));
+// SSR home page.
+app.get("/", homePageHandler);
 
 export default app;
