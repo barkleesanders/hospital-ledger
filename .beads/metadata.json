@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "hospital_ledger",
+  "project_id": "f0ba7732-c106-49ec-81b4-588773e93058"
+}

@@ -30,3 +30,8 @@ site/data/cpt/
 site/data/cpt-index.json
 site/data/prices/*.json
 !site/data/prices/index.json
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
