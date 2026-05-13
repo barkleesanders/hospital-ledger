@@ -1,7 +1,0 @@
-/api/hospitals.json /data/hospitals.json 301
-/api/summary.json /data/summary.json 301
-
-# /procedure/{code}, /payer/{slug}, /hospital/{ccn} are handled by
-# Pages Functions in functions/procedure|payer|hospital/[*].js — they take
-# precedence over CF Pages' built-in path normalization, which otherwise
-# 308-redirects /procedure/45378 → /procedure when procedure.html exists.
