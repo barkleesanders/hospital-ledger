@@ -35,6 +35,23 @@ app.use("*", async (c, next) => {
   }
 });
 
+// URL normalization: 301-redirect trailing-slash and uppercase entity paths
+// to a single canonical form. Skips /api/* (case-/slash-strict by contract).
+app.use("*", async (c, next) => {
+  const url = new URL(c.req.url);
+  if (url.pathname.startsWith("/api/")) return next();
+  // Trailing slash → no slash (except root)
+  if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
+    return c.redirect(url.pathname.slice(0, -1) + url.search, 301);
+  }
+  // Lowercase only the entity prefix paths (the params themselves are already canonical)
+  const lowered = url.pathname.toLowerCase();
+  if (lowered !== url.pathname && /^\/(procedure|payer|hospital)\//i.test(url.pathname)) {
+    return c.redirect(lowered + url.search, 301);
+  }
+  return next();
+});
+
 // API routes (preserve byte-similar shapes with the legacy Pages Functions).
 app.get("/api/prices-index", pricesIndexHandler);
 app.get("/api/cpt-index", cptIndexHandler);
