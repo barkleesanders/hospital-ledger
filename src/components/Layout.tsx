@@ -11,6 +11,11 @@ import type { FC, PropsWithChildren } from "hono/jsx";
 export type LayoutProps = PropsWithChildren<{
   title: string;
   description: string;
+  // Full canonical URL for this page (e.g. "https://hospitalledger.com/procedure/27130").
+  // Optional for backwards compat — pages that omit it skip the canonical/og:url tags.
+  url?: string;
+  // Override the default OG image (defaults to https://hospitalledger.com/og.png).
+  ogImage?: string;
   ogTitle?: string;
   bodyClass?: string;
   // Optional inline `<script>` body to ship below the rendered content.
@@ -22,24 +27,47 @@ export type LayoutProps = PropsWithChildren<{
   scriptSrc?: string | string[];
 }>;
 
+const DEFAULT_OG_IMAGE = "https://hospitalledger.com/og.png";
+
 export const Layout: FC<LayoutProps> = ({
   title,
   description,
+  url,
+  ogImage,
   ogTitle,
   bodyClass,
   inlineScript,
   scriptSrc,
   children,
-}) => (
+}) => {
+  const resolvedOgImage = ogImage ?? DEFAULT_OG_IMAGE;
+  const resolvedOgTitle = ogTitle ?? title;
+  return (
   <html lang="en" class="bg-zinc-950 text-zinc-100">
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width,initial-scale=1" />
       <title>{title}</title>
       <meta name="description" content={description} />
-      <meta property="og:title" content={ogTitle ?? title} />
+      {url ? <link rel="canonical" href={url} /> : null}
+
+      {/* Open Graph */}
+      <meta property="og:title" content={resolvedOgTitle} />
       <meta property="og:description" content={description} />
       <meta property="og:type" content="website" />
+      <meta property="og:site_name" content="Hospital Ledger" />
+      {url ? <meta property="og:url" content={url} /> : null}
+      <meta property="og:image" content={resolvedOgImage} />
+      <meta property="og:image:width" content="1200" />
+      <meta property="og:image:height" content="630" />
+      <meta property="og:image:alt" content="Hospital Ledger — what every U.S. hospital actually charges" />
+
+      {/* Twitter / X */}
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={resolvedOgTitle} />
+      <meta name="twitter:description" content={description} />
+      <meta name="twitter:image" content={resolvedOgImage} />
+
       <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
       <link rel="alternate icon" href="/favicon.ico" />
       <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -98,7 +126,8 @@ export const Layout: FC<LayoutProps> = ({
       ) : null}
     </body>
   </html>
-);
+  );
+};
 
 export const PageHeader: FC<{ eyebrow?: string }> = ({ eyebrow }) => (
   <header class="border-b border-zinc-800">

@@ -12,9 +12,9 @@ import { fmtMoney } from "../lib/format";
 
 const VALID_SLUG = /^[a-z0-9][a-z0-9-]{0,80}$/;
 
-function notFoundPage(slug: string){
+function notFoundPage(slug: string, url: string){
   return (
-    <Layout title={`Insurance ${slug} — Hospital Ledger`} description={`No data for insurance ${slug} yet.`}>
+    <Layout title={`Insurance ${slug} — Hospital Ledger`} description={`No data for insurance ${slug} yet.`} url={url}>
       <PageHeader eyebrow="Insurance" />
       <main class="mx-auto max-w-6xl px-6 py-8">
         <h1 class="text-3xl md:text-4xl font-semibold">{slug}</h1>
@@ -24,7 +24,7 @@ function notFoundPage(slug: string){
   );
 }
 
-function payerPage(slug: string, data: PayerData){
+function payerPage(slug: string, data: PayerData, url: string){
   const p = data.payer ?? { slug, display: slug };
   const display = p.display ?? slug;
   const hospitalCount = data.hospital_count ?? data.hospitals.length;
@@ -41,6 +41,7 @@ function payerPage(slug: string, data: PayerData){
     <Layout
       title={`${display} prices — Hospital Ledger`}
       description={`Hospitals that have negotiated rates with ${display}.`}
+      url={url}
     >
       <header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
         <div class="mx-auto max-w-6xl px-6 py-8">
@@ -159,14 +160,15 @@ function payerPage(slug: string, data: PayerData){
 
 export async function payerPageHandler(c: Context<Env>): Promise<Response> {
   const slug = String(c.req.param("slug") ?? "").toLowerCase();
+  const canonicalUrl = `https://hospitalledger.com/payer/${slug}`;
   if (!VALID_SLUG.test(slug)) {
-    return c.html(notFoundPage(slug), 400);
+    return c.html(notFoundPage(slug, canonicalUrl), 400);
   }
   const data = await loadPayer(c.env, c.req.raw, slug);
   if (!data) {
-    return c.html(notFoundPage(slug), 404);
+    return c.html(notFoundPage(slug, canonicalUrl), 404);
   }
-  return c.html(payerPage(slug, data), 200, {
+  return c.html(payerPage(slug, data, canonicalUrl), 200, {
     "cache-control": "public, max-age=300",
     "x-hl-template": "payer-ssr",
   });

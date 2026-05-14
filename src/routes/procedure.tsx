@@ -20,12 +20,13 @@ import { escapeHtml, fmtMoney, titleCase } from "../lib/format";
 
 const VALID_CODE = /^[A-Z0-9][A-Z0-9-]{1,9}$/i;
 
-function notFoundPage(code: string){
+function notFoundPage(code: string, url: string){
   const fallbackName = lookupCptName(code) ?? `Procedure ${code}`;
   return (
     <Layout
       title={`Procedure ${code} not indexed — Hospital Ledger`}
       description={`No price data available for procedure ${code}.`}
+      url={url}
     >
       <PageHeader eyebrow="Procedure" />
       <main class="mx-auto max-w-6xl px-6 py-8">
@@ -131,7 +132,7 @@ function hospitalRows(data: ProcedureData) {
   });
 }
 
-function procedurePage(data: ProcedureData){
+function procedurePage(data: ProcedureData, url: string){
   const name = procedureName(data);
   const flaggedLow = data.stats.flagged_low ?? 0;
   const cashMinNote =
@@ -162,6 +163,7 @@ function procedurePage(data: ProcedureData){
       title={`${name} (${data.code}) — Hospital Ledger`}
       description={seoDesc}
       ogTitle={`${name} (${data.code}) — Hospital Ledger`}
+      url={url}
     >
       <PageHeader eyebrow="Procedure" />
       <main class="mx-auto max-w-6xl px-6 py-8">
@@ -343,14 +345,15 @@ function procedurePage(data: ProcedureData){
 
 export async function procedurePageHandler(c: Context<Env>): Promise<Response> {
   const code = String(c.req.param("code") ?? "").toUpperCase();
+  const canonicalUrl = `https://hospitalledger.com/procedure/${code}`;
   if (!VALID_CODE.test(code)) {
-    return c.html(notFoundPage(code), 400);
+    return c.html(notFoundPage(code, canonicalUrl), 400);
   }
   const data = await loadProcedure(c.env, c.req.raw, code);
   if (!data) {
-    return c.html(notFoundPage(code), 404);
+    return c.html(notFoundPage(code, canonicalUrl), 404);
   }
-  return c.html(procedurePage(data), 200, {
+  return c.html(procedurePage(data, canonicalUrl), 200, {
     "cache-control": "public, max-age=300",
     "x-hl-template": "procedure-ssr",
   });

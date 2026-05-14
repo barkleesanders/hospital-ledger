@@ -28,9 +28,9 @@ const GRADE_COLOR: Record<string, string> = {
   F: "text-rose-300",
 };
 
-function notFoundPage(ccn: string){
+function notFoundPage(ccn: string, url: string){
   return (
-    <Layout title={`Hospital ${ccn} — Hospital Ledger`} description={`No price data published for hospital ${ccn}.`}>
+    <Layout title={`Hospital ${ccn} — Hospital Ledger`} description={`No price data published for hospital ${ccn}.`} url={url}>
       <PageHeader eyebrow="Hospital" />
       <main class="mx-auto max-w-6xl px-6 py-8">
         <h1 class="text-3xl md:text-4xl font-semibold">Hospital {ccn}</h1>
@@ -40,7 +40,7 @@ function notFoundPage(ccn: string){
   );
 }
 
-function hospitalPage(ccn: string, data: HospitalData){
+function hospitalPage(ccn: string, data: HospitalData, url: string){
   const name = data.hospital_name || `Hospital ${ccn}`;
   const compliance = data.compliance ?? {};
   const grade = (compliance.grade ?? "F").toUpperCase();
@@ -64,7 +64,7 @@ function hospitalPage(ccn: string, data: HospitalData){
         : "This hospital published little of what § 180 requires.";
 
   return (
-    <Layout title={`${name} — Hospital Ledger`} description={`Prices and compliance for ${name}.`}>
+    <Layout title={`${name} — Hospital Ledger`} description={`Prices and compliance for ${name}.`} url={url}>
       <header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
         <div class="mx-auto max-w-6xl px-6 py-8">
           <div class="flex items-center justify-between">
@@ -181,14 +181,15 @@ function hospitalPage(ccn: string, data: HospitalData){
 
 export async function hospitalPageHandler(c: Context<Env>): Promise<Response> {
   const ccn = String(c.req.param("ccn") ?? "");
+  const canonicalUrl = `https://hospitalledger.com/hospital/${ccn}`;
   if (!VALID_CCN.test(ccn)) {
-    return c.html(notFoundPage(ccn), 400);
+    return c.html(notFoundPage(ccn, canonicalUrl), 400);
   }
   const data = await loadHospital(c.env, c.req.raw, ccn);
   if (!data) {
-    return c.html(notFoundPage(ccn), 404);
+    return c.html(notFoundPage(ccn, canonicalUrl), 404);
   }
-  return c.html(hospitalPage(ccn, data), 200, {
+  return c.html(hospitalPage(ccn, data, canonicalUrl), 200, {
     "cache-control": "public, max-age=300",
     "x-hl-template": "hospital-ssr",
   });

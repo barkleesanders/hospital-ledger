@@ -16,12 +16,13 @@ import type { Env } from "../index";
 import { Layout } from "../components/Layout";
 import { RangeBar } from "../components/RangeBar";
 
-function homePage() {
+function homePage(url: string) {
   return (
     <Layout
       title="Hospital Ledger — what the law required, what hospitals delivered"
       description="A free public database of every U.S. hospital's federally-mandated price transparency machine-readable file. Built from CMS data + live verification. CC0 licensed."
       ogTitle="Hospital Ledger"
+      url={url}
       scriptSrc={["/cpt-names.js", "/home-client.js"]}
     >
       <header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
@@ -609,7 +610,7 @@ function homePage() {
 }
 
 export async function homePageHandler(c: Context<Env>): Promise<Response> {
-  return c.html(homePage(), 200, {
+  return c.html(homePage("https://hospitalledger.com/"), 200, {
     "cache-control": "public, max-age=300",
     "x-hl-template": "home-ssr",
   });
