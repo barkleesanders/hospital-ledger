@@ -16,8 +16,8 @@ function notFoundPage(slug: string, url: string){
   return (
     <Layout title={`Insurance ${slug} — Hospital Ledger`} description={`No data for insurance ${slug} yet.`} url={url}>
       <PageHeader eyebrow="Insurance" />
-      <main class="mx-auto max-w-6xl px-6 py-8">
-        <h1 class="text-3xl md:text-4xl font-semibold">{slug}</h1>
+      <main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+        <h1 class="text-2xl sm:text-3xl md:text-4xl font-semibold">{slug}</h1>
         <p class="mt-2 text-zinc-400">No data for "{slug}" yet.</p>
       </main>
     </Layout>
@@ -44,21 +44,21 @@ function payerPage(slug: string, data: PayerData, url: string){
       url={url}
     >
       <header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
-        <div class="mx-auto max-w-6xl px-6 py-8">
-          <div class="flex items-center justify-between">
+        <div class="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8">
+          <div class="flex items-center justify-between gap-2">
             <a href="/" class="text-sm text-zinc-400 hover:text-zinc-200">
               ← Hospital Ledger
             </a>
             <div class="text-xs uppercase tracking-widest text-emerald-400">{(p.category ?? "insurance").replace("-", " ")}</div>
           </div>
-          <h1 class="mt-4 text-3xl md:text-4xl font-semibold">{display}</h1>
+          <h1 class="mt-4 text-2xl sm:text-3xl md:text-4xl font-semibold">{display}</h1>
           <p class="mt-2 text-zinc-400">
             {hospitalCount.toLocaleString("en-US")} hospitals have negotiated rates with this insurance.
           </p>
         </div>
       </header>
 
-      <main class="mx-auto max-w-6xl px-6 py-8">
+      <main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
         <section class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
           <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
             <div class="text-xs uppercase tracking-wider text-zinc-500">Hospitals with this insurance</div>
@@ -120,9 +120,9 @@ function payerPage(slug: string, data: PayerData, url: string){
                 <tr>
                   <th class="px-3 py-2 text-left">Hospital</th>
                   <th class="px-3 py-2 text-left">State</th>
-                  <th class="px-3 py-2 text-right">Procedures with rate</th>
+                  <th class="hidden md:table-cell px-3 py-2 text-right">Procedures with rate</th>
                   <th class="px-3 py-2 text-right">Median rate</th>
-                  <th class="px-3 py-2 text-center">Compliance</th>
+                  <th class="hidden md:table-cell px-3 py-2 text-center">Compliance</th>
                 </tr>
               </thead>
               <tbody id="results" class="divide-y divide-zinc-800">
@@ -134,11 +134,11 @@ function payerPage(slug: string, data: PayerData, url: string){
                       </a>
                     </td>
                     <td class="px-3 py-2 text-zinc-400">{h.state}</td>
-                    <td class="px-3 py-2 text-right tab-num text-zinc-200">
+                    <td class="hidden md:table-cell px-3 py-2 text-right tab-num text-zinc-200">
                       {(h.n_items_with_payer ?? 0).toLocaleString("en-US")}
                     </td>
                     <td class="px-3 py-2 text-right tab-num text-emerald-300 font-medium">{fmtMoney(h.median_rate)}</td>
-                    <td class="px-3 py-2 text-center">
+                    <td class="hidden md:table-cell px-3 py-2 text-center">
                       <GradeBadge grade={h.compliance_grade} score={h.compliance_score} />
                     </td>
                   </tr>

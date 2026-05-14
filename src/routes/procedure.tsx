@@ -29,8 +29,8 @@ function notFoundPage(code: string, url: string){
       url={url}
     >
       <PageHeader eyebrow="Procedure" />
-      <main class="mx-auto max-w-6xl px-6 py-8">
-        <h1 class="serif text-5xl md:text-6xl text-zinc-50">{fallbackName}</h1>
+      <main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+        <h1 class="serif text-4xl sm:text-5xl md:text-6xl text-zinc-50">{fallbackName}</h1>
         <div class="label-eyebrow mt-3">
           <span class="mono text-zinc-300">{escapeHtml(code)}</span> · not in our top-10,000 index
         </div>
@@ -117,14 +117,14 @@ function hospitalRows(data: ProcedureData) {
           </a>
         </td>
         <td class="px-3 py-2 text-zinc-400">{h.state}</td>
-        <td class="px-3 py-2 text-right tab-num text-zinc-300">{fmtMoney(h.gross)}</td>
+        <td class="hidden md:table-cell px-3 py-2 text-right tab-num text-zinc-300">{fmtMoney(h.gross)}</td>
         <td class={`px-3 py-2 text-right tab-num ${cashClass}`}>
           {fmtMoney(h.cash)}
           {flagBadge}
         </td>
-        <td class="px-3 py-2 text-right tab-num text-zinc-400">{fmtMoney(h.min)}</td>
-        <td class="px-3 py-2 text-right tab-num text-zinc-400">{fmtMoney(h.max)}</td>
-        <td class="px-3 py-2 text-right tab-num text-zinc-200">
+        <td class="hidden md:table-cell px-3 py-2 text-right tab-num text-zinc-400">{fmtMoney(h.min)}</td>
+        <td class="hidden md:table-cell px-3 py-2 text-right tab-num text-zinc-400">{fmtMoney(h.max)}</td>
+        <td class="hidden md:table-cell px-3 py-2 text-right tab-num text-zinc-200">
           <span class="text-zinc-500">{(h.payers ?? []).length} insurers</span>
         </td>
       </tr>
@@ -166,38 +166,38 @@ function procedurePage(data: ProcedureData, url: string){
       url={url}
     >
       <PageHeader eyebrow="Procedure" />
-      <main class="mx-auto max-w-6xl px-6 py-8">
+      <main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
         <EditorialHero eyebrow={eyebrow} title={name}>
           {ledeMarkup(data)}
         </EditorialHero>
 
-        <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 md:mb-12">
           <div>
             <div class="label-eyebrow">Cheapest published</div>
-            <div class="mt-2 serif text-4xl md:text-5xl text-amber-300">{fmtMoney(data.stats.cash_min)}</div>
+            <div class="mt-2 serif text-3xl sm:text-4xl md:text-5xl text-amber-300">{fmtMoney(data.stats.cash_min)}</div>
             <div class="mt-2 text-sm text-zinc-400 leading-snug">{cashMinNote}</div>
           </div>
           <div>
             <div class="label-eyebrow">
               Median across <span class="tab-num">{data.stats.hospital_count.toLocaleString("en-US")}</span> hospitals
             </div>
-            <div class="mt-2 serif text-4xl md:text-5xl text-emerald-300">{fmtMoney(data.stats.cash_p50)}</div>
+            <div class="mt-2 serif text-3xl sm:text-4xl md:text-5xl text-emerald-300">{fmtMoney(data.stats.cash_p50)}</div>
             <div class="mt-2 text-sm text-zinc-400 leading-snug">
               The realistic middle of the cash-price distribution. Use this as your benchmark.
             </div>
           </div>
           <div>
             <div class="label-eyebrow">Most expensive</div>
-            <div class="mt-2 serif text-4xl md:text-5xl text-rose-300">{fmtMoney(data.stats.cash_max)}</div>
+            <div class="mt-2 serif text-3xl sm:text-4xl md:text-5xl text-rose-300">{fmtMoney(data.stats.cash_max)}</div>
             <div class="mt-2 text-sm text-zinc-400 leading-snug">
               Highest published price. Often a gross-charge "list price" rarely actually paid.
             </div>
           </div>
         </section>
 
-        <section class="mb-12">
-          <div class="flex items-baseline justify-between mb-4">
-            <h2 class="serif text-3xl text-zinc-100">Price distribution</h2>
+        <section class="mb-8 md:mb-12">
+          <div class="flex items-baseline justify-between mb-4 gap-2">
+            <h2 class="serif text-2xl sm:text-3xl text-zinc-100">Price distribution</h2>
             <div class="label-eyebrow">
               {data.hospitals.filter((h) => h.quality === "normal" && h.cash !== null && (h.cash as number) > 0).length.toLocaleString("en-US")}{" "}
               hospitals · log-scale x-axis
@@ -318,11 +318,11 @@ function procedurePage(data: ProcedureData, url: string){
                 <tr>
                   <th class="px-3 py-2 text-left">Hospital</th>
                   <th class="px-3 py-2 text-left">State</th>
-                  <th class="px-3 py-2 text-right">Gross</th>
+                  <th class="hidden md:table-cell px-3 py-2 text-right">Gross</th>
                   <th class="px-3 py-2 text-right">Cash price</th>
-                  <th class="px-3 py-2 text-right">Min negotiated</th>
-                  <th class="px-3 py-2 text-right">Max negotiated</th>
-                  <th class="px-3 py-2 text-right">Your insurer</th>
+                  <th class="hidden md:table-cell px-3 py-2 text-right">Min negotiated</th>
+                  <th class="hidden md:table-cell px-3 py-2 text-right">Max negotiated</th>
+                  <th class="hidden md:table-cell px-3 py-2 text-right">Your insurer</th>
                 </tr>
               </thead>
               <tbody id="results" class="divide-y divide-zinc-800">
