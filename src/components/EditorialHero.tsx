@@ -21,9 +21,9 @@ export const EditorialHero: FC<EditorialHeroProps> = ({ eyebrow, title, children
       // biome-ignore lint/security/noDangerouslySetInnerHtml: server-built trusted HTML
       dangerouslySetInnerHTML={{ __html: eyebrow }}
     />
-    <h1 class="serif text-5xl md:text-7xl leading-[1.05] text-zinc-50">{title}</h1>
+    <h1 class="serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.05] text-zinc-50">{title}</h1>
     {children ? (
-      <p class="mt-6 max-w-3xl text-lg md:text-xl text-zinc-300 leading-relaxed">{children}</p>
+      <p class="mt-6 max-w-3xl text-base sm:text-lg md:text-xl text-zinc-300 leading-relaxed">{children}</p>
     ) : null}
   </section>
 );

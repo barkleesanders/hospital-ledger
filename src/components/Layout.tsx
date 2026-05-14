@@ -131,7 +131,7 @@ export const Layout: FC<LayoutProps> = ({
 
 export const PageHeader: FC<{ eyebrow?: string }> = ({ eyebrow }) => (
   <header class="border-b border-zinc-800">
-    <div class="mx-auto max-w-6xl px-6 pt-8 pb-4">
+    <div class="mx-auto max-w-6xl px-4 sm:px-6 pt-6 sm:pt-8 pb-4">
       <div class="flex items-center justify-between">
         <a href="/" class="text-sm text-zinc-400 hover:text-zinc-200">
           ← Hospital Ledger

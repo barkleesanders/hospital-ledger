@@ -28,22 +28,29 @@ export const RangeBar: FC<RangeBarProps> = ({ min, median, max, medianFrac }) =>
   const frac = medianFrac ?? logFrac(min, median, max);
   const leftPct = (frac * 100).toFixed(1);
   return (
-    <div class="mt-5 relative h-10">
-      <div class="absolute inset-x-0 top-1/2 h-px bg-zinc-700" />
-      <div class="absolute left-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-amber-300 ring-2 ring-amber-300/30" />
-      <div class="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-rose-300 ring-2 ring-rose-300/30" />
-      <div
-        class="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-emerald-300 ring-2 ring-emerald-300/30"
-        style={`left: ${leftPct}%;`}
-      />
-      <div class="absolute left-0 top-full mt-1 text-[10px] tab-num text-amber-300/80">{fmtMoney(min)}</div>
-      <div
-        class="absolute top-full mt-1 text-[10px] tab-num text-emerald-300/90 -translate-x-1/2"
-        style={`left: ${leftPct}%;`}
-      >
+    <>
+      <div class="mt-5 relative h-10">
+        <div class="absolute inset-x-0 top-1/2 h-px bg-zinc-700" />
+        <div class="absolute left-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-amber-300 ring-2 ring-amber-300/30" />
+        <div class="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-rose-300 ring-2 ring-rose-300/30" />
+        <div
+          class="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-emerald-300 ring-2 ring-emerald-300/30"
+          style={`left: ${leftPct}%;`}
+        />
+        <div class="absolute left-0 top-full mt-1 text-[10px] tab-num text-amber-300/80">{fmtMoney(min)}</div>
+        {/* Median label: hidden on mobile (collides with min/max), inline on sm+ */}
+        <div
+          class="hidden sm:block absolute top-full mt-1 text-[10px] tab-num text-emerald-300/90 -translate-x-1/2"
+          style={`left: ${leftPct}%;`}
+        >
+          {fmtMoney(median)} · median
+        </div>
+        <div class="absolute right-0 top-full mt-1 text-[10px] tab-num text-rose-300/80">{fmtMoney(max)}</div>
+      </div>
+      {/* Mobile: median below the bar so labels don't collide */}
+      <div class="sm:hidden mt-6 text-center text-[11px] tab-num text-emerald-300/90">
         {fmtMoney(median)} · median
       </div>
-      <div class="absolute right-0 top-full mt-1 text-[10px] tab-num text-rose-300/80">{fmtMoney(max)}</div>
-    </div>
+    </>
   );
 };

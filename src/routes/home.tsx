@@ -26,7 +26,7 @@ function homePage(url: string) {
       scriptSrc={["/cpt-names.js", "/home-client.js"]}
     >
       <header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
-        <div class="mx-auto max-w-6xl px-6 pt-10 pb-12 md:pt-14 md:pb-16">
+        <div class="mx-auto max-w-6xl px-4 sm:px-6 pt-8 pb-10 sm:pt-10 sm:pb-12 md:pt-14 md:pb-16">
           <div class="flex items-center gap-3 text-xs uppercase tracking-widest text-emerald-400">
             <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>Hospital Ledger</span>
@@ -34,10 +34,10 @@ function homePage(url: string) {
             <span class="text-zinc-500">Free forever · No signup · No tracking</span>
           </div>
 
-          <h1 class="mt-5 serif text-5xl md:text-7xl leading-[1.05] tracking-tight max-w-4xl">
+          <h1 class="mt-5 serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.05] tracking-tight max-w-4xl">
             What does your hospital <em class="text-emerald-300">actually</em> charge?
           </h1>
-          <p class="mt-5 text-lg md:text-xl text-zinc-300 max-w-2xl leading-snug">
+          <p class="mt-5 text-base sm:text-lg md:text-xl text-zinc-300 max-w-2xl leading-snug">
             Compare the real price of a procedure across{" "}
             <span id="hero-hospital-count" class="font-semibold text-white tab-num">
               3,699
@@ -138,22 +138,22 @@ function homePage(url: string) {
         </div>
       </header>
 
-      <main class="mx-auto max-w-6xl px-6 py-10 space-y-12">
+      <main class="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10 space-y-10 sm:space-y-12">
         <section
           id="for-patients"
-          class="rounded-xl border border-emerald-700/30 bg-gradient-to-br from-emerald-950/30 to-zinc-900/40 p-6 fade-in"
+          class="rounded-xl border border-emerald-700/30 bg-gradient-to-br from-emerald-950/30 to-zinc-900/40 p-4 sm:p-6 fade-in"
         >
           <div class="section-rule">
             <span class="num">01</span>
             <span class="label">Find a price</span>
             <span class="line" />
           </div>
-          <h2 class="serif text-3xl md:text-4xl mb-2">Three ways to start.</h2>
+          <h2 class="serif text-2xl sm:text-3xl md:text-4xl mb-2">Three ways to start.</h2>
           <p class="text-zinc-400 mb-5 max-w-2xl">
             Search by what you need, your insurance, or the hospital you're going to. Every price is straight from
             that hospital's own published file.
           </p>
-          <div class="grid md:grid-cols-3 gap-4">
+          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <form id="by-proc-form" class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 lift" autocomplete="off">
               <div class="flex items-center gap-2 mb-1">
                 <span class="num-step text-xs">A.</span>
@@ -240,8 +240,8 @@ function homePage(url: string) {
             <span class="label">How it works</span>
             <span class="line" />
           </div>
-          <h2 class="serif text-3xl md:text-4xl mb-6">Three steps. No fees, no signup.</h2>
-          <div class="grid md:grid-cols-3 gap-6">
+          <h2 class="serif text-2xl sm:text-3xl md:text-4xl mb-6">Three steps. No fees, no signup.</h2>
+          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
               <div class="num-step text-2xl mb-2">01</div>
               <h3 class="serif text-2xl mb-2">Search</h3>
@@ -277,7 +277,7 @@ function homePage(url: string) {
               <span class="label">Why this exists</span>
               <span class="line" />
             </div>
-            <h2 class="serif text-3xl md:text-4xl mb-3">
+            <h2 class="serif text-2xl sm:text-3xl md:text-4xl mb-3">
               The law's been on the books since 2021. The database wasn't.
             </h2>
             <ul class="space-y-3 text-zinc-300 leading-relaxed">
@@ -406,7 +406,7 @@ function homePage(url: string) {
           </div>
         </section>
 
-        <section id="methodology" class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-6">
+        <section id="methodology" class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 sm:p-6">
           <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 class="text-2xl font-semibold tracking-tight">Sources / methodology</h2>
@@ -503,7 +503,7 @@ function homePage(url: string) {
           </div>
         </section>
 
-        <section id="prices" class="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6">
+        <section id="prices" class="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 sm:p-6">
           <h2 class="text-2xl font-semibold tracking-tight">🩺 Live prices — standardized, on-site</h2>
           <p class="text-sm text-zinc-400 mt-1">
             Parsed directly from each hospital's MRF into a unified schema. No external links — search prices by CPT
@@ -545,7 +545,7 @@ function homePage(url: string) {
           <div id="cpt-results" class="mt-3" />
         </section>
 
-        <section id="api" class="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+        <section id="api" class="rounded-lg border border-zinc-800 bg-zinc-900 p-4 sm:p-6">
           <h2 class="text-2xl font-semibold tracking-tight">Use it</h2>
           <p class="text-zinc-300 mt-2">
             Everything here is <strong>CC0 / public domain</strong>. No attribution required. Build whatever you want
