@@ -136,29 +136,51 @@ function hospitalPage(ccn: string, data: HospitalData, url: string){
 
         <section class="mb-8">
           <h2 class="text-lg font-semibold mb-2">Most expensive procedures (gross)</h2>
-          <div class="overflow-x-auto rounded-lg border border-zinc-800">
+          {/* Mobile: card-stacked list (visible 0-767px) */}
+          <div class="md:hidden space-y-2">
+            {top.map((it) => (
+              <a
+                href={`/procedure/${it.code}`}
+                class="block rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 hover:border-emerald-700/50 transition"
+              >
+                <div class="flex items-baseline justify-between gap-2 mb-2 min-w-0">
+                  <div class="mono text-emerald-300 text-sm shrink-0">{it.code}</div>
+                  <div class="text-right tab-num text-base font-medium text-emerald-300">{fmtMoney(it.cash)}</div>
+                </div>
+                {it.desc ? (
+                  <div class="text-xs text-zinc-300 mb-2 line-clamp-2">{it.desc}</div>
+                ) : null}
+                <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  <div class="text-zinc-500">Gross</div>
+                  <div class="text-right tab-num text-zinc-400">{fmtMoney(it.gross)}</div>
+                </div>
+              </a>
+            ))}
+          </div>
+          {/* Desktop: table (visible 768px+) */}
+          <div class="hidden md:block overflow-x-auto rounded-lg border border-zinc-800">
             <table class="w-full text-sm">
               <thead class="bg-zinc-900 text-xs uppercase tracking-wider text-zinc-400">
                 <tr>
                   <th class="px-3 py-2 text-left">Code</th>
-                  <th class="hidden sm:table-cell px-3 py-2 text-left">Description</th>
-                  <th class="hidden md:table-cell px-3 py-2 text-right">Gross</th>
+                  <th class="px-3 py-2 text-left">Description</th>
+                  <th class="px-3 py-2 text-right">Gross</th>
                   <th class="px-3 py-2 text-right">Cash</th>
-                  <th class="hidden md:table-cell px-3 py-2 text-right">Min payer</th>
-                  <th class="hidden md:table-cell px-3 py-2 text-right">Max payer</th>
-                  <th class="hidden md:table-cell px-3 py-2 text-center"># insurers</th>
+                  <th class="px-3 py-2 text-right">Min payer</th>
+                  <th class="px-3 py-2 text-right">Max payer</th>
+                  <th class="px-3 py-2 text-center"># insurers</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-zinc-800">
                 {top.map((it) => (
                   <tr class="hover:bg-zinc-900/50">
                     <td class="px-3 py-2 mono text-zinc-300">{it.code}</td>
-                    <td class="hidden sm:table-cell px-3 py-2 text-zinc-200">{it.desc ?? ""}</td>
-                    <td class="hidden md:table-cell px-3 py-2 text-right tab-num text-zinc-300">{fmtMoney(it.gross)}</td>
+                    <td class="px-3 py-2 text-zinc-200">{it.desc ?? ""}</td>
+                    <td class="px-3 py-2 text-right tab-num text-zinc-300">{fmtMoney(it.gross)}</td>
                     <td class="px-3 py-2 text-right tab-num text-emerald-300">{fmtMoney(it.cash)}</td>
-                    <td class="hidden md:table-cell px-3 py-2 text-right tab-num text-zinc-400">{fmtMoney(it.min)}</td>
-                    <td class="hidden md:table-cell px-3 py-2 text-right tab-num text-zinc-400">{fmtMoney(it.max)}</td>
-                    <td class="hidden md:table-cell px-3 py-2 text-center text-zinc-300">{it.pc ?? 0}</td>
+                    <td class="px-3 py-2 text-right tab-num text-zinc-400">{fmtMoney(it.min)}</td>
+                    <td class="px-3 py-2 text-right tab-num text-zinc-400">{fmtMoney(it.max)}</td>
+                    <td class="px-3 py-2 text-center text-zinc-300">{it.pc ?? 0}</td>
                   </tr>
                 ))}
               </tbody>
