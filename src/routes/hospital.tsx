@@ -141,7 +141,7 @@ function hospitalPage(ccn: string, data: HospitalData, url: string){
               <thead class="bg-zinc-900 text-xs uppercase tracking-wider text-zinc-400">
                 <tr>
                   <th class="px-3 py-2 text-left">Code</th>
-                  <th class="px-3 py-2 text-left">Description</th>
+                  <th class="hidden sm:table-cell px-3 py-2 text-left">Description</th>
                   <th class="hidden md:table-cell px-3 py-2 text-right">Gross</th>
                   <th class="px-3 py-2 text-right">Cash</th>
                   <th class="hidden md:table-cell px-3 py-2 text-right">Min payer</th>
@@ -153,7 +153,7 @@ function hospitalPage(ccn: string, data: HospitalData, url: string){
                 {top.map((it) => (
                   <tr class="hover:bg-zinc-900/50">
                     <td class="px-3 py-2 mono text-zinc-300">{it.code}</td>
-                    <td class="px-3 py-2 text-zinc-200">{it.desc ?? ""}</td>
+                    <td class="hidden sm:table-cell px-3 py-2 text-zinc-200">{it.desc ?? ""}</td>
                     <td class="hidden md:table-cell px-3 py-2 text-right tab-num text-zinc-300">{fmtMoney(it.gross)}</td>
                     <td class="px-3 py-2 text-right tab-num text-emerald-300">{fmtMoney(it.cash)}</td>
                     <td class="hidden md:table-cell px-3 py-2 text-right tab-num text-zinc-400">{fmtMoney(it.min)}</td>
