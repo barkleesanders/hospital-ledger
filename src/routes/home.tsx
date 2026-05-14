@@ -241,7 +241,7 @@ function homePage(url: string) {
             <span class="line" />
           </div>
           <h2 class="serif text-2xl sm:text-3xl md:text-4xl mb-6">Three steps. No fees, no signup.</h2>
-          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <div>
               <div class="num-step text-2xl mb-2">01</div>
               <h3 class="serif text-2xl mb-2">Search</h3>
@@ -270,7 +270,7 @@ function homePage(url: string) {
           </div>
         </section>
 
-        <section id="why" class="grid md:grid-cols-3 gap-6">
+        <section id="why" class="grid md:grid-cols-3 gap-4 md:gap-6">
           <div class="md:col-span-2">
             <div class="section-rule">
               <span class="num">03</span>
@@ -596,7 +596,7 @@ function homePage(url: string) {
         id="modal"
         class="fixed inset-0 bg-zinc-950/90 backdrop-blur-sm hidden z-50 p-4 overflow-y-auto"
       >
-        <div class="mx-auto max-w-3xl rounded-xl bg-zinc-900 border border-zinc-800 p-6 mt-12">
+        <div class="mx-auto max-w-3xl rounded-xl bg-zinc-900 border border-zinc-800 p-4 sm:p-6 mt-8 sm:mt-12">
           <div class="flex items-start justify-between gap-4">
             <div id="modal-content" class="flex-1" />
             <button class="text-zinc-500 hover:text-zinc-200 text-2xl leading-none" data-close-modal>

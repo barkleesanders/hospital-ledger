@@ -107,7 +107,7 @@ export const Layout: FC<LayoutProps> = ({
     </head>
     <body class={bodyClass ?? "min-h-screen"}>
       {children}
-      <footer class="border-t border-zinc-800 mt-12 py-6 text-center text-xs text-zinc-500">
+      <footer class="border-t border-zinc-800 mt-10 sm:mt-12 py-6 text-center text-xs text-zinc-500">
         <a href="/" class="hover:text-zinc-300">
           Hospital Ledger
         </a>{" "}
