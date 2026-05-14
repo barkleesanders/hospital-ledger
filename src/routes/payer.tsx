@@ -114,15 +114,40 @@ function payerPage(slug: string, data: PayerData, url: string){
           <div id="status" class="text-sm text-zinc-400 mb-2">
             {rows.length.toLocaleString("en-US")} hospitals
           </div>
-          <div class="overflow-x-auto rounded-lg border border-zinc-800">
+          {/* Mobile: card-stacked list (visible 0-767px) */}
+          <div class="md:hidden space-y-2">
+            {rows.map((h) => (
+              <a
+                href={`/hospital/${h.ccn}`}
+                class="block rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 hover:border-emerald-700/50 transition"
+              >
+                <div class="flex items-baseline justify-between gap-2 mb-2 min-w-0">
+                  <div class="font-medium text-emerald-300 truncate text-sm">{h.name}</div>
+                  <div class="text-xs text-zinc-500 shrink-0">{h.state}</div>
+                </div>
+                <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  <div class="text-zinc-500">Median rate</div>
+                  <div class="text-right tab-num text-base font-medium text-emerald-300">{fmtMoney(h.median_rate)}</div>
+                  <div class="text-zinc-500">Procedures w/ rate</div>
+                  <div class="text-right tab-num text-zinc-300">{(h.n_items_with_payer ?? 0).toLocaleString("en-US")}</div>
+                  <div class="text-zinc-500">Compliance</div>
+                  <div class="text-right">
+                    <GradeBadge grade={h.compliance_grade} score={h.compliance_score} />
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+          {/* Desktop: table (visible 768px+) */}
+          <div class="hidden md:block overflow-x-auto rounded-lg border border-zinc-800">
             <table class="w-full text-sm">
               <thead class="bg-zinc-900 text-xs uppercase tracking-wider text-zinc-400">
                 <tr>
                   <th class="px-3 py-2 text-left">Hospital</th>
                   <th class="px-3 py-2 text-left">State</th>
-                  <th class="hidden md:table-cell px-3 py-2 text-right">Procedures with rate</th>
+                  <th class="px-3 py-2 text-right">Procedures with rate</th>
                   <th class="px-3 py-2 text-right">Median rate</th>
-                  <th class="hidden md:table-cell px-3 py-2 text-center">Compliance</th>
+                  <th class="px-3 py-2 text-center">Compliance</th>
                 </tr>
               </thead>
               <tbody id="results" class="divide-y divide-zinc-800">
@@ -134,11 +159,11 @@ function payerPage(slug: string, data: PayerData, url: string){
                       </a>
                     </td>
                     <td class="px-3 py-2 text-zinc-400">{h.state}</td>
-                    <td class="hidden md:table-cell px-3 py-2 text-right tab-num text-zinc-200">
+                    <td class="px-3 py-2 text-right tab-num text-zinc-200">
                       {(h.n_items_with_payer ?? 0).toLocaleString("en-US")}
                     </td>
                     <td class="px-3 py-2 text-right tab-num text-emerald-300 font-medium">{fmtMoney(h.median_rate)}</td>
-                    <td class="hidden md:table-cell px-3 py-2 text-center">
+                    <td class="px-3 py-2 text-center">
                       <GradeBadge grade={h.compliance_grade} score={h.compliance_score} />
                     </td>
                   </tr>
