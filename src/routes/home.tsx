@@ -154,7 +154,7 @@ function homePage(url: string) {
             that hospital's own published file.
           </p>
           <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <form id="by-proc-form" class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 lift" autocomplete="off">
+            <form id="by-proc-form" class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 lift min-w-0" autocomplete="off">
               <div class="flex items-center gap-2 mb-1">
                 <span class="num-step text-xs">A.</span>
                 <span class="text-xs uppercase tracking-wider text-zinc-400">What you need</span>
@@ -166,7 +166,7 @@ function homePage(url: string) {
                 Type the name (<em>"colonoscopy"</em>) or the CPT/HCPCS code (
                 <code class="mono text-emerald-300">45378</code>).
               </div>
-              <div class="flex gap-2">
+              <div class="flex gap-2 min-w-0">
                 <input
                   id="by-proc-input"
                   type="search"
@@ -182,16 +182,16 @@ function homePage(url: string) {
                   data-1p-ignore="true"
                   data-lpignore="true"
                   data-form-type="other"
-                  class="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+                  class="flex-1 min-w-0 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
                 />
-                <button class="rounded-md bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-sm font-medium">
+                <button class="shrink-0 rounded-md bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-sm font-medium">
                   Compare
                 </button>
               </div>
               <datalist id="proc-suggestions" />
               <div id="by-proc-msg" class="mt-2 text-xs text-zinc-500 min-h-4" />
             </form>
-            <form id="by-payer-form" class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 lift">
+            <form id="by-payer-form" class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 lift min-w-0">
               <div class="flex items-center gap-2 mb-1">
                 <span class="num-step text-xs">B.</span>
                 <span class="text-xs uppercase tracking-wider text-zinc-400">What you have</span>
@@ -200,28 +200,28 @@ function homePage(url: string) {
               <div class="text-sm text-zinc-400 mb-3">
                 See every hospital that has a negotiated rate with your plan.
               </div>
-              <div class="flex gap-2">
-                <select id="by-payer-select" required class="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm">
+              <div class="flex gap-2 min-w-0">
+                <select id="by-payer-select" required class="flex-1 min-w-0 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm">
                   <option value="">Loading insurers…</option>
                 </select>
-                <button class="rounded-md bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-sm font-medium">Go</button>
+                <button class="shrink-0 rounded-md bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-sm font-medium">Go</button>
               </div>
             </form>
-            <form id="by-hosp-form" class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 lift">
+            <form id="by-hosp-form" class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 lift min-w-0">
               <div class="flex items-center gap-2 mb-1">
                 <span class="num-step text-xs">C.</span>
                 <span class="text-xs uppercase tracking-wider text-zinc-400">Where you're going</span>
               </div>
               <label class="block serif text-xl mb-1 text-zinc-100">A specific hospital</label>
               <div class="text-sm text-zinc-400 mb-3">Get its compliance grade plus its top procedure prices.</div>
-              <div class="flex gap-2">
+              <div class="flex gap-2 min-w-0">
                 <input
                   id="by-hosp-input"
                   type="text"
                   placeholder="Hospital name or 6-digit CCN"
-                  class="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+                  class="flex-1 min-w-0 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
                 />
-                <button class="rounded-md bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-sm font-medium">
+                <button class="shrink-0 rounded-md bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-sm font-medium">
                   Find
                 </button>
               </div>
@@ -385,7 +385,7 @@ function homePage(url: string) {
             <p class="text-sm text-zinc-400 mt-1">
               By share of CMS-required hospitals with a live MRF.
             </p>
-            <div class="mt-4 rounded-lg border border-zinc-800">
+            <div class="mt-4 rounded-lg border border-zinc-800 overflow-x-auto">
               <table class="min-w-full text-sm">
                 <thead class="bg-zinc-900 text-zinc-400">
                   <tr>
