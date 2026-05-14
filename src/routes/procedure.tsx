@@ -75,6 +75,52 @@ function ledeMarkup(data: ProcedureData){
   );
 }
 
+function hospitalCards(data: ProcedureData) {
+  const rows = data.hospitals.slice(0, 500);
+  if (!rows.length) {
+    return <div class="px-3 py-6 text-center text-zinc-500 text-sm">No matches.</div>;
+  }
+  const med = data.stats.cash_p50 ?? 0;
+  const sorted = [...rows].sort((a, b) => {
+    const qa = a.quality === "normal" ? 0 : 1;
+    const qb = b.quality === "normal" ? 0 : 1;
+    if (qa !== qb) return qa - qb;
+    const da = a.cash !== null ? Math.abs((a.cash as number) - med) : Infinity;
+    const db = b.cash !== null ? Math.abs((b.cash as number) - med) : Infinity;
+    return da - db;
+  });
+  return sorted.map((h) => {
+    const isLow = h.quality === "low_outlier";
+    const isHigh = h.quality === "high_outlier";
+    const cashClass = isLow || isHigh ? "text-amber-200" : "text-emerald-300";
+    const flagBadge = isLow ? (
+      <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-amber-900/30 text-amber-300 border border-amber-700/40">⚠ check</span>
+    ) : isHigh ? (
+      <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-amber-900/30 text-amber-300 border border-amber-700/40">⚠ high</span>
+    ) : null;
+    return (
+      <a
+        href={`/hospital/${h.ccn}`}
+        class={`block rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 hover:border-emerald-700/50 transition ${isLow || isHigh ? "opacity-70" : ""}`}
+      >
+        <div class="flex items-baseline justify-between gap-2 mb-2 min-w-0">
+          <div class="font-medium text-emerald-300 truncate text-sm">{h.name}</div>
+          <div class="text-xs text-zinc-500 shrink-0">{h.state}</div>
+        </div>
+        <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+          <div class="text-zinc-500">Cash</div>
+          <div class={`text-right tab-num text-base font-medium ${cashClass}`}>
+            {fmtMoney(h.cash)}
+            {flagBadge}
+          </div>
+          <div class="text-zinc-500">Gross</div>
+          <div class="text-right tab-num text-zinc-400">{fmtMoney(h.gross)}</div>
+        </div>
+      </a>
+    );
+  });
+}
+
 function hospitalRows(data: ProcedureData) {
   const rows = data.hospitals.slice(0, 500);
   if (!rows.length) {
@@ -312,17 +358,22 @@ function procedurePage(data: ProcedureData, url: string){
           <div id="status" class="text-sm text-zinc-400 mb-2">
             {data.hospitals.length.toLocaleString("en-US")} hospitals reporting
           </div>
-          <div class="overflow-x-auto rounded-lg border border-zinc-800">
+          {/* Mobile: card-stacked list (visible 0-767px) */}
+          <div class="md:hidden space-y-2" id="results-mobile">
+            {hospitalCards(data)}
+          </div>
+          {/* Desktop: table (visible 768px+) */}
+          <div class="hidden md:block overflow-x-auto rounded-lg border border-zinc-800">
             <table class="w-full text-sm">
               <thead class="bg-zinc-900 text-xs uppercase tracking-wider text-zinc-400">
                 <tr>
                   <th class="px-3 py-2 text-left">Hospital</th>
                   <th class="px-3 py-2 text-left">State</th>
-                  <th class="hidden md:table-cell px-3 py-2 text-right">Gross</th>
+                  <th class="px-3 py-2 text-right">Gross</th>
                   <th class="px-3 py-2 text-right">Cash price</th>
-                  <th class="hidden md:table-cell px-3 py-2 text-right">Min negotiated</th>
-                  <th class="hidden md:table-cell px-3 py-2 text-right">Max negotiated</th>
-                  <th class="hidden md:table-cell px-3 py-2 text-right">Your insurer</th>
+                  <th class="px-3 py-2 text-right">Min negotiated</th>
+                  <th class="px-3 py-2 text-right">Max negotiated</th>
+                  <th class="px-3 py-2 text-right">Your insurer</th>
                 </tr>
               </thead>
               <tbody id="results" class="divide-y divide-zinc-800">
