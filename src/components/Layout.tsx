@@ -40,6 +40,9 @@ export const Layout: FC<LayoutProps> = ({
       <meta property="og:title" content={ogTitle ?? title} />
       <meta property="og:description" content={description} />
       <meta property="og:type" content="website" />
+      <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+      <link rel="alternate icon" href="/favicon.ico" />
+      <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
       <link
