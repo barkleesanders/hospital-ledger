@@ -14,7 +14,7 @@
 import type { Context } from "hono";
 import type { Env } from "../index";
 import { Layout } from "../components/Layout";
-import { RangeBar } from "../components/RangeBar";
+import { ProcedureCarousel } from "../components/ProcedureCarousel";
 
 function homePage(url: string) {
   return (
@@ -23,7 +23,7 @@ function homePage(url: string) {
       description="A free public database of every U.S. hospital's federally-mandated price transparency machine-readable file. Built from CMS data + live verification. CC0 licensed."
       ogTitle="Hospital Ledger"
       url={url}
-      scriptSrc={["/cpt-names.js", "/home-client.js"]}
+      scriptSrc={["/cpt-names.js", "/home-client.js", "/procedure-carousel.js"]}
     >
       <header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
         <div class="mx-auto max-w-6xl px-4 sm:px-6 pt-8 pb-10 sm:pt-10 sm:pb-12 md:pt-14 md:pb-16">
@@ -45,21 +45,7 @@ function homePage(url: string) {
             U.S. hospitals — straight from each hospital's own federally-mandated price file.
           </p>
 
-          <a
-            href="/procedure/27130"
-            class="group block mt-8 rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 hover:border-emerald-700/50 transition"
-          >
-            <div class="label-eyebrow text-zinc-500 mb-2">FEATURED · TOTAL HIP REPLACEMENT (CPT 27130)</div>
-            <p class="serif text-xl md:text-2xl text-zinc-100 leading-snug max-w-3xl">
-              The same hip replacement costs <span class="text-amber-300 tab-num">$3,124</span> at one hospital and{" "}
-              <span class="text-rose-300 tab-num">$182,439</span> at another. Median:{" "}
-              <span class="text-emerald-300 tab-num">$28,901</span>.
-            </p>
-            <RangeBar min={3124} median={28901} max={182439} medianFrac={0.145} />
-            <div class="mt-6 text-xs text-zinc-500 group-hover:text-emerald-400 transition">
-              See all 1,540+ hospitals →
-            </div>
-          </a>
+          <ProcedureCarousel />
 
           <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-zinc-400">
             <div class="flex items-start gap-2">

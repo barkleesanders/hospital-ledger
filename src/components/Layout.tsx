@@ -100,6 +100,8 @@ export const Layout: FC<LayoutProps> = ({
   .section-rule .num { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #71717a; letter-spacing: 0.1em; }
   .section-rule .label { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.15em; color: #a1a1aa; }
   .section-rule .line { flex: 1; height: 1px; background: #27272a; }
+  .carousel-track::-webkit-scrollbar { display: none; }
+  .carousel-track { scrollbar-width: none; -ms-overflow-style: none; }
   @media print { body { background: white; color: black; } .no-print { display: none; } }
         `,
         }}
