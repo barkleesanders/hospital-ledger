@@ -320,6 +320,121 @@ function homePage(url: string) {
           </aside>
         </section>
 
+        <section
+          id="how-we-built-this"
+          class="rounded-xl border border-emerald-700/30 bg-gradient-to-br from-emerald-950/30 to-zinc-900/40 p-4 sm:p-6 fade-in"
+        >
+          <div class="section-rule">
+            <span class="num">04</span>
+            <span class="label">How we built this</span>
+            <span class="line" />
+          </div>
+          <h2 class="serif text-2xl sm:text-3xl md:text-4xl mb-3">
+            Three days. Two AI agents. <em class="text-emerald-300">~46 weeks</em> of human work.
+          </h2>
+          <p class="text-zinc-300 max-w-3xl leading-relaxed">
+            Hospital Ledger was built between May 12–15, 2026 by two AI coding agents —{" "}
+            <a class="text-emerald-300 underline" href="https://www.anthropic.com/claude-code">
+              Claude Code
+            </a>{" "}
+            and{" "}
+            <a class="text-emerald-300 underline" href="https://github.com/openai/codex">
+              OpenAI Codex
+            </a>{" "}
+            — working in parallel under one operator. Each MRF format (CSV-tall, CSV-wide, JSON v2/v3,
+            XLSX, ZIP-wrapped) needed its own parser. Each of the{" "}
+            <span class="tab-num font-semibold text-zinc-100">4,625</span> CMS-required hospitals had its
+            own URL to find, probe, fall back on, and verify. A human doing this at 30 minutes per hospital
+            would need ~46 weeks of full-time work — and that's just the parsing pass.
+          </p>
+
+          <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div class="rounded-lg bg-zinc-950/50 border border-zinc-800 p-4">
+              <div class="text-xs uppercase tracking-wider text-zinc-500">Raw data processed</div>
+              <div class="mt-1 text-2xl font-semibold tab-num text-emerald-300">99 GB</div>
+              <div class="text-xs text-zinc-500 mt-1">MRFs downloaded, parsed, normalized</div>
+            </div>
+            <div class="rounded-lg bg-zinc-950/50 border border-zinc-800 p-4">
+              <div class="text-xs uppercase tracking-wider text-zinc-500">MRFs parsed</div>
+              <div class="mt-1 text-2xl font-semibold tab-num text-emerald-300">3,699</div>
+              <div class="text-xs text-zinc-500 mt-1">across 6 schema variants → one schema</div>
+            </div>
+            <div class="rounded-lg bg-zinc-950/50 border border-zinc-800 p-4">
+              <div class="text-xs uppercase tracking-wider text-zinc-500">URLs probed</div>
+              <div class="mt-1 text-2xl font-semibold tab-num text-emerald-300">7,191</div>
+              <div class="text-xs text-zinc-500 mt-1">TPAFS seed + email-domain + Wayback</div>
+            </div>
+            <div class="rounded-lg bg-zinc-950/50 border border-zinc-800 p-4">
+              <div class="text-xs uppercase tracking-wider text-zinc-500">Enforcement records</div>
+              <div class="mt-1 text-2xl font-semibold tab-num text-emerald-300">8,642</div>
+              <div class="text-xs text-zinc-500 mt-1">CMS warning · CAP · CMP · closure</div>
+            </div>
+          </div>
+
+          <div class="mt-6 grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4">
+              <div class="text-xs uppercase tracking-wider text-emerald-400 mb-3">
+                The 11-stage pipeline
+              </div>
+              <ol class="space-y-1.5 text-sm text-zinc-300 list-decimal pl-4">
+                <li>Seed the CMS hospital universe (5,426 facilities)</li>
+                <li>Load TPAFS MRF URL seeds, probe each for liveness</li>
+                <li>Rediscover dead URLs from each hospital's transparency page</li>
+                <li>Exa web search fallback for the still-missing</li>
+                <li>Claude / Codex agent loop on the hardest holdouts</li>
+                <li>CMS-HPT marker files + email-domain expansion</li>
+                <li>Wayback Machine fallback for vanished URLs</li>
+                <li>Fetch + parse CSV / JSON / XLSX / ZIP into one unified schema</li>
+                <li>Ingest CMS enforcement (warning / CAP / CMP / closure)</li>
+                <li>Build cross-hospital CPT / HCPCS price index</li>
+                <li>SSR site + Cloudflare Pages + JSON API</li>
+              </ol>
+            </div>
+            <div class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4">
+              <div class="text-xs uppercase tracking-wider text-emerald-400 mb-3">
+                Why this didn't exist before
+              </div>
+              <ul class="space-y-2 text-sm text-zinc-300">
+                <li class="flex gap-2">
+                  <span class="text-emerald-400 mt-0.5">▸</span>
+                  <span>Commercial aggregators (Turquoise, PayerPrice, Serif) lock the data behind NDAs.</span>
+                </li>
+                <li class="flex gap-2">
+                  <span class="text-emerald-400 mt-0.5">▸</span>
+                  <span>CMS publishes the rule but doesn't aggregate or verify anything.</span>
+                </li>
+                <li class="flex gap-2">
+                  <span class="text-emerald-400 mt-0.5">▸</span>
+                  <span>Every hospital uses a different format, vendor, and URL convention.</span>
+                </li>
+                <li class="flex gap-2">
+                  <span class="text-emerald-400 mt-0.5">▸</span>
+                  <span>13.8% of files sit behind bot defenses; "compliance" ≠ "reachable".</span>
+                </li>
+                <li class="flex gap-2">
+                  <span class="text-emerald-400 mt-0.5">▸</span>
+                  <span>
+                    Until LLM agents got good at parsing arbitrary CSV / JSON shapes, this scale of
+                    normalization wasn't cost-effective for one person.
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <p class="mt-6 text-sm text-zinc-400 max-w-3xl">
+            Built in the open at{" "}
+            <a
+              class="text-emerald-300 underline"
+              href="https://github.com/barkleesanders/hospital-ledger"
+            >
+              github.com/barkleesanders/hospital-ledger
+            </a>
+            {" "}— 36 pipeline scripts, ~10,700 lines of Python, ~3,000 lines of TypeScript. AGPLv3 code,
+            CC0 data. <span class="text-zinc-500">No tracking. No signup. Free forever.</span>
+          </p>
+        </section>
+
         <section id="search">
           <h2 class="text-2xl font-semibold tracking-tight">Search every hospital</h2>
           <p class="text-sm text-zinc-400 mt-1">
