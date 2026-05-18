@@ -330,7 +330,8 @@ function homePage(url: string) {
             <span class="line" />
           </div>
           <h2 class="serif text-2xl sm:text-3xl md:text-4xl mb-3">
-            Three days. Two AI agents. <em class="text-emerald-300">~46 weeks</em> of human work.
+            Three days. Two AI agents.{" "}
+            <em class="text-emerald-300">~3 person-years</em> of human work.
           </h2>
           <p class="text-zinc-300 max-w-3xl leading-relaxed">
             Hospital Ledger was built between May 12–15, 2026 by two AI coding agents —{" "}
@@ -341,12 +342,100 @@ function homePage(url: string) {
             <a class="text-emerald-300 underline" href="https://github.com/openai/codex">
               OpenAI Codex
             </a>{" "}
-            — working in parallel under one operator. Each MRF format (CSV-tall, CSV-wide, JSON v2/v3,
-            XLSX, ZIP-wrapped) needed its own parser. Each of the{" "}
-            <span class="tab-num font-semibold text-zinc-100">4,625</span> CMS-required hospitals had its
-            own URL to find, probe, fall back on, and verify. A human doing this at 30 minutes per hospital
-            would need ~46 weeks of full-time work — and that's just the parsing pass.
+            — working in parallel under one operator. The headline number isn't a vibe — it's a sum of
+            real per-step rates a competent analyst with Excel, Power Query, and Python would actually
+            hit. Every hospital labels "gross charge", "cash price", "negotiated rate", and "CPT code"
+            differently; the CMS rule mandates the data points, not the column names. So every file is a
+            new schema-mapping problem.
           </p>
+
+          <div class="mt-5 rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 sm:p-5">
+            <div class="text-xs uppercase tracking-wider text-emerald-400 mb-3">
+              Show the math (per step, defensible rates)
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm tab-num">
+                <thead class="text-zinc-500 text-left">
+                  <tr class="border-b border-zinc-800">
+                    <th class="py-2 pr-3 font-medium">Step</th>
+                    <th class="py-2 pr-3 font-medium">Volume</th>
+                    <th class="py-2 pr-3 font-medium">Per-unit rate (human)</th>
+                    <th class="py-2 pr-3 font-medium text-right">Hours</th>
+                  </tr>
+                </thead>
+                <tbody class="text-zinc-300 divide-y divide-zinc-800/60">
+                  <tr>
+                    <td class="py-2 pr-3">Parse each MRF (download · open · map columns · normalize · QA)</td>
+                    <td class="py-2 pr-3">3,699 files</td>
+                    <td class="py-2 pr-3">~77 min avg (90% × 66 min clean + 10% × 180 min hard)</td>
+                    <td class="py-2 pr-3 text-right text-emerald-300">4,747</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 pr-3">Find candidate MRF URLs from CMS + transparency pages</td>
+                    <td class="py-2 pr-3">4,625 hospitals</td>
+                    <td class="py-2 pr-3">~5 min / hospital</td>
+                    <td class="py-2 pr-3 text-right text-emerald-300">385</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 pr-3">Probe URLs for liveness (curl / browser open)</td>
+                    <td class="py-2 pr-3">7,191 URLs</td>
+                    <td class="py-2 pr-3">~1 min / URL</td>
+                    <td class="py-2 pr-3 text-right text-emerald-300">120</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 pr-3">Rediscover dead links by hunting each hospital's site</td>
+                    <td class="py-2 pr-3">~1,000 dead/missing</td>
+                    <td class="py-2 pr-3">~15 min each</td>
+                    <td class="py-2 pr-3 text-right text-emerald-300">250</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 pr-3">Canonicalize payer names (Aetna vs AETNA vs Aetna Health Inc.)</td>
+                    <td class="py-2 pr-3">74,747 raw rows</td>
+                    <td class="py-2 pr-3">~250 wpm reading + ~500 unique merges</td>
+                    <td class="py-2 pr-3 text-right text-emerald-300">50</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 pr-3">Validate CPT / HCPCS codes against AMA reference</td>
+                    <td class="py-2 pr-3">10,000 codes</td>
+                    <td class="py-2 pr-3">~3 codes / min spot-check + cleanup</td>
+                    <td class="py-2 pr-3 text-right text-emerald-300">30</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 pr-3">Ingest + link CMS enforcement actions to CCNs</td>
+                    <td class="py-2 pr-3">8,642 records</td>
+                    <td class="py-2 pr-3">structured CSV, mostly automated</td>
+                    <td class="py-2 pr-3 text-right text-emerald-300">10</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 pr-3">Build the cross-hospital price index (joins, dedup, pivots)</td>
+                    <td class="py-2 pr-3">~660 K rows</td>
+                    <td class="py-2 pr-3">Excel/Power Query at solo-analyst pace</td>
+                    <td class="py-2 pr-3 text-right text-emerald-300">40</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 pr-3">Design + build the SSR site, API, search, charts</td>
+                    <td class="py-2 pr-3">11 pages, 8 endpoints</td>
+                    <td class="py-2 pr-3">solo full-stack dev</td>
+                    <td class="py-2 pr-3 text-right text-emerald-300">300</td>
+                  </tr>
+                  <tr class="bg-emerald-950/20 font-semibold">
+                    <td class="py-2 pr-3">Total</td>
+                    <td class="py-2 pr-3"></td>
+                    <td class="py-2 pr-3 text-zinc-400">≈ 2,080 hr / person-year (full-time)</td>
+                    <td class="py-2 pr-3 text-right text-emerald-300">~5,930</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="mt-3 text-xs text-zinc-500">
+              ≈ <span class="text-emerald-300">2.85 person-years</span> at 40 hr/week fully-utilized, or
+              roughly <span class="text-emerald-300">5–6 calendar years</span> for one analyst working a
+              sustainable 20 hr/week on the side. The 99 GB of raw MRF data is too large to retype —
+              nobody types it; they normalize. The cost is mapping, not keystrokes. Reading speed
+              (~250 wpm) and typing speed (~40 wpm) only show up inside the per-MRF column-mapping pass
+              and the payer-name canonicalization row.
+            </p>
+          </div>
 
           <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
             <div class="rounded-lg bg-zinc-950/50 border border-zinc-800 p-4">
