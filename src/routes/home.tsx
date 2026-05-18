@@ -437,6 +437,78 @@ function homePage(url: string) {
             </p>
           </div>
 
+          <div class="mt-5 rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 sm:p-5">
+            <div class="text-xs uppercase tracking-wider text-emerald-400 mb-3">
+              What this would cost if I charged for it
+            </div>
+            <div class="grid sm:grid-cols-3 gap-3">
+              <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
+                <div class="text-xs uppercase tracking-wider text-zinc-500">
+                  If a contracting firm built it
+                </div>
+                <div class="mt-2 text-3xl font-semibold tab-num text-zinc-100">~$593,000</div>
+                <div class="text-xs text-zinc-500 mt-2 leading-relaxed">
+                  5,930 hr × $100/hr — the midpoint of published US healthcare data-analyst freelance
+                  rates ($93–$160/hr per{" "}
+                  <a
+                    class="underline hover:text-zinc-300"
+                    href="https://www.ziprecruiter.com/Salaries/Healthcare-Data-Analytics-Salary"
+                  >
+                    ZipRecruiter
+                  </a>{" "}
+                  +{" "}
+                  <a
+                    class="underline hover:text-zinc-300"
+                    href="https://golance.com/hiring/best-freelance-data-analysts-hourly-rate"
+                  >
+                    goLance 2026
+                  </a>
+                  ). Senior healthcare specialists quote ~$200/hr — that's a $1.18M build.
+                </div>
+              </div>
+              <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
+                <div class="text-xs uppercase tracking-wider text-zinc-500">
+                  Commercial alternative
+                </div>
+                <div class="mt-2 text-3xl font-semibold tab-num text-zinc-100">
+                  "Contact sales"
+                </div>
+                <div class="text-xs text-zinc-500 mt-2 leading-relaxed">
+                  Every aggregator selling this data (
+                  <a class="underline hover:text-zinc-300" href="https://turquoise.health/">
+                    Turquoise Health
+                  </a>
+                  ,{" "}
+                  <a class="underline hover:text-zinc-300" href="https://www.serifhealth.com/">
+                    Serif Health
+                  </a>
+                  , PayerPrice, Trilliant) hides pricing behind a sales call. None publishes a number
+                  on its public site. The absence is the answer.
+                </div>
+              </div>
+              <div class="rounded-lg border border-emerald-700/50 bg-emerald-950/30 p-4">
+                <div class="text-xs uppercase tracking-wider text-emerald-300">What we charge</div>
+                <div class="mt-2 text-3xl font-semibold tab-num text-emerald-300">$0</div>
+                <div class="text-xs text-zinc-400 mt-2 leading-relaxed">
+                  Free forever. CC0 public-domain data. AGPLv3 code. No signup, no API key, no
+                  rate-limited tier. The full dataset and the full source — including the search,
+                  the API, and the cross-hospital price index — are <em>and will stay</em> free.
+                </div>
+              </div>
+            </div>
+            <p class="mt-4 text-xs text-zinc-500 max-w-3xl">
+              The hospitals were already legally required to publish this data{" "}
+              <a
+                class="underline hover:text-zinc-300"
+                href="https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-E/part-180"
+              >
+                under 45 CFR § 180
+              </a>
+              . Aggregating it into one queryable place doesn't make it ours to sell — it just
+              makes it actually usable.
+            </p>
+          </div>
+
           <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
             <div class="rounded-lg bg-zinc-950/50 border border-zinc-800 p-4">
               <div class="text-xs uppercase tracking-wider text-zinc-500">Raw data processed</div>
