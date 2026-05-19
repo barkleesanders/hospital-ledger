@@ -2,6 +2,23 @@
 
 This file provides instructions and context for AI coding agents working on this project.
 
+## Copy-Truth Gate (MANDATORY before every /ship)
+
+Every deploy of hospital-ledger MUST pass `scripts/predeploy_audit.py` (exit 0).
+The audit compares numeric claims in README.md and src/routes/ against ground
+truth from `public/data/summary.json`, `db/hospital_ledger.db`, `data/_payer_raw.jsonl`,
+and `data/parsed/` — catches stale counts before they reach users.
+
+Workflow during /ship:
+1. Pre-deploy (source vs local truth): `npm run audit:copy` (or `python3 scripts/predeploy_audit.py`).
+   Also fires automatically as the `predeploy` npm hook before `npm run deploy`.
+2. If FAIL: run `python3 scripts/predeploy_audit.py --fix` to auto-apply, then re-run.
+3. Post-deploy (source vs live site): `npm run audit:copy:live`. Must pass before declaring done.
+
+To add a new claim: append a `Claim(...)` entry to `CLAIMS` in `scripts/predeploy_audit.py`.
+The regex must have ONE capture group with the displayed value; `truth` returns the
+expected string. One-line addition for any future drift detection.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
 
