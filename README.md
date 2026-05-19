@@ -3,7 +3,8 @@
 **Open-source, public-good crawler for U.S. hospital price transparency
 machine-readable files (MRFs).**
 
-Status: v0 (Stages 1–2 complete).
+Live at **[hospitalledger.com](https://hospitalledger.com)**. Status: v1 — live,
+public, indexed (all 11 pipeline stages running; the site & API are deployed).
 
 ## What this is
 
@@ -14,18 +15,57 @@ verify the files. Commercial aggregators (Turquoise, PayerPrice, Serif)
 paywall their data behind NDAs.
 
 This project produces a single CC0-licensed dataset of every U.S. hospital
-MRF: where it is, whether it's live, and what's in it.
+MRF: where it is, whether it's live, and what's in it — searchable on the site
+and queryable via JSON API.
+
+## What's in the data right now
+
+Numbers below are verified from the deployed site (`public/data/summary.json`,
+`public/data/prices/index.json`, and the R2-backed `/api/cpt-index`) on
+2026-05-18. Re-derive them anytime with the queries in [Verify](#verify).
+
+| Metric | Value | Source |
+|---|---|---|
+| Hospitals in the CMS universe | **5,426** | `hospitals` table |
+| CMS-required hospitals (the denominator for compliance) | **4,625** | `summary.json#cms_required_total` |
+| CMS-required hospitals with a verified live MRF | **3,986 (86.2%)** | `summary.json#compliant` / `#compliance_pct` |
+| Hospitals with a standardized on-site price preview | **3,699** | `public/data/prices/index.json` |
+| Standardized price rows across those hospitals | **62.6 M** | sum of `n` in prices index |
+| CPT- / HCPCS-coded rows (patient-comparable) | **14.2 M** | sum of `cpt_indexed` in prices index |
+| Distinct CPT / HCPCS codes in the cross-hospital index | **5,000** | `/api/cpt-index` keys |
+| Payer-negotiated rate cells | **148.9 M** | sum of `n_rates` in `data/_payer_raw.jsonl` |
+| Hospitals with at least one payer-rate row | **3,061** | distinct CCN in `_payer_raw.jsonl` |
+| CCN × raw-payer-string rows | **74,747** | line count of `_payer_raw.jsonl` |
+| Canonical payer brands surfaced on site | **200 featured** (21,803 raw) | `/api/payers-index` |
+| CMS enforcement records loaded | **11,440** | `cms_enforcement` table |
+| Enforcement actions linked to required hospitals | **8,642** | `summary.json#enforcement_actions_total` |
+| Raw MRF data downloaded & parsed | **~97 GB** | `data/parsed/` |
 
 ## Pipeline
+
+The site is built from 11 stages running end-to-end; all 11 are running in
+production. Stages 1–2 land in the SQLite mirror at `db/hospital_ledger.db`;
+stages 3–11 land in JSONL gap files under `data/` and the deployed JSON bundles
+under `public/data/`.
 
 | Stage | Description | Status |
 |---|---|---|
 | 1 | Seed CMS hospital universe (5,426 facilities) | done |
-| 2 | Load MRF URL seeds (7,191 from TPAFS) + probe liveness | done (probe results in `mrf_probe`) |
-| 3 | URL rediscovery crawler for dead URLs | pending |
-| 4 | Fetch + parse alive MRFs (CSV-tall/wide, JSON v2/v3, XLSX) | pending |
-| 5 | Public API + UI | pending |
-| 6 | Compliance watchdog + auto-CMS-complaints | pending |
+| 2 | Load MRF URL seeds (7,191 from TPAFS) + probe liveness | done (in `mrf_probe`) |
+| 3 | URL rediscovery crawler for dead URLs | done (in `mrf_rediscovered`) |
+| 4 | Fetch + parse alive MRFs (CSV-tall/wide, JSON v2/v3, XLSX) | live (3,699 / 3,986 = 92.8% of required+live hospitals parsed; 19 terminal exceptions, 1,158 in known-vendor failure clusters) |
+| 5 | Public API + UI (SSR on Cloudflare Workers + R2) | live at hospitalledger.com |
+| 6 | Compliance watchdog + CMS enforcement ingestion | live (`cms_enforcement` + `cms_enforcement_match`) |
+| 7 | Cross-hospital CPT / HCPCS price index | live (5,000 codes, R2-backed `/api/cpt-index`) |
+| 8 | Canonical payer normalization | live (200 featured brands, `/api/payers-index`) |
+| 9 | Per-hospital standardized price files | live (R2 `parsed/{ccn}.json`, served via `/api/prices/{ccn}`) |
+| 10 | Coverage-gap closeout & retry loop | running (`scripts/coverage_closeout.py`, `scripts/finalize_gap_backfill.py`) |
+| 11 | CMS validation monitor (auto-CMS-complaints) | running (`scripts/cms_validation_monitor.py`) |
+
+Coverage gap as of 2026-05-13 closeout snapshot: 850 preview-gap hospitals
+remaining (out of 3,986 CMS-required+live targets); 19 terminal exceptions
+documented in `data/coverage_terminal_exceptions.json`; full failure cluster
+breakdown in `data/coverage_closeout_status.json`.
 
 ## Files
 
@@ -68,9 +108,39 @@ CREATE TABLE mrf_probe (
 
 ```bash
 cd ~/projects/hospital-ledger
-python3 scripts/build_db.py          # ~5 sec
-python3 scripts/probe_mrf_urls.py --all --concurrency 12   # ~10–15 min
+python3 scripts/build_db.py          # ~5 sec — Stage 1 (CMS universe)
+python3 scripts/probe_mrf_urls.py --all --concurrency 12   # ~10–15 min — Stage 2
 python3 scripts/export_scoreboard.py # ~1 sec → data/hospital_ledger_scoreboard.csv
+python3 scripts/rediscover_mrf_urls.py # Stage 3
+python3 scripts/batch_ingest.py --workers $(scripts/tune_ingest_workers.py) # Stage 4
+python3 scripts/build_aggregates.py  # Stage 7 — cross-hospital CPT/HCPCS index
+python3 scripts/build_site_data.py   # Stage 5 — emit public/data/{hospitals,summary,prices/index}.json
+```
+
+## Verify
+
+To re-derive every number in the table above (don't trust the README, trust the
+data):
+
+```bash
+sqlite3 db/hospital_ledger.db <<'SQL'
+SELECT COUNT(*) AS hospitals FROM hospitals;                            -- 5426
+SELECT COUNT(DISTINCT ccn) AS alive_probe FROM mrf_probe WHERE alive=1; -- 1840
+SELECT COUNT(*) AS enf FROM cms_enforcement;                            -- 11440
+SQL
+
+python3 - <<'PY'
+import json
+d = json.load(open('public/data/prices/index.json'))
+print("priced hospitals:", len(d['hospitals']))
+print("standardized rows:", sum(h['n'] for h in d['hospitals']))
+print("CPT-indexed rows:", sum(h['cpt_indexed'] for h in d['hospitals']))
+PY
+
+curl -sS https://hospitalledger.com/api/cpt-index | python3 -c \
+  "import json,sys; d=json.load(sys.stdin); print('distinct codes:', len(d))"
+curl -sS https://hospitalledger.com/api/payers-index | python3 -c \
+  "import json,sys; d=json.load(sys.stdin); print('payers total/featured:', d['total'], len(d['featured']))"
 ```
 
 ## License
@@ -86,7 +156,10 @@ python3 scripts/export_scoreboard.py # ~1 sec → data/hospital_ledger_scoreboar
 
 ## What this is NOT
 
-- Not a chargemaster aggregator (yet — Stage 4).
 - Not a payer (insurance-side) transparency tool (out of scope for v1).
 - Not a clinical or quality dataset (CMS rating included but not the focus).
 - Not affiliated with CMS, HHS, or any commercial transparency vendor.
+
+> Previously this section also said "Not a chargemaster aggregator (yet — Stage
+> 4)." That is now false: Stage 4 is live, and 3,699 hospitals' MRFs have been
+> parsed into a unified schema and indexed by CPT / HCPCS.

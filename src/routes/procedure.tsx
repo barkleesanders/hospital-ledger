@@ -32,14 +32,14 @@ function notFoundPage(code: string, url: string){
       <main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
         <h1 class="serif text-4xl sm:text-5xl md:text-6xl text-zinc-50">{fallbackName}</h1>
         <div class="label-eyebrow mt-3">
-          <span class="mono text-zinc-300">{escapeHtml(code)}</span> · not in our top-10,000 index
+          <span class="mono text-zinc-300">{escapeHtml(code)}</span> · not in our top-5,000 index
         </div>
         <div class="mt-8 rounded-lg border border-amber-700/40 bg-amber-900/15 p-4 text-amber-100 max-w-2xl">
           <div class="font-semibold mb-1">No price data for code <span class="mono">{escapeHtml(code)}</span></div>
           <div class="text-sm text-amber-200/90">
-            We index the top 10,000 most-coverage CPT/HCPCS codes. This code may be:
+            We index the top 5,000 most-coverage CPT/HCPCS codes. This code may be:
             <ul class="list-disc ml-5 mt-1 space-y-0.5">
-              <li>A rare or specialty procedure not in our top 10k</li>
+              <li>A rare or specialty procedure not in our top 5k</li>
               <li>A typo (CPT codes are 5 digits; HCPCS are letter + 4 digits)</li>
               <li>A non-CPT charge code unique to one hospital</li>
             </ul>
