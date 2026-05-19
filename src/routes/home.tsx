@@ -85,6 +85,10 @@ function homePage(url: string) {
             rows in <a href="/api/prices-index" class="underline hover:text-zinc-300">/api/prices-index</a>. The
             summary is mirrored in <a href="/data/summary.json" class="underline hover:text-zinc-300">/data/summary.json</a>.
           </p>
+          <p class="mt-2 text-xs text-zinc-500 max-w-2xl leading-relaxed">
+            Why the gap? <span class="tab-num">{fmt(liveMrfRequired - standardizedPriceHospitals)}</span> hospitals (
+            <span class="tab-num">{fmt(liveMrfRequired)}</span> live MRFs − <span class="tab-num">{fmt(standardizedPriceHospitals)}</span> standardized) are files we can download but haven't fully extracted usable rows from yet — <span class="tab-num">{fmt(parsedMrfOutputs - standardizedPriceHospitals)}</span> parsed to zero rows (empty/placeholder files) and the rest are still in the parse queue. Closing it is in progress; see <a href="/about-the-numbers" class="underline hover:text-zinc-300">/about-the-numbers</a>.
+          </p>
 
           <ProcedureCarousel />
 
@@ -329,6 +333,21 @@ function homePage(url: string) {
                   <span class="tab-num">{fmt(liveMrfRequired)}</span> of{" "}
                   <span class="tab-num">{fmt(cmsRequiredTotal)}</span> CMS-required hospitals and standardized price
                   rows for <span class="tab-num">{fmt(standardizedPriceHospitals)}</span> of them.
+                </span>
+              </li>
+              <li class="flex gap-3">
+                <span class="text-emerald-400 mt-1">▸</span>
+                <span>
+                  The{" "}
+                  <span class="tab-num">{fmt(liveMrfRequired - standardizedPriceHospitals)}</span>-hospital gap between
+                  "live MRF" and "standardized prices" is the parser's coverage hole — files we can download but
+                  haven't fully extracted usable rows from yet ({fmt(parsedMrfOutputs - standardizedPriceHospitals)}{" "}
+                  parsed to zero rows, {fmt(liveMrfRequired - parsedMrfOutputs)} still in the parse queue). Closing it
+                  is in progress; see{" "}
+                  <a href="/about-the-numbers" class="text-emerald-300 underline">
+                    /about-the-numbers
+                  </a>{" "}
+                  for the live breakdown.
                 </span>
               </li>
               <li class="flex gap-3">

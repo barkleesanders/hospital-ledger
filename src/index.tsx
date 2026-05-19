@@ -8,6 +8,7 @@ import { payersIndexHandler } from "./routes/api/payers-index";
 import { pricesHandler } from "./routes/api/prices";
 import { pricesIndexHandler } from "./routes/api/prices-index";
 import { procedureHandler } from "./routes/api/procedure";
+import { aboutNumbersPageHandler } from "./routes/about-the-numbers";
 import { homePageHandler } from "./routes/home";
 import { hospitalPageHandler } from "./routes/hospital";
 import { payerPageHandler } from "./routes/payer";
@@ -154,5 +155,9 @@ app.get("/hospital/:ccn", hospitalPageHandler);
 
 // SSR home page.
 app.get("/", homePageHandler);
+
+// SSR methodology page explaining the gap between CMS-required, live MRF,
+// and standardized-price counts. Linked from the home-page hero + Section 03.
+app.get("/about-the-numbers", aboutNumbersPageHandler);
 
 export default app;

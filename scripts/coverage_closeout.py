@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 PARSED_DIR = DATA_DIR / "parsed"
-SITE_PRICE_INDEX = ROOT / "site" / "data" / "prices" / "index.json"
+SITE_PRICE_INDEX = ROOT / "public" / "data" / "prices" / "index.json"
 DB_PATH = ROOT / "db" / "hospital_ledger.db"
 STATUS_FILE = DATA_DIR / "coverage_closeout_status.json"
 GAP_FILE = DATA_DIR / "coverage_gap_ccns.txt"
