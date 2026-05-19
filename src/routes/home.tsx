@@ -451,7 +451,7 @@ function homePage(url: string) {
                   </tr>
                   <tr>
                     <td class="py-2 pr-3">Canonicalize payer names (Aetna vs AETNA vs Aetna Health Inc.)</td>
-                    <td class="py-2 pr-3">48,225 raw rows</td>
+                    <td class="py-2 pr-3">48,277 raw rows</td>
                     <td class="py-2 pr-3">~250 wpm reading + ~500 unique merges</td>
                     <td class="py-2 pr-3 text-right text-emerald-300">50</td>
                   </tr>

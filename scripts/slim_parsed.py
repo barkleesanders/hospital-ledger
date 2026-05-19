@@ -164,6 +164,18 @@ def display_code_and_type(item):
     if not code and desc and (gross is not None or cash is not None or payer_rates):
         code = desc[:48]
         code_type = 'CDM'
+    # Vendor-specific code_types (LOCAL, CHRGCD, PERDIEM, PERCASE, STANDARD,
+    # PHARMACY, single-letter codes like 'C'/'H', etc.) carry real CDM data
+    # with valid gross_charge / cash_discount / payer_rates. Normalize them to
+    # 'CDM' so they survive the DISPLAY_TYPES filter at the slim step. Without
+    # this, ~10 hospitals (200K+ items each) get dropped at the filter despite
+    # having complete price data. See Tier 1 of the 2026-05-19 coverage-gap fix.
+    if (
+        code
+        and code_type not in DISPLAY_TYPES
+        and (gross is not None or cash is not None or payer_rates)
+    ):
+        code_type = 'CDM'
     return code, code_type
 
 requested_ccns = selected_ccns()
