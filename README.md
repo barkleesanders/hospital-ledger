@@ -73,6 +73,24 @@ python3 scripts/probe_mrf_urls.py --all --concurrency 12   # ~10–15 min
 python3 scripts/export_scoreboard.py # ~1 sec → data/hospital_ledger_scoreboard.csv
 ```
 
+## Cloud closeout speed tuning
+
+For standardized-price closeout runs in Codex/Cloud, the ingestion defaults are
+set for higher network-bound parallelism: `batch_ingest.py` and
+`full_standardize.py` use `HL_INGEST_WORKERS` or 16 workers by default, while
+`retry_failed_ingest.py` uses `HL_RETRY_WORKERS` or 12 workers by default.
+
+To benchmark the current runner and automatically choose the fastest stable
+worker count before a full pass, run:
+
+```bash
+python3 scripts/full_standardize.py --auto-workers --max-workers 128 --tune-sample-size 48 --resume
+```
+
+The tuner performs real ingest work on live-MRF gaps, tests worker steps up to
+`--max-workers`, backs off when a worker step is unstable, and writes the
+recommendation plus benchmark details to `data/worker_tune_results.json`.
+
 ## License
 
 - **Code:** AGPLv3 (forces commercial aggregators who fork to publish back).

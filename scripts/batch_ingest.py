@@ -485,7 +485,7 @@ def main():
     p.add_argument('--all', action='store_true', help='Ignore --limit and target every live-MRF hospital')
     p.add_argument('--resume', action='store_true', help='Skip CCNs with an existing non-empty parsed JSON')
     p.add_argument('--offset', type=int, default=0, help='Skip the first N eligible CCNs after ordering')
-    p.add_argument('--workers', type=int, default=4, help='Parallel ingestion workers (mind RAM — each parser holds the whole MRF in memory)')
+    p.add_argument('--workers', type=int, default=int(os.environ.get('HL_INGEST_WORKERS', '16')), help='Parallel ingestion workers (default: HL_INGEST_WORKERS or 16; mind RAM — each parser holds the whole MRF in memory)')
     p.add_argument('--progress-every', type=int, default=25)
     p.add_argument(
         '--status-every-seconds',

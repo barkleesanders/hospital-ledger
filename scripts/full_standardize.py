@@ -34,6 +34,7 @@ SCRIPTS = os.path.join(ROOT, 'scripts')
 DATA_DIR = os.path.join(ROOT, 'data')
 SHARD_DIR = os.path.join(DATA_DIR, 'full_standardize_shards')
 AGG_STATUS_FILE = os.path.join(DATA_DIR, 'full_standardize_parallel_status.json')
+WORKER_TUNE_FILE = os.path.join(DATA_DIR, 'worker_tune_results.json')
 
 
 def run(cmd):
@@ -131,6 +132,32 @@ def aggregate_status(shard_specs, started_at):
     }
 
 
+def auto_tune_workers(args):
+    """Run a small real-ingest benchmark and return the recommended worker count."""
+    cmd = [
+        sys.executable,
+        os.path.join(SCRIPTS, 'tune_ingest_workers.py'),
+        '--sample-size', str(args.tune_sample_size),
+        '--max-workers', str(args.max_workers),
+        '--item-timeout-seconds', str(args.item_timeout_seconds),
+        '--output', WORKER_TUNE_FILE,
+        '--allow-parser-failures',
+    ]
+    if args.state:
+        cmd.extend(['--state', args.state])
+    if args.offset:
+        cmd.extend(['--offset', str(args.offset)])
+    if args.limit and args.limit > 0:
+        cmd.extend(['--limit', str(args.limit)])
+    print('$ ' + ' '.join(cmd), flush=True)
+    subprocess.run(cmd, cwd=ROOT, check=True)
+    with open(WORKER_TUNE_FILE) as handle:
+        result = json.load(handle)
+    recommended = int(result.get('recommended_workers') or args.workers or 16)
+    print(f"auto-tuned ingest workers={recommended} (results={WORKER_TUNE_FILE})", flush=True)
+    return max(1, recommended)
+
+
 def run_sharded_ingest(args):
     targets = resolve_targets(args)
     total = len(targets)
@@ -204,7 +231,8 @@ def run_sharded_ingest(args):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--workers', type=int, default=6)
+    p.add_argument('--workers', type=int, default=int(os.environ.get('HL_INGEST_WORKERS', '16')),
+                   help='Batch workers per shard (default: HL_INGEST_WORKERS or 16; use --auto-workers to benchmark first)')
     p.add_argument('--shards', type=int, default=1,
                    help='Process-level shards; each shard runs batch_ingest.py over a disjoint CCN slice')
     p.add_argument('--progress-every', type=int, default=25)
@@ -215,7 +243,18 @@ def main():
     p.add_argument('--state')
     p.add_argument('--resume', action='store_true', default=True)
     p.add_argument('--upload-r2', action='store_true')
+    p.add_argument('--auto-workers', action='store_true',
+                   help='Run scripts/tune_ingest_workers.py first and use the fastest stable worker count')
+    p.add_argument('--max-workers', type=int, default=int(os.environ.get('HL_MAX_WORKERS', str(max(16, min(128, (os.cpu_count() or 4) * 8))))),
+                   help='Upper bound for --auto-workers (default: HL_MAX_WORKERS or cpu_count*8 capped at 128)')
+    p.add_argument('--tune-sample-size', type=int, default=48,
+                   help='CCNs per worker step for --auto-workers')
     args = p.parse_args()
+
+    if args.workers < 1:
+        args.auto_workers = True
+    if args.auto_workers:
+        args.workers = auto_tune_workers(args)
 
     started = time.time()
     if args.shards > 1:

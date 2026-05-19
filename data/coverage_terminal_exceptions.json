@@ -1,3 +1,636 @@
 {
-  "exceptions": []
+  "exceptions": [
+    {
+      "ccn": "040088",
+      "failure_logs": [
+        "data/recovery_shard_04.failures.jsonl"
+      ],
+      "hospital_name": "SOUTH ARKANSAS REGIONAL HOSPITAL LLC",
+      "http_content_result": "seed:status=200,alive=1,type=text/html; charset=utf-8",
+      "original_url": "https://www.themedcenter.net/Uploads/Public/Documents/charge-masters/710785071_Med%20Ctr%20of%20S%20Ark_standardcharges.csv",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [],
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_length": null,
+          "content_type": "text/html; charset=utf-8",
+          "http_status": 200,
+          "mrf_url": "https://www.themedcenter.net/Uploads/Public/Documents/charge-masters/710785071_Med%20Ctr%20of%20S%20Ark_standardcharges.csv",
+          "probed_at": "2026-05-11T05:47:26Z"
+        }
+      ]
+    },
+    {
+      "ccn": "050135",
+      "failure_logs": [
+        "data/recovery_shard_04.failures.jsonl"
+      ],
+      "hospital_name": "SOUTHERN CALIFORNIA HOSPITAL AT HOLLYWOOD",
+      "http_content_result": "seed:status=None,alive=None,type=-; rediscovery:status=404,alive=0,type=text/html; charset=utf-8",
+      "original_url": "",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [
+        {
+          "alive": 0,
+          "candidate_url": "https://data.chhs.ca.gov/dataset/0c315f3b-fc3c-4998-bd79-4659616c834d/resource/8f55398a-4e91-4e42-911c-1a107a661189/download/chargemasters-nognhk63.zip",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": null,
+          "head_content_type": "text/html; charset=utf-8",
+          "head_status": 404,
+          "score": 5,
+          "source_page": "exa-hub:https://data.chhs.ca.gov/dataset/chargemasters"
+        },
+        {
+          "alive": 1,
+          "candidate_url": "https://search.hospitalpriceindex.com/hpi2/machineReadable/SouthernCaliforniaHospitalatHollywood/7923",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": 2133,
+          "head_content_type": "text/html",
+          "head_status": 200,
+          "score": 4,
+          "source_page": "exa-hub:https://www.sch-hollywood.com/billing-and-payment/"
+        }
+      ],
+      "seed_probe_history": [
+        {
+          "alive": null,
+          "content_length": null,
+          "content_type": "",
+          "http_status": null,
+          "mrf_url": "",
+          "probed_at": ""
+        }
+      ]
+    },
+    {
+      "ccn": "100047",
+      "failure_logs": [
+        "data/recovery_shard_04.failures.jsonl"
+      ],
+      "hospital_name": "SHOREPOINT HEALTH PUNTA GORDA",
+      "http_content_result": "seed:status=200,alive=1,type=text/html; charset=UTF-8",
+      "original_url": "https://www.shorepointhealthcharlotte.com/Uploads/Public/Documents/charge-masters/650526360_Punta%20Gorda_standardcharges.csv",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [],
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_length": 31671,
+          "content_type": "text/html; charset=UTF-8",
+          "http_status": 200,
+          "mrf_url": "https://www.shorepointhealthcharlotte.com/Uploads/Public/Documents/charge-masters/650526360_Punta%20Gorda_standardcharges.csv",
+          "probed_at": "2026-05-11T05:44:10Z"
+        }
+      ]
+    },
+    {
+      "ccn": "100298",
+      "failure_logs": [
+        "data/recovery_shard_02.failures.jsonl"
+      ],
+      "hospital_name": "FLORIDA STATE HOSPITAL UNIT 31 MED",
+      "http_content_result": "seed:status=404,alive=0,type=text/html; rediscovery:status=200,alive=1,type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "original_url": "https://www.myflfamilies.com/service-programs/mental-health/docs/FSH%20Charge%20Master.xlsx",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [
+        {
+          "alive": 1,
+          "candidate_url": "https://quality.healthfinder.fl.gov/files/AllFacilityData_MiamiDade.xlsx",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": 1583854,
+          "head_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "head_status": 200,
+          "score": 4,
+          "source_page": "exa-hub:https://quality.healthfinder.fl.gov/Compare-Care/charges-explanation"
+        },
+        {
+          "alive": 1,
+          "candidate_url": "https://quality.healthfinder.fl.gov/files/Clinical Lab Facility Data.xlsx",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": 4843006,
+          "head_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "head_status": 200,
+          "score": 3,
+          "source_page": "exa-hub:https://quality.healthfinder.fl.gov/Compare-Care/charges-explanation"
+        }
+      ],
+      "seed_probe_history": [
+        {
+          "alive": 0,
+          "content_length": 1024,
+          "content_type": "text/html",
+          "http_status": 404,
+          "mrf_url": "https://www.myflfamilies.com/service-programs/mental-health/docs/FSH%20Charge%20Master.xlsx",
+          "probed_at": "2026-05-11T05:45:15Z"
+        }
+      ]
+    },
+    {
+      "ccn": "101312",
+      "failure_logs": [
+        "data/recovery_shard_02.failures.jsonl"
+      ],
+      "hospital_name": "FISHERMEN'S COMMUNITY HOSPITAL",
+      "http_content_result": "seed:status=500,alive=0,type=text/html; rediscovery:status=200,alive=1,type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "original_url": "https://baptisthealth.net/-/media/documents/patient-resources/patient-pricing/hospital-price-transparency-february-2022/82-1682066_fishermens-health-inc_standardcharges.ashx",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [
+        {
+          "alive": 1,
+          "candidate_url": "https://quality.healthfinder.fl.gov/files/AllFacilityData_MiamiDade.xlsx",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": 1583854,
+          "head_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "head_status": 200,
+          "score": 4,
+          "source_page": "exa-hub:https://quality.healthfinder.fl.gov/Compare-Care/charges-explanation"
+        },
+        {
+          "alive": 1,
+          "candidate_url": "https://quality.healthfinder.fl.gov/files/Clinical Lab Facility Data.xlsx",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": 4843006,
+          "head_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "head_status": 200,
+          "score": 3,
+          "source_page": "exa-hub:https://quality.healthfinder.fl.gov/Compare-Care/charges-explanation"
+        }
+      ],
+      "seed_probe_history": [
+        {
+          "alive": 0,
+          "content_length": 59361,
+          "content_type": "text/html",
+          "http_status": 500,
+          "mrf_url": "https://baptisthealth.net/-/media/documents/patient-resources/patient-pricing/hospital-price-transparency-february-2022/82-1682066_fishermens-health-inc_standardcharges.ashx",
+          "probed_at": "2026-05-11T05:45:27Z"
+        }
+      ]
+    },
+    {
+      "ccn": "110043",
+      "failure_logs": [
+        "data/recovery_shard_04.failures.jsonl"
+      ],
+      "hospital_name": "ST JOSEPH'S HOSPITAL - SAVANNAH",
+      "http_content_result": "seed:status=200,alive=1,type=text/html; charset=utf-8",
+      "original_url": "https://www.sjchs.org/docs/default-source/default-document-library/110043_st-josephs-hospital---savannah_standardcharges_id580568702.json",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [],
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_length": null,
+          "content_type": "text/html; charset=utf-8",
+          "http_status": 200,
+          "mrf_url": "https://www.sjchs.org/docs/default-source/default-document-library/110043_st-josephs-hospital---savannah_standardcharges_id580568702.json",
+          "probed_at": "2026-05-11T05:46:34Z"
+        }
+      ]
+    },
+    {
+      "ccn": "110142",
+      "failure_logs": [
+        "data/recovery_shard_02.failures.jsonl"
+      ],
+      "hospital_name": "EVANS MEMORIAL HOSPITAL",
+      "http_content_result": "seed:status=None,alive=None,type=-; rediscovery:status=200,alive=1,type=text/html; charset=utf-8",
+      "original_url": "",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [
+        {
+          "alive": 1,
+          "candidate_url": "https://www.dropbox.com/s/4m6mxb5ruzqs83x/Evans%20Memorial%20DRG%20Average%20Cost%20FY%202018_01.csv?dl=0",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": null,
+          "head_content_type": "text/html; charset=utf-8",
+          "head_status": 200,
+          "score": 4,
+          "source_page": "exa-hub:https://www.evansmemorialhospital.org/the-clinic-2"
+        },
+        {
+          "alive": 1,
+          "candidate_url": "https://www.dropbox.com/s/9ftpyy3bmbw29af/582257925_EvansMemorialHospital_ShoppableServices.csv?dl=0",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": null,
+          "head_content_type": "text/html; charset=utf-8",
+          "head_status": 200,
+          "score": 4,
+          "source_page": "exa-hub:https://www.evansmemorialhospital.org/the-clinic-2"
+        }
+      ],
+      "seed_probe_history": [
+        {
+          "alive": null,
+          "content_length": null,
+          "content_type": "",
+          "http_status": null,
+          "mrf_url": "",
+          "probed_at": ""
+        }
+      ]
+    },
+    {
+      "ccn": "140148",
+      "failure_logs": [
+        "data/recovery_shard_03.failures.jsonl"
+      ],
+      "hospital_name": "MEMORIAL MEDICAL CENTER",
+      "http_content_result": "seed:status=200,alive=1,type=text/html",
+      "original_url": "https://memorial.health/Resources/c16d4818-5a84-4f89-85dc-373b1c474c58/370661220-Memorial-Medical-Center-standardcharges.csv",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [],
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_length": null,
+          "content_type": "text/html",
+          "http_status": 200,
+          "mrf_url": "https://memorial.health/Resources/c16d4818-5a84-4f89-85dc-373b1c474c58/370661220-Memorial-Medical-Center-standardcharges.csv",
+          "probed_at": "2026-05-11T05:44:40Z"
+        }
+      ]
+    },
+    {
+      "ccn": "141324",
+      "failure_logs": [
+        "data/recovery_shard_02.failures.jsonl"
+      ],
+      "hospital_name": "FERRELL HOSPITAL COMMUNITY FOUNDATIONS",
+      "http_content_result": "seed:status=None,alive=None,type=-; rediscovery:status=200,alive=1,type=text/html",
+      "original_url": "",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [
+        {
+          "alive": 1,
+          "candidate_url": "https://search.hospitalpriceindex.com/hpi2/machineReadable/FerrellHospital/8309",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": 2133,
+          "head_content_type": "text/html",
+          "head_status": 200,
+          "score": 4,
+          "source_page": "exa-hub:http://www.ferrellhosp.org/for-you/patients-and-visitors/patients/pricing"
+        },
+        {
+          "alive": 1,
+          "candidate_url": "https://search.hospitalpriceindex.com/hpi2/machineReadable/FerrellHospital/8309or",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": 2133,
+          "head_content_type": "text/html",
+          "head_status": 200,
+          "score": 4,
+          "source_page": "exa-hub:http://www.ferrellhosp.org/for-you/patients-and-visitors/patients/pricing"
+        }
+      ],
+      "seed_probe_history": [
+        {
+          "alive": null,
+          "content_length": null,
+          "content_type": "",
+          "http_status": null,
+          "mrf_url": "",
+          "probed_at": ""
+        }
+      ]
+    },
+    {
+      "ccn": "181308",
+      "failure_logs": [
+        "data/recovery_shard_01.failures.jsonl"
+      ],
+      "hospital_name": "BLUEGRASS COMMUNITY HOSPITAL",
+      "http_content_result": "seed:status=200,alive=1,type=text/html; charset=utf-8",
+      "original_url": "https://www.bluegrasscommunityhospital.com/sites/bluegrass/assets/uploads/MRF%20-%20Bluegrass_Community_Standard_Charges_06122021%20522260534.zip",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [],
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_length": null,
+          "content_type": "text/html; charset=utf-8",
+          "http_status": 200,
+          "mrf_url": "https://www.bluegrasscommunityhospital.com/sites/bluegrass/assets/uploads/MRF%20-%20Bluegrass_Community_Standard_Charges_06122021%20522260534.zip",
+          "probed_at": "2026-05-11T05:45:14Z"
+        }
+      ]
+    },
+    {
+      "ccn": "220030",
+      "failure_logs": [
+        "data/recovery_shard_01.failures.jsonl"
+      ],
+      "hospital_name": "BAYSTATE WING HOSPITAL",
+      "http_content_result": "seed:status=200,alive=1,type=text/html; charset=utf-8",
+      "original_url": "https://www.baystatehealth.org/-/media/files/patients-and-visitors/billing-and-financial-assistance/hospital-standard-charges/222519813-baystatewinghospital-standardcharges.zip",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [],
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_length": 137576,
+          "content_type": "text/html; charset=utf-8",
+          "http_status": 200,
+          "mrf_url": "https://www.baystatehealth.org/-/media/files/patients-and-visitors/billing-and-financial-assistance/hospital-standard-charges/222519813-baystatewinghospital-standardcharges.zip",
+          "probed_at": "2026-05-11T05:47:53Z"
+        }
+      ]
+    },
+    {
+      "ccn": "240036",
+      "failure_logs": [
+        "data/recovery_shard_04.failures.jsonl"
+      ],
+      "hospital_name": "ST CLOUD HOSPITAL",
+      "http_content_result": "seed:status=403,alive=0,type=text/html; rediscovery:status=200,alive=1,type=application/pdf",
+      "original_url": "https://www.centracare.com/documents/Standard-Charges-St-Cloud-Hospital.xls",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [
+        {
+          "alive": 1,
+          "candidate_url": "https://www.allinahealth.org/-/media/allina-health/files/customer-service/united-hospital-standard-charges.pdf",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": 1566246,
+          "head_content_type": "application/pdf",
+          "head_status": 200,
+          "score": 7,
+          "source_page": "exa:https://www.newchoicehealth.com/f/1043269798/st-cloud-hospital"
+        }
+      ],
+      "seed_probe_history": [
+        {
+          "alive": 0,
+          "content_length": 444,
+          "content_type": "text/html",
+          "http_status": 403,
+          "mrf_url": "https://www.centracare.com/documents/Standard-Charges-St-Cloud-Hospital.xls",
+          "probed_at": "2026-05-11T05:45:11Z"
+        }
+      ]
+    },
+    {
+      "ccn": "241366",
+      "failure_logs": [
+        "data/recovery_shard_03.failures.jsonl"
+      ],
+      "hospital_name": "MEEKER MEMORIAL HOSPITAL",
+      "http_content_result": "seed:status=None,alive=None,type=-; rediscovery:status=200,alive=1,type=application/pdf",
+      "original_url": "",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [
+        {
+          "alive": 1,
+          "candidate_url": "https://www.meekermemorial.org/wp-content/uploads/2025/03/2025-Primary-Care-Pricing-Transparency.pdf",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": 825925,
+          "head_content_type": "application/pdf",
+          "head_status": 200,
+          "score": 4,
+          "source_page": "exa-hub:https://www.meekermemorial.org/pricing-and-financial-assistance/"
+        }
+      ],
+      "seed_probe_history": [
+        {
+          "alive": null,
+          "content_length": null,
+          "content_type": "",
+          "http_status": null,
+          "mrf_url": "",
+          "probed_at": ""
+        }
+      ]
+    },
+    {
+      "ccn": "260034",
+      "failure_logs": [
+        "data/recovery_shard_01.failures.jsonl"
+      ],
+      "hospital_name": "BATES COUNTY MEMORIAL HOSPITAL",
+      "http_content_result": "seed:status=None,alive=None,type=-; rediscovery:status=404,alive=0,type=application/xml",
+      "original_url": "",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [
+        {
+          "alive": 0,
+          "candidate_url": "https://sthpiprd.blob.core.windows.net/machine-readable-files/7803/436052772_bates-county-memorial-hospital_standardcharges.json",
+          "discovered_at": "2026-05-11T08:03:03+00:00",
+          "head_content_length": 215,
+          "head_content_type": "application/xml",
+          "head_status": 404,
+          "score": 10,
+          "source_page": "cms-hpt-email:https://www.bcmhospital.com"
+        },
+        {
+          "alive": 1,
+          "candidate_url": "https://search.hospitalpriceindex.com/hpi2/machineReadable/batescountymemorialhospital/7803",
+          "discovered_at": "2026-05-11T06:09:01+00:00",
+          "head_content_length": 2133,
+          "head_content_type": "text/html",
+          "head_status": 200,
+          "score": 4,
+          "source_page": "https://bcmhospital.com/pricing-transparency/"
+        }
+      ],
+      "seed_probe_history": [
+        {
+          "alive": null,
+          "content_length": null,
+          "content_type": "",
+          "http_status": null,
+          "mrf_url": "",
+          "probed_at": ""
+        }
+      ]
+    },
+    {
+      "ccn": "271340",
+      "failure_logs": [
+        "data/recovery_shard_01.failures.jsonl"
+      ],
+      "hospital_name": "BITTERROOT HEALTH - DALY HOSPITAL",
+      "http_content_result": "seed:status=None,alive=None,type=-; rediscovery:status=200,alive=1,type=text/html",
+      "original_url": "",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [
+        {
+          "alive": 1,
+          "candidate_url": "https://search.hospitalpriceindex.com/hpi2/machineReadable/MarcusDalyMemorialHospital/8431or",
+          "discovered_at": "2026-05-11T08:03:03+00:00",
+          "head_content_length": 2133,
+          "head_content_type": "text/html",
+          "head_status": 200,
+          "score": 10,
+          "source_page": "cms-hpt-email:https://www.bitterroothealth.org"
+        }
+      ],
+      "seed_probe_history": [
+        {
+          "alive": null,
+          "content_length": null,
+          "content_type": "",
+          "http_status": null,
+          "mrf_url": "",
+          "probed_at": ""
+        }
+      ]
+    },
+    {
+      "ccn": "281357",
+      "failure_logs": [
+        "data/recovery_shard_04.failures.jsonl"
+      ],
+      "hospital_name": "SIDNEY REGIONAL MEDICAL CENTER",
+      "http_content_result": "seed:status=None,alive=None,type=-; rediscovery:status=200,alive=1,type=text/html",
+      "original_url": "",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [
+        {
+          "alive": 1,
+          "candidate_url": "https://search.hospitalpriceindex.com/hpi2/machineReadable/SidneyRegionalMedicalCenter/8186or",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": 2133,
+          "head_content_type": "text/html",
+          "head_status": 200,
+          "score": 4,
+          "source_page": "exa-hub:https://www.sidneyrmc.com/billing-basics/"
+        }
+      ],
+      "seed_probe_history": [
+        {
+          "alive": null,
+          "content_length": null,
+          "content_type": "",
+          "http_status": null,
+          "mrf_url": "",
+          "probed_at": ""
+        }
+      ]
+    },
+    {
+      "ccn": "330259",
+      "failure_logs": [
+        "data/recovery_shard_03.failures.jsonl"
+      ],
+      "hospital_name": "MERCY MEDICAL CENTER",
+      "http_content_result": "seed:status=200,alive=1,type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "original_url": "https://www.chsli.org/sites/default/files/2022-01/1659330173_mercy-medical-center_standardcharges.xlsx",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [],
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_length": 2235425,
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "http_status": 200,
+          "mrf_url": "https://www.chsli.org/sites/default/files/2022-01/1659330173_mercy-medical-center_standardcharges.xlsx",
+          "probed_at": "2026-05-11T05:47:04Z"
+        }
+      ]
+    },
+    {
+      "ccn": "440058",
+      "failure_logs": [
+        "data/recovery_shard_04.failures.jsonl"
+      ],
+      "hospital_name": "SOUTHERN TENNESSEE REGIONAL HEALTH SYSTEM WINCHEST",
+      "http_content_result": "seed:status=200,alive=1,type=text/html; charset=utf-8",
+      "original_url": "https://www.southerntnwinchester.com/sites/strhswinchester/assets/uploads/MRF%20-%20STRHS_-_Winchester_Standard_Charges_06112021%20621762535.zip",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [],
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_length": null,
+          "content_type": "text/html; charset=utf-8",
+          "http_status": 200,
+          "mrf_url": "https://www.southerntnwinchester.com/sites/strhswinchester/assets/uploads/MRF%20-%20STRHS_-_Winchester_Standard_Charges_06112021%20621762535.zip",
+          "probed_at": "2026-05-11T05:47:19Z"
+        }
+      ]
+    },
+    {
+      "ccn": "440218",
+      "failure_logs": [
+        "data/recovery_shard_04.failures.jsonl"
+      ],
+      "hospital_name": "SAINT THOMAS HOSPITAL FOR SPINAL SURGERY",
+      "http_content_result": "seed:status=200,alive=1,type=text/html; charset=utf-8; rediscovery:status=404,alive=0,type=text/html",
+      "original_url": "http://www.sthspecialtysurgery.com/media/21043/621772195_st.thomashospitalforspecialtysurgery_standardcharges.json",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [
+        {
+          "alive": 0,
+          "candidate_url": "https://mrfs.hyvehealthcare.com/USPI/621772195_st-thomas-hospital-for-specialty-surgery_standardcharges.json",
+          "discovered_at": "2026-05-11T07:55:54+00:00",
+          "head_content_length": 321,
+          "head_content_type": "text/html",
+          "head_status": 404,
+          "score": 10,
+          "source_page": "cms-hpt-v2:http://www.sthspecialtysurgery.com"
+        }
+      ],
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_length": 64874,
+          "content_type": "text/html; charset=utf-8",
+          "http_status": 200,
+          "mrf_url": "http://www.sthspecialtysurgery.com/media/21043/621772195_st.thomashospitalforspecialtysurgery_standardcharges.json",
+          "probed_at": "2026-05-11T05:47:38Z"
+        }
+      ]
+    },
+    {
+      "ccn": "443303",
+      "failure_logs": [
+        "data/recovery_shard_02.failures.jsonl"
+      ],
+      "hospital_name": "EAST TENNESSEE CHILDRENS HOSPITAL",
+      "http_content_result": "seed:status=None,alive=None,type=-; rediscovery:status=200,alive=1,type=application/xml",
+      "original_url": "",
+      "provisional": true,
+      "reason": "no_live_mrf",
+      "rediscovery_attempts": [
+        {
+          "alive": 1,
+          "candidate_url": "https://www.openmedicaid.org/feed.xml",
+          "discovered_at": "2026-05-11T06:49:46+00:00",
+          "head_content_length": 12032,
+          "head_content_type": "application/xml",
+          "head_status": 200,
+          "score": 3,
+          "source_page": "exa-hub:https://www.openmedicaid.org/providers/1235350901"
+        }
+      ],
+      "seed_probe_history": [
+        {
+          "alive": null,
+          "content_length": null,
+          "content_type": "",
+          "http_status": null,
+          "mrf_url": "",
+          "probed_at": ""
+        }
+      ]
+    }
+  ]
 }

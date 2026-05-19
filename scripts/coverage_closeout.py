@@ -30,6 +30,7 @@ BATCH_FILE = DATA_DIR / "coverage_closeout_batch_ccns.txt"
 INGEST_STATUS_FILE = DATA_DIR / "coverage_closeout_ingest.status.json"
 FAILURES_FILE = DATA_DIR / "coverage_closeout_failures.jsonl"
 EXCEPTIONS_FILE = DATA_DIR / "coverage_terminal_exceptions.json"
+WORKER_TUNE_FILE = DATA_DIR / "worker_tune_results.json"
 ROW_COUNT_RE = re.compile(rb'"row_count":(\d+)')
 FAILURE_GLOBS = (
     str(DATA_DIR / "full_standardize_failures.jsonl"),
@@ -463,6 +464,7 @@ def write_closeout_artifacts(
         "preview_gap_file": display_path(preview_gap_file),
         "terminal_exceptions_file": display_path(exceptions_file),
         "failure_clusters": closeout["failure_clusters"],
+        "last_cluster_attacked": (closeout["failure_clusters"][0] if closeout["failure_clusters"] else None),
         "sample_preview_ccns": closeout["sample_preview_ccns"],
     }
     write_json(status_file, status_payload)
@@ -483,6 +485,39 @@ def resolve_python() -> str:
 def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
     print("$ " + " ".join(cmd), flush=True)
     return subprocess.run(cmd, cwd=str(ROOT), text=True, check=check)
+
+
+def auto_tune_batch_workers(batch_file: Path, args: argparse.Namespace) -> int:
+    """Run the real-work cloud tuner against the current parse gap and return workers."""
+    if not args.auto_workers:
+        return args.batch_workers
+    if not batch_file.exists() or batch_file.stat().st_size == 0:
+        return args.batch_workers
+    cmd = [
+        resolve_python(),
+        str(ROOT / "scripts" / "tune_ingest_workers.py"),
+        "--ccns-file",
+        str(batch_file),
+        "--sample-size",
+        str(args.tune_sample_size),
+        "--max-workers",
+        str(args.max_workers),
+        "--item-timeout-seconds",
+        str(args.batch_item_timeout_seconds),
+        "--max-failure-rate",
+        str(args.tune_max_failure_rate),
+        "--fallback-workers",
+        str(args.batch_workers),
+        "--output",
+        str(WORKER_TUNE_FILE),
+        "--allow-parser-failures",
+    ]
+    run(cmd)
+    result = read_json(WORKER_TUNE_FILE)
+    if not isinstance(result, dict):
+        return args.batch_workers
+    recommended = int(result.get("recommended_workers") or args.batch_workers)
+    return max(1, recommended)
 
 
 def run_batch_ingest(batch_file: Path, workers: int, timeout_seconds: int) -> None:
@@ -561,14 +596,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--loop-until-complete", action="store_true")
     parser.add_argument("--max-loops", type=int, default=1)
     parser.add_argument("--sleep-seconds", type=int, default=0)
-    parser.add_argument("--batch-workers", type=int, default=4)
+    parser.add_argument("--batch-workers", type=int, default=int(os.environ.get("HL_INGEST_WORKERS", "16")))
     parser.add_argument("--batch-item-timeout-seconds", type=int, default=2400)
     parser.add_argument("--retry-passes", type=int, default=0)
-    parser.add_argument("--retry-workers", type=int, default=3)
+    parser.add_argument("--retry-workers", type=int, default=int(os.environ.get("HL_RETRY_WORKERS", "12")))
     parser.add_argument("--retry-item-timeout-seconds", type=int, default=1200)
     parser.add_argument("--rediscover-limit", type=int, default=0)
     parser.add_argument("--rediscover-top-n", type=int, default=5)
     parser.add_argument("--publish-each-loop", action="store_true")
+    parser.add_argument("--auto-workers", action="store_true", help="Benchmark the current parse gap and use the fastest stable batch worker count")
+    parser.add_argument("--max-workers", type=int, default=int(os.environ.get("HL_MAX_WORKERS", str(max(16, min(128, (os.cpu_count() or 4) * 8))))))
+    parser.add_argument("--tune-sample-size", type=int, default=48)
+    parser.add_argument("--tune-max-failure-rate", type=float, default=0.35)
     return parser.parse_args()
 
 
@@ -598,7 +637,9 @@ def main() -> int:
         if int(payload["missing_parsed"]) == 0 and int(payload["missing_preview"]) == 0:
             break
         if int(payload["missing_parsed"]) > 0:
-            run_batch_ingest(Path(args.batch_file), args.batch_workers, args.batch_item_timeout_seconds)
+            tuned_workers = auto_tune_batch_workers(Path(args.batch_file), args)
+            print(f"closeout ingest workers={tuned_workers}", flush=True)
+            run_batch_ingest(Path(args.batch_file), tuned_workers, args.batch_item_timeout_seconds)
             run_retry_passes(args.retry_passes, args.retry_workers, args.retry_item_timeout_seconds)
             refreshed = write_closeout_artifacts(
                 status_file=Path(args.status_file),

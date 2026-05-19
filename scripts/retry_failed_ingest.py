@@ -38,8 +38,8 @@ def parse_args(argv=None):
     parser.add_argument(
         "--workers",
         type=int,
-        default=4,
-        help="Parallel retry workers",
+        default=int(os.environ.get("HL_RETRY_WORKERS", "12")),
+        help="Parallel retry workers (default: HL_RETRY_WORKERS or 12)",
     )
     parser.add_argument(
         "--item-timeout-seconds",
