@@ -39,7 +39,6 @@ const standardizedPriceHospitals =
   SITE_COUNTS.standardized_price_hospitals ?? SITE_COUNTS.standardized_price_index_hospitals ?? 3587;
 const parsedMrfOutputs = SITE_COUNTS.standardized_price_index_hospitals ?? 3699;
 const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 62577586;
-const cptIndexedHospitals = SITE_COUNTS.cpt_indexed_hospitals ?? 2210;
 const cptIndexedRows = SITE_COUNTS.cpt_indexed_rows ?? 14247687;
 const updatedDate = SITE_COUNTS.generated_at.slice(0, 10);
 const fmt = (n: number) => n.toLocaleString("en-US");
