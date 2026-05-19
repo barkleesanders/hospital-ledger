@@ -126,7 +126,7 @@ function homePage(url: string) {
             <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
               <div class="text-xs uppercase tracking-wider text-zinc-500">Procedures</div>
               <div id="kpi-patient-procedures" class="mt-1 text-3xl font-semibold tab-num text-emerald-300">
-                10,000
+                5,000
               </div>
               <div class="text-xs text-zinc-500 mt-1">comparable across hospitals</div>
             </div>
@@ -135,7 +135,7 @@ function homePage(url: string) {
               <div id="kpi-patient-payers" class="mt-1 text-3xl font-semibold tab-num text-emerald-300">
                 200+
               </div>
-              <div class="text-xs text-zinc-500 mt-1">with negotiated rates</div>
+              <div class="text-xs text-zinc-500 mt-1">canonical brands · 21,803 raw</div>
             </div>
             <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
               <div class="text-xs uppercase tracking-wider text-zinc-500">Cost</div>
@@ -439,7 +439,7 @@ function homePage(url: string) {
                   </tr>
                   <tr>
                     <td class="py-2 pr-3">Validate CPT / HCPCS codes against AMA reference</td>
-                    <td class="py-2 pr-3">10,000 codes</td>
+                    <td class="py-2 pr-3">5,000 codes</td>
                     <td class="py-2 pr-3">~3 codes / min spot-check + cleanup</td>
                     <td class="py-2 pr-3 text-right text-emerald-300">30</td>
                   </tr>
@@ -634,7 +634,7 @@ function homePage(url: string) {
             >
               github.com/barkleesanders/hospital-ledger
             </a>
-            {" "}— 36 pipeline scripts, ~10,700 lines of Python, ~3,000 lines of TypeScript. AGPLv3 code,
+            {" "}— 34 pipeline scripts, ~10,700 lines of Python, ~3,400 lines of TypeScript. AGPLv3 code,
             CC0 data. <span class="text-zinc-500">No tracking. No signup. Free forever.</span>
           </p>
         </section>

@@ -597,7 +597,7 @@
       try {
         const r = await fetch("/api/procedure/" + encodeURIComponent(code), { cache: "no-store" });
         if (r.status === 404) {
-          procMsg.textContent = `Code ${code} isn't in our top 10,000 indexed procedures yet. Try a more common procedure or browse hospital prices directly.`;
+          procMsg.textContent = `Code ${code} isn't in our top 5,000 indexed procedures yet. Try a more common procedure or browse hospital prices directly.`;
           return;
         }
         if (!r.ok) {
