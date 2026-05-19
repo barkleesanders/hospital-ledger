@@ -15,6 +15,34 @@ import type { Context } from "hono";
 import type { Env } from "../index";
 import { Layout } from "../components/Layout";
 import { ProcedureCarousel } from "../components/ProcedureCarousel";
+import summaryJson from "../../public/data/summary.json";
+
+type HomeSummary = {
+  generated_at: string;
+  total_facilities?: number;
+  cms_required_total: number;
+  compliant: number;
+  compliance_pct: number;
+  standardized_price_index_hospitals?: number;
+  standardized_price_hospitals?: number;
+  standardized_price_rows?: number;
+  cpt_indexed_hospitals?: number;
+  cpt_indexed_rows?: number;
+  enforcement_actions_total: number;
+};
+
+const SITE_COUNTS = summaryJson as HomeSummary;
+const totalFacilities = SITE_COUNTS.total_facilities ?? 5426;
+const cmsRequiredTotal = SITE_COUNTS.cms_required_total;
+const liveMrfRequired = SITE_COUNTS.compliant;
+const standardizedPriceHospitals =
+  SITE_COUNTS.standardized_price_hospitals ?? SITE_COUNTS.standardized_price_index_hospitals ?? 3587;
+const parsedMrfOutputs = SITE_COUNTS.standardized_price_index_hospitals ?? 3699;
+const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 62577586;
+const cptIndexedHospitals = SITE_COUNTS.cpt_indexed_hospitals ?? 2210;
+const cptIndexedRows = SITE_COUNTS.cpt_indexed_rows ?? 14247687;
+const updatedDate = SITE_COUNTS.generated_at.slice(0, 10);
+const fmt = (n: number) => n.toLocaleString("en-US");
 
 function homePage(url: string) {
   return (
@@ -38,11 +66,24 @@ function homePage(url: string) {
             What does your hospital <em class="text-emerald-300">actually</em> charge?
           </h1>
           <p class="mt-5 text-base sm:text-lg md:text-xl text-zinc-300 max-w-2xl leading-snug">
-            Compare the real price of a procedure across{" "}
+            Compare standardized price rows from{" "}
             <span id="hero-hospital-count" class="font-semibold text-white tab-num">
-              3,699
+              {fmt(standardizedPriceHospitals)}
             </span>{" "}
-            U.S. hospitals — straight from each hospital's own federally-mandated price file.
+            U.S. hospitals — straight from each hospital's own federally-mandated price file. We separately verified{" "}
+            <span id="hero-live-mrf-count" class="font-semibold text-white tab-num">
+              {fmt(liveMrfRequired)}
+            </span>{" "}
+            of{" "}
+            <span id="hero-required-visible" class="font-semibold text-white tab-num">
+              {fmt(cmsRequiredTotal)}
+            </span>{" "}
+            CMS-required hospitals have a live machine-readable file.
+          </p>
+          <p class="mt-3 text-xs text-zinc-500 max-w-2xl leading-relaxed">
+            Count definition: the headline uses only hospitals with <code class="mono text-zinc-300">n &gt; 0</code>{" "}
+            rows in <a href="/api/prices-index" class="underline hover:text-zinc-300">/api/prices-index</a>. The
+            summary is mirrored in <a href="/data/summary.json" class="underline hover:text-zinc-300">/data/summary.json</a>.
           </p>
 
           <ProcedureCarousel />
@@ -78,9 +119,9 @@ function homePage(url: string) {
             <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
               <div class="text-xs uppercase tracking-wider text-zinc-500">Hospitals · with prices</div>
               <div id="kpi-patient-hospitals" class="mt-1 text-3xl font-semibold tab-num text-emerald-300">
-                —
+                {fmt(standardizedPriceHospitals)}
               </div>
-              <div class="text-xs text-zinc-500 mt-1">readable, indexed prices</div>
+              <div class="text-xs text-zinc-500 mt-1">standardized price rows</div>
             </div>
             <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
               <div class="text-xs uppercase tracking-wider text-zinc-500">Procedures</div>
@@ -107,7 +148,7 @@ function homePage(url: string) {
             <span id="kpi-missing">—</span>
             <span id="kpi-enforcement">—</span>
             <span id="kpi-actions">—</span>
-            <span id="hero-required">4,625</span>
+            <span id="hero-required">{fmt(cmsRequiredTotal)}</span>
           </div>
 
           <div class="mt-8 flex flex-wrap gap-3 text-sm">
@@ -284,8 +325,10 @@ function homePage(url: string) {
               <li class="flex gap-3">
                 <span class="text-emerald-400 mt-1">▸</span>
                 <span>
-                  Most hospitals technically comply by uploading a giant unreadable file. We parsed all 4,625 of them
-                  so you don't have to.
+                  Most hospitals technically comply by uploading a giant unreadable file. We verified live MRFs for{" "}
+                  <span class="tab-num">{fmt(liveMrfRequired)}</span> of{" "}
+                  <span class="tab-num">{fmt(cmsRequiredTotal)}</span> CMS-required hospitals and standardized price
+                  rows for <span class="tab-num">{fmt(standardizedPriceHospitals)}</span> of them.
                 </span>
               </li>
               <li class="flex gap-3">
@@ -366,13 +409,13 @@ function homePage(url: string) {
                 <tbody class="text-zinc-300 divide-y divide-zinc-800/60">
                   <tr>
                     <td class="py-2 pr-3">Parse each MRF (download · open · map columns · normalize · QA)</td>
-                    <td class="py-2 pr-3">3,699 files</td>
+                    <td class="py-2 pr-3">{fmt(parsedMrfOutputs)} parsed outputs; {fmt(standardizedPriceHospitals)} with rows</td>
                     <td class="py-2 pr-3">~77 min avg (90% × 66 min clean + 10% × 180 min hard)</td>
                     <td class="py-2 pr-3 text-right text-emerald-300">4,747</td>
                   </tr>
                   <tr>
                     <td class="py-2 pr-3">Find candidate MRF URLs from CMS + transparency pages</td>
-                    <td class="py-2 pr-3">4,625 hospitals</td>
+                    <td class="py-2 pr-3">{fmt(cmsRequiredTotal)} hospitals</td>
                     <td class="py-2 pr-3">~5 min / hospital</td>
                     <td class="py-2 pr-3 text-right text-emerald-300">385</td>
                   </tr>
@@ -408,7 +451,7 @@ function homePage(url: string) {
                   </tr>
                   <tr>
                     <td class="py-2 pr-3">Build the cross-hospital price index (joins, dedup, pivots)</td>
-                    <td class="py-2 pr-3">~660 K rows</td>
+                    <td class="py-2 pr-3">{fmt(cptIndexedRows)} CPT / HCPCS rows</td>
                     <td class="py-2 pr-3">Excel/Power Query at solo-analyst pace</td>
                     <td class="py-2 pr-3 text-right text-emerald-300">40</td>
                   </tr>
@@ -517,8 +560,8 @@ function homePage(url: string) {
             </div>
             <div class="rounded-lg bg-zinc-950/50 border border-zinc-800 p-4">
               <div class="text-xs uppercase tracking-wider text-zinc-500">MRFs parsed</div>
-              <div class="mt-1 text-2xl font-semibold tab-num text-emerald-300">3,699</div>
-              <div class="text-xs text-zinc-500 mt-1">across 6 schema variants → one schema</div>
+              <div class="mt-1 text-2xl font-semibold tab-num text-emerald-300">{fmt(parsedMrfOutputs)}</div>
+              <div class="text-xs text-zinc-500 mt-1">{fmt(standardizedPriceHospitals)} produced standardized rows</div>
             </div>
             <div class="rounded-lg bg-zinc-950/50 border border-zinc-800 p-4">
               <div class="text-xs uppercase tracking-wider text-zinc-500">URLs probed</div>
@@ -538,7 +581,7 @@ function homePage(url: string) {
                 The 11-stage pipeline
               </div>
               <ol class="space-y-1.5 text-sm text-zinc-300 list-decimal pl-4">
-                <li>Seed the CMS hospital universe (5,426 facilities)</li>
+                <li>Seed the CMS hospital universe ({fmt(totalFacilities)} facilities)</li>
                 <li>Load TPAFS MRF URL seeds, probe each for liveness</li>
                 <li>Rediscover dead URLs from each hospital's transparency page</li>
                 <li>Exa web search fallback for the still-missing</li>
@@ -599,7 +642,11 @@ function homePage(url: string) {
         <section id="search">
           <h2 class="text-2xl font-semibold tracking-tight">Search every hospital</h2>
           <p class="text-sm text-zinc-400 mt-1">
-            Real-time filter across all <span id="hosp-count">5,426</span> facilities
+            Real-time filter across all <span id="hosp-count">{fmt(totalFacilities)}</span> facilities.{" "}
+            <span class="text-zinc-500">
+              {fmt(cmsRequiredTotal)} are CMS-required; {fmt(standardizedPriceHospitals)} currently have standardized
+              price rows.
+            </span>
           </p>
           <div class="mt-4 grid md:grid-cols-[1fr_180px_160px] gap-3">
             <input
@@ -735,9 +782,13 @@ function homePage(url: string) {
               <p class="mt-3 text-xs text-zinc-500">
                 Current on-site preview coverage:{" "}
                 <span id="methodology-price-count" class="tab-num text-zinc-300">
-                  —
+                  {fmt(standardizedPriceHospitals)}
                 </span>{" "}
-                hospitals with standardized price rows.
+                hospitals with standardized price rows, out of{" "}
+                <span id="methodology-live-mrf-count" class="tab-num text-zinc-300">
+                  {fmt(liveMrfRequired)}
+                </span>{" "}
+                CMS-required hospitals with a verified live MRF.
               </p>
             </div>
             <div class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4">
@@ -754,7 +805,7 @@ function homePage(url: string) {
                 </li>
                 <li>
                   <strong>Standardized price preview</strong> appears when parsed rows were actually generated for that
-                  hospital.
+                  hospital. Hospitals with zero generated rows are not counted in the headline.
                 </li>
               </ul>
               <p class="mt-3 text-xs text-zinc-500">
@@ -775,19 +826,19 @@ function homePage(url: string) {
             <div>
               <div class="text-xs uppercase tracking-wider text-zinc-500">Hospital previews</div>
               <div id="price-hospital-count" class="mt-1 text-2xl font-semibold tab-num text-emerald-300">
-                —
+                {fmt(standardizedPriceHospitals)}
               </div>
             </div>
             <div>
               <div class="text-xs uppercase tracking-wider text-zinc-500">Standardized rows</div>
               <div id="price-row-count" class="mt-1 text-2xl font-semibold tab-num text-zinc-100">
-                —
+                {fmt(standardizedPriceRows)}
               </div>
             </div>
             <div>
               <div class="text-xs uppercase tracking-wider text-zinc-500">CPT / HCPCS codes</div>
               <div id="price-code-count" class="mt-1 text-2xl font-semibold tab-num text-zinc-100">
-                —
+                Load on search
               </div>
             </div>
           </div>
@@ -816,11 +867,11 @@ function homePage(url: string) {
           <div class="mt-4 grid md:grid-cols-2 gap-3 text-sm">
             <a href="/data/hospitals.json" class="rounded-md border border-zinc-700 hover:bg-zinc-800 p-3">
               <div class="mono text-emerald-400">/data/hospitals.json</div>
-              <div class="text-zinc-400 mt-1">Full dataset · 3.1 MB · 5,426 hospitals</div>
+              <div class="text-zinc-400 mt-1">Full dataset · 3.1 MB · {fmt(totalFacilities)} facilities</div>
             </a>
             <a href="/data/summary.json" class="rounded-md border border-zinc-700 hover:bg-zinc-800 p-3">
               <div class="mono text-emerald-400">/data/summary.json</div>
-              <div class="text-zinc-400 mt-1">Aggregate stats · 5.5 KB</div>
+              <div class="text-zinc-400 mt-1">Aggregate stats and count definitions</div>
             </a>
             <a href="/api/cpt-index" class="rounded-md border border-zinc-700 hover:bg-zinc-800 p-3">
               <div class="mono text-emerald-400">/api/cpt-index</div>
@@ -841,15 +892,17 @@ function homePage(url: string) {
           </p>
           <p>
             <strong>Method:</strong> 11 stages (TPAFS seed → page parsing → Exa search → Claude agents → CMS-HPT marker
-            files → email-domain expansion → Wayback fallback). 86.2% live MRFs found via automated probing. Updated
-            quarterly.
+            files → email-domain expansion → Wayback fallback). {SITE_COUNTS.compliance_pct}% live MRFs found via
+            automated probing; {fmt(standardizedPriceHospitals)} hospitals have standardized price rows. Updated from
+            generated data on {updatedDate}.
           </p>
           <p>
             <strong>Limits:</strong> Some MRFs require browser bot-bypass (Akamai-walled hospitals). We don't claim 100%
             — and the 13.8% gap IS the policy artifact: federally-required, federally-cited, still not public.
           </p>
           <p class="text-zinc-600">
-            Not affiliated with CMS, HHS, Cost Plus Drugs, or any commercial transparency vendor. No warranty.
+            © 2026 Hospital Ledger. Not affiliated with CMS, HHS, Cost Plus Drugs, or any commercial transparency
+            vendor. No warranty.
           </p>
         </footer>
       </main>

@@ -5,20 +5,20 @@ For each parsed/<ccn>.json:
  - Keep only displayable items with a code (CPT/HCPCS/DRG/MS-DRG/REV/CDM)
  - Dedupe to (code, billing_class/setting) keys
  - Truncate descriptions to 100 chars
- - Output to site/data/prices/<ccn>.json (compact)
+ - Output to public/data/prices/<ccn>.json (compact)
 
 Also builds:
- - site/data/prices/index.json   — CCN -> {n_items, top_codes}
- - site/data/cpt-index.json      — CPT code -> [{ccn, gross, cash, payers_count}]
+ - public/data/prices/index.json — CCN -> {n_items, top_codes}
+ - public/data/cpt-index.json    — CPT code -> [{ccn, gross, cash, payers_count}]
 """
 import json, os, sys, glob, re
 from collections import defaultdict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'data', 'parsed')
-OUT_DIR = os.path.join(ROOT, 'site', 'data', 'prices')
+OUT_DIR = os.path.join(ROOT, 'public', 'data', 'prices')
 INDEX = os.path.join(OUT_DIR, 'index.json')
-CPT_INDEX = os.path.join(ROOT, 'site', 'data', 'cpt-index.json')
+CPT_INDEX = os.path.join(ROOT, 'public', 'data', 'cpt-index.json')
 # Side-car accumulators consumed by scripts/build_aggregates.py.
 # JSONL = one record per (ccn, raw_payer) tuple; rebuilt every full slim run.
 PAYER_RAW_JSONL = os.path.join(ROOT, 'data', '_payer_raw.jsonl')

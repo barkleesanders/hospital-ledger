@@ -3,7 +3,7 @@
 
 This is the resumable nationwide runner:
 1. Ingest every live-MRF hospital into data/parsed/<ccn>.json
-2. Rebuild compact site/data/prices and site/data/cpt-index.json
+2. Rebuild compact public/data/prices and public/data/cpt-index.json
 3. Optionally mirror artifacts to R2
 
 Rerunning is safe with --resume because parsed hospitals are skipped.

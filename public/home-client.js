@@ -54,6 +54,21 @@
   function renderSummary() {
     if (!summary) return;
     if ($("hero-required")) $("hero-required").textContent = summary.cms_required_total.toLocaleString();
+    if ($("hero-required-visible")) $("hero-required-visible").textContent = summary.cms_required_total.toLocaleString();
+    if ($("hero-live-mrf-count")) $("hero-live-mrf-count").textContent = summary.compliant.toLocaleString();
+    if ($("methodology-live-mrf-count")) $("methodology-live-mrf-count").textContent = summary.compliant.toLocaleString();
+    const standardizedHospitals =
+      summary.standardized_price_hospitals || summary.standardized_price_index_hospitals || null;
+    if (standardizedHospitals) {
+      const text = standardizedHospitals.toLocaleString();
+      if ($("hero-hospital-count")) $("hero-hospital-count").textContent = text;
+      if ($("kpi-patient-hospitals")) $("kpi-patient-hospitals").textContent = text;
+      if ($("methodology-price-count")) $("methodology-price-count").textContent = text;
+      if ($("price-hospital-count")) $("price-hospital-count").textContent = text;
+    }
+    if (summary.standardized_price_rows && $("price-row-count")) {
+      $("price-row-count").textContent = summary.standardized_price_rows.toLocaleString();
+    }
     if ($("kpi-compliance")) $("kpi-compliance").textContent = summary.compliance_pct + "%";
     if ($("kpi-missing")) $("kpi-missing").textContent = summary.missing.toLocaleString();
     if ($("kpi-enforcement")) $("kpi-enforcement").textContent = summary.under_enforcement.toLocaleString();
@@ -162,6 +177,7 @@
     if ($("price-row-count")) $("price-row-count").textContent = rowText;
     if ($("price-code-count")) $("price-code-count").textContent = codeText;
     if ($("kpi-patient-hospitals")) $("kpi-patient-hospitals").textContent = hospitalText;
+    if ($("hero-hospital-count")) $("hero-hospital-count").textContent = hospitalText;
   }
 
   async function ensureCptIndex() {

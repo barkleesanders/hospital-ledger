@@ -27,8 +27,8 @@ rsync -az --partial --delete --progress -e "$RSYNC_SSH" \
   --exclude 'data/cms_validation/' \
   --exclude 'data/_pages_bundle/' \
   --exclude 'data/_pages_bundle_test/' \
-  --exclude 'site/data/prices/' \
-  --exclude 'site/data/cpt-index.json' \
+  --exclude 'public/data/prices/' \
+  --exclude 'public/data/cpt-index.json' \
   --exclude '*.log' \
   ./ "$REMOTE:$REMOTE_DIR/"
 

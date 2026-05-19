@@ -113,7 +113,7 @@ export const Layout: FC<LayoutProps> = ({
         <a href="/" class="hover:text-zinc-300">
           Hospital Ledger
         </a>{" "}
-        · CC0 · No tracking
+        · © 2026 · CC0 data · No tracking
       </footer>
       {Array.isArray(scriptSrc)
         ? scriptSrc.map((src) => <script src={src} defer />)

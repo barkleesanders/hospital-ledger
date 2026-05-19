@@ -331,7 +331,7 @@ def main() -> int:
     else:
         run(ingest_command(), dry_run=dry_run)
     if skip_slim:
-        print("SKIP_SLIM=1: using existing site/data/prices artifacts")
+        print("SKIP_SLIM=1: using existing public/data/prices artifacts")
     else:
         run([sys.executable, str(SCRIPTS / "slim_parsed.py")], dry_run=dry_run)
 

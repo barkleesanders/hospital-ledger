@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build site/data/hospitals.json from the ledger DB.
+"""Build public/data/hospitals.json from the ledger DB.
 
 Schema per hospital:
   ccn, name, city, state, type, ownership, rating,
@@ -11,8 +11,10 @@ from collections import defaultdict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = os.path.join(ROOT, 'db', 'hospital_ledger.db')
-OUT = os.path.join(ROOT, 'site', 'data', 'hospitals.json')
-SUMMARY_OUT = os.path.join(ROOT, 'site', 'data', 'summary.json')
+PUBLIC_DATA = os.path.join(ROOT, 'public', 'data')
+OUT = os.path.join(PUBLIC_DATA, 'hospitals.json')
+SUMMARY_OUT = os.path.join(PUBLIC_DATA, 'summary.json')
+PRICE_INDEX = os.path.join(PUBLIC_DATA, 'prices', 'index.json')
 
 REQUIRED_TYPES = (
     'Acute Care Hospitals', 'Critical Access Hospitals',
@@ -146,15 +148,54 @@ type_arr = [{'type': t, **st, 'pct': round(100 * st['live'] / st['total'], 1)}
             for t, st in type_stats.items()]
 type_arr.sort(key=lambda x: -x['total'])
 
+def price_index_metrics():
+    metrics = {
+        'standardized_price_index_hospitals': 0,
+        'standardized_price_hospitals': 0,
+        'standardized_price_rows': 0,
+        'cpt_indexed_hospitals': 0,
+        'cpt_indexed_rows': 0,
+        'zero_price_index_entries': 0,
+    }
+    try:
+        with open(PRICE_INDEX) as f:
+            entries = json.load(f).get('hospitals', [])
+    except (OSError, json.JSONDecodeError):
+        return metrics
+    metrics['standardized_price_index_hospitals'] = len(entries)
+    for h in entries:
+        n = int(h.get('n') or h.get('count') or h.get('items') or 0)
+        cpt = int(h.get('cpt_indexed') or 0)
+        metrics['standardized_price_rows'] += n
+        metrics['cpt_indexed_rows'] += cpt
+        if n > 0:
+            metrics['standardized_price_hospitals'] += 1
+        else:
+            metrics['zero_price_index_entries'] += 1
+        if cpt > 0:
+            metrics['cpt_indexed_hospitals'] += 1
+    return metrics
+
 summary = {
     'generated_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z'),
+    'total_facilities': len(hospitals),
     'cms_required_total': len(required),
+    'live_mrf_total': sum(1 for h in hospitals if h['has_live_mrf']),
     'compliant': len(compliant),
     'compliance_pct': round(100 * len(compliant) / len(required), 1),
     'missing': len(missing),
     'under_enforcement': len(under_enf),
     'missing_with_enforcement': len(missing_with_enf),
     'enforcement_actions_total': sum(h.get('enforcement_count', 0) for h in required),
+    **price_index_metrics(),
+    'count_definitions': {
+        'total_facilities': 'Rows in public/data/hospitals.json from CMS Hospital General Information.',
+        'cms_required_total': 'Hospitals whose type is in the CMS price-transparency-required set.',
+        'compliant': 'CMS-required hospitals with a verified live machine-readable file URL.',
+        'standardized_price_index_hospitals': 'Entries in public/data/prices/index.json, including zero-row outputs.',
+        'standardized_price_hospitals': 'Entries in public/data/prices/index.json with n > 0 standardized rows.',
+        'cpt_indexed_hospitals': 'Entries in public/data/prices/index.json with cpt_indexed > 0.',
+    },
     'states': state_arr,
     'types': type_arr,
     'worst_offenders': [{

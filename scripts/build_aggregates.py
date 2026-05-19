@@ -5,14 +5,14 @@ Inputs (produced by scripts/slim_parsed.py + scripts/build_site_data.py):
   data/_payer_raw.jsonl          per (ccn, raw_payer) raw stats
   data/_compliance_per_hospital.jsonl   per-hospital § 180 score
   data/_cpt_detail_raw.jsonl     per (CPT code) hospital + top-5 payers
-  site/data/prices/index.json    per-hospital slim summary (with compliance)
-  site/data/hospitals.json       per-hospital metadata (state, name, etc.)
+  public/data/prices/index.json  per-hospital slim summary (with compliance)
+  public/data/hospitals.json     per-hospital metadata (state, name, etc.)
 
 Outputs (uploaded to R2 by stage4_refresh.py):
-  site/data/compliance-ranking.json     — sortable hospital ranking
-  site/data/payers-index.json           — top ~100 payers patient-facing
-  site/data/payer/{slug}.json           — per-payer page data
-  site/data/cpt-detail/{code}.json      — per-procedure cross-hospital comparison
+  public/data/compliance-ranking.json   — sortable hospital ranking
+  public/data/payers-index.json         — top ~100 payers patient-facing
+  public/data/payer/{slug}.json         — per-payer page data
+  public/data/cpt-detail/{code}.json    — per-procedure cross-hospital comparison
 
 Each output file is bounded in size (≤500 KB for index files, ≤300 KB per
 payer/code) so the API endpoints can serve them with a single R2 GET.
@@ -32,7 +32,7 @@ from payer_canonical import canonicalize, category_for, PATIENT_FACING_PAYERS  #
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / 'data'
-SITE_DATA_DIR = ROOT / 'site' / 'data'
+SITE_DATA_DIR = ROOT / 'public' / 'data'
 
 PAYER_RAW = DATA_DIR / '_payer_raw.jsonl'
 COMPLIANCE_PER_HOSP = DATA_DIR / '_compliance_per_hospital.jsonl'
