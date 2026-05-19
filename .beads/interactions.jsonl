@@ -1,0 +1,2 @@
+{"id":"int-624eb079","kind":"field_change","created_at":"2026-05-19T02:23:40.418513Z","actor":"barkleesanders","issue_id":"hospital-ledger-closeout-b1b","extra":{"field":"status","new_value":"open","old_value":"in_progress"}}
+{"id":"int-e73051df","kind":"field_change","created_at":"2026-05-19T02:24:30.973859Z","actor":"barkleesanders","issue_id":"hospital-ledger-closeout-b1b","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Production verified on hospitalledger.com after deploy"}}
