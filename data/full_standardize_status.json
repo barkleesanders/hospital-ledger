@@ -1,18 +1,79 @@
 {
   "all": false,
-  "done": 1,
-  "eligible": 1,
+  "done": 201,
+  "eligible": 201,
   "eta_seconds": 0,
-  "failed": 0,
+  "failed": 199,
   "pending": 0,
-  "rate_per_second": 0.121,
-  "recent_failures": [],
+  "rate_per_second": 0.11,
+  "recent_failures": [
+    {
+      "ccn": "511309",
+      "error": "rediscovered:-:probe_html:206:text/html; charset=UTF-8",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "520028",
+      "error": "seed:-:subprocess:1:520028 THE MONROE CLINIC                        html             0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "521307",
+      "error": "seed:-:subprocess:1:521307 CHIPPEWA VALLEY HOSPITAL                 json             0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "521341",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "521358",
+      "error": "rediscovered:-:probe_html:206:text/html; charset=utf-8",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "531311",
+      "error": "no_live_mrf",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "650001",
+      "error": "rediscovered:-:probe_html:200:text/html; charset=UTF-8",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "451310",
+      "error": "rediscovered:-:probe_html:200:text/html; charset=utf-8",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "490084",
+      "error": "rediscovered:-:probe_html:206:text/html",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "440193",
+      "error": "rediscovered:-:timeout:600s",
+      "fmt": "",
+      "items": 0
+    }
+  ],
   "resume": false,
   "skipped_existing": 0,
-  "started_at": "2026-05-11T16:33:03+00:00",
+  "started_at": "2026-05-19T08:04:45+00:00",
   "state": "",
-  "success": 1,
-  "total_items": 21614,
-  "updated_at": "2026-05-11T16:33:11+00:00",
-  "workers": 1
+  "success": 2,
+  "total_items": 212210,
+  "updated_at": "2026-05-19T08:35:07+00:00",
+  "workers": 4
 }

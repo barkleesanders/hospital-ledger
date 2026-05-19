@@ -13,6 +13,8 @@ SCRIPTS_DIR = os.path.join(ROOT, 'scripts')
 DB = os.path.join(ROOT, 'db', 'hospital_ledger.db')
 PARSED_DIR = os.path.join(ROOT, 'data', 'parsed')
 SITE_PRICE_DIR = os.path.join(ROOT, 'site', 'data', 'prices')
+PRICED_INDEX = os.path.join(ROOT, 'public', 'data', 'prices', 'index.json')
+TERMINAL_EXCEPTIONS = os.path.join(ROOT, 'data', 'coverage_terminal_exceptions.json')
 STATUS_FILE = os.path.join(ROOT, 'data', 'full_standardize_status.json')
 FAILURES_FILE = os.path.join(ROOT, 'data', 'full_standardize_failures.jsonl')
 
@@ -376,10 +378,12 @@ def parsed_source_candidate(ccn):
 
 
 def clear_parsed_record(ccn):
-    try:
-        os.remove(parsed_path(ccn))
-    except FileNotFoundError:
-        return
+    """Remove both .json and .json.gz so a re-ingest can't be shadowed by a stale .gz."""
+    for path in (parsed_path(ccn), parsed_path(ccn) + '.gz'):
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            continue
 
 
 def ingest_candidate_subprocess(ccn, candidate, timeout_seconds):
@@ -477,6 +481,39 @@ def parsed_ok(ccn):
     return parsed_row_count(ccn) > 0
 
 
+def load_done_set():
+    """CCNs that should be skipped on --resume.
+
+    Sources (both survive a `rm -rf data/parsed/`):
+      - public/data/prices/index.json : every successfully-slimmed hospital
+      - data/coverage_terminal_exceptions.json : known-dead, don't re-fetch
+
+    This replaces the old `parsed_ok()` check, which used the existence of
+    data/parsed/{ccn}.json as a resume marker — that file is now a transient
+    gzipped scratch artifact, not the source of truth.
+    """
+    done = set()
+    try:
+        with open(PRICED_INDEX) as f:
+            idx = json.load(f)
+        for h in idx.get('hospitals', []):
+            ccn = h.get('ccn')
+            if ccn:
+                done.add(ccn)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    try:
+        with open(TERMINAL_EXCEPTIONS) as f:
+            exc = json.load(f)
+        for e in exc.get('exceptions', []):
+            ccn = e.get('ccn')
+            if ccn:
+                done.add(ccn)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    return done
+
+
 def load_ccns_file(path):
     ccns = []
     with open(path) as handle:
@@ -527,7 +564,7 @@ def main():
     p.add_argument('--state', help='Process all live-MRF hospitals in a state')
     p.add_argument('--limit', type=int, default=10)
     p.add_argument('--all', action='store_true', help='Ignore --limit and target every live-MRF hospital')
-    p.add_argument('--resume', action='store_true', help='Skip CCNs with an existing non-empty parsed JSON')
+    p.add_argument('--resume', action='store_true', help='Skip CCNs already in public/data/prices/index.json or data/coverage_terminal_exceptions.json')
     p.add_argument('--offset', type=int, default=0, help='Skip the first N eligible CCNs after ordering')
     p.add_argument('--workers', type=int, default=4, help='Parallel ingestion workers (mind RAM — each parser holds the whole MRF in memory)')
     p.add_argument('--progress-every', type=int, default=25)
@@ -562,9 +599,11 @@ def main():
 
     eligible = len(ccns)
     if args.resume:
+        done = load_done_set()
         before = len(ccns)
-        ccns = [c for c in ccns if not parsed_ok(c)]
+        ccns = [c for c in ccns if c not in done]
         skipped = before - len(ccns)
+        print(f"resume skip: priced+exceptions={len(done)} → skipped {skipped} of {before} eligible", flush=True)
     else:
         skipped = 0
 

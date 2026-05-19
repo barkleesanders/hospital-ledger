@@ -10,13 +10,6 @@
       "host": "search.hospitalpriceindex.com"
     },
     {
-      "count": 15,
-      "error": "unknown",
-      "example_ccn": "050438",
-      "fmt": "-",
-      "host": "www.northwell.edu"
-    },
-    {
       "count": 14,
       "error": "unknown",
       "example_ccn": "061308",
@@ -29,13 +22,6 @@
       "example_ccn": "060003",
       "fmt": "-",
       "host": "csdam.widen.net"
-    },
-    {
-      "count": 9,
-      "error": "unknown",
-      "example_ccn": "210002",
-      "fmt": "-",
-      "host": "www.umms.org"
     },
     {
       "count": 8,
@@ -82,13 +68,6 @@
     {
       "count": 4,
       "error": "unknown",
-      "example_ccn": "110008",
-      "fmt": "-",
-      "host": "assets.northside.com"
-    },
-    {
-      "count": 4,
-      "error": "unknown",
       "example_ccn": "440039",
       "fmt": "-",
       "host": "finance.vumc.org"
@@ -106,18 +85,39 @@
       "example_ccn": "050126",
       "fmt": "-",
       "host": "nyp.widen.net"
+    },
+    {
+      "count": 4,
+      "error": "unknown",
+      "example_ccn": "100113",
+      "fmt": "-",
+      "host": "quality.healthfinder.fl.gov"
+    },
+    {
+      "count": 3,
+      "error": "unknown",
+      "example_ccn": "110008",
+      "fmt": "-",
+      "host": "assets.northside.com"
+    },
+    {
+      "count": 3,
+      "error": "unknown",
+      "example_ccn": "390067",
+      "fmt": "-",
+      "host": "cdn.upmc.com"
     }
   ],
   "gap_file": "data/coverage_gap_ccns.txt",
   "live_target_total": 3986,
   "loop": 1,
-  "missing_parsed": 329,
+  "missing_parsed": 262,
   "missing_preview": 399,
   "parse_gap_file": "data/coverage_parse_gap_ccns.txt",
-  "parsed_not_preview_total": 109,
-  "parsed_positive": 3657,
-  "parsed_positive_total": 3657,
-  "phase": "snapshot",
+  "parsed_not_preview_total": 176,
+  "parsed_positive": 3724,
+  "parsed_positive_total": 3724,
+  "phase": "post_ingest",
   "preview_gap_file": "data/coverage_preview_gap_ccns.txt",
   "preview_index_entries": 3699,
   "preview_not_parsed_total": 39,
@@ -133,5 +133,5 @@
   "terminal_exception_candidate_total": 19,
   "terminal_exceptions": 19,
   "terminal_exceptions_file": "data/coverage_terminal_exceptions.json",
-  "updated_at": "2026-05-19T03:12:27+00:00"
+  "updated_at": "2026-05-19T03:46:33+00:00"
 }

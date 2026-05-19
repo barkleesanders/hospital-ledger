@@ -30,8 +30,8 @@ const S = summaryJson as Summary;
 const totalFacilities = S.total_facilities ?? 5426;
 const cmsRequired = S.cms_required_total;
 const compliant = S.compliant;
-const indexEntries = S.standardized_price_index_hospitals ?? 3699;
-const standardized = S.standardized_price_hospitals ?? 3587;
+const indexEntries = S.standardized_price_index_hospitals ?? 3768;
+const standardized = S.standardized_price_hospitals ?? 3654;
 const zeroEntries = S.zero_price_index_entries ?? (indexEntries - standardized);
 const notInIndex = compliant - indexEntries;
 const totalGap = compliant - standardized;
@@ -42,7 +42,7 @@ function aboutPage(url: string) {
   return (
     <Layout
       title="About the numbers — Hospital Ledger"
-      description="Why the homepage says 3,587 hospitals when CMS required 4,625 and 3,986 have a live MRF. Pipeline, count definitions, and the live gap."
+      description={`Why the homepage says ${fmt(standardized)} hospitals when CMS required ${fmt(cmsRequired)} and ${fmt(compliant)} have a live MRF. Pipeline, count definitions, and the live gap.`}
       ogTitle="About the numbers — Hospital Ledger"
       url={url}
     >

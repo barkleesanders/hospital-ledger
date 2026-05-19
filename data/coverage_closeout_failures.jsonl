@@ -61,3 +61,228 @@
 {"ccn":"150056","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:150056 INDIANA UNIVERSITY HEALTH                html             0 items  OK"}
 {"ccn":"150075","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:150075 BLUFFTON REGIONAL MEDICAL CENTER                          0 items  ERR: p"}
 {"ccn":"150007","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:150007 COMMUNITY HOWARD REGIONAL HEALTH INC.                     0 items  ERR: f"}
+{"ccn":"010150","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"010044","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"040088","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"050135","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"030138","fmt":"","items":0,"error":"seed:-:subprocess:1:030138 CITY OF HOPE CANCER CENTER PHOENIX                        0 items  ERR: f"}
+{"ccn":"050145","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"050543","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"050471","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html; charset=utf-8"}
+{"ccn":"050779","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"050546","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"050780","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"051339","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:051339 PALO VERDE HOSPITAL                      csv              0 items  OK"}
+{"ccn":"050025","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"060116","fmt":"","items":0,"error":"parsed-cache:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"061308","fmt":"","items":0,"error":"seed:-:subprocess:1:061308 SAN LUIS VALLEY HEALTH CONEJOS COUNTY HO html             0 items  OK"}
+{"ccn":"070004","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:070004 SHARON HOSPITAL                                           0 items  ERR: f"}
+{"ccn":"070034","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100047","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100071","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100086","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100113","fmt":"","items":0,"error":"rediscovered:-:probe:InvalidURL"}
+{"ccn":"100177","fmt":"","items":0,"error":"rediscovered:-:probe:InvalidURL"}
+{"ccn":"100249","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100276","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"100287","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"100298","fmt":"","items":0,"error":"rediscovered:-:probe:InvalidURL"}
+{"ccn":"110043","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"110008","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"101312","fmt":"","items":0,"error":"rediscovered:-:probe:InvalidURL"}
+{"ccn":"110142","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"110161","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"110087","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:110087 NORTHSIDE HOSPITAL GWINNETT                               0 items  ERR: f"}
+{"ccn":"110252","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:110252 NORTHSIDE HOSPITAL DULUTH                                 0 items  ERR: f"}
+{"ccn":"110779","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"111305","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"121300","fmt":"","items":0,"error":"seed:-:subprocess:1:121300 KAUAI VETERANS MEMORIAL HOSPITAL         html             0 items  OK"}
+{"ccn":"140046","fmt":"","items":0,"error":"seed:-:subprocess:1:140046 GOOD SAMARITAN REGIONAL HLTH CENTER      html             0 items  OK"}
+{"ccn":"140054","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html"}
+{"ccn":"140135","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"140148","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"140100","fmt":"","items":0,"error":"seed:-:subprocess:1:140100 MIDWESTERN REGION MED CENTER, INC                         0 items  ERR: f"}
+{"ccn":"141324","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"141330","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"141339","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"141352","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"150042","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"150048","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"141351","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html; charset=UTF-8"}
+{"ccn":"150051","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"150056","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"170049","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"170109","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"161328","fmt":"","items":0,"error":"seed:-:subprocess:1:161328 REGIONAL HEALTH SERVICES OF HOWARD COUNT xls-legacy       0 items  OK"}
+{"ccn":"161368","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html; charset=UTF-8"}
+{"ccn":"140011","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:140011 HERRIN HOSPITAL                          json             0 items  OK"}
+{"ccn":"180046","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"180056","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"180066","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"180092","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"180138","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"180043","fmt":"","items":0,"error":"seed:-:subprocess:1:180043 AdventHealthManchester                   json             0 items  OK"}
+{"ccn":"181308","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"190270","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html"}
+{"ccn":"190167","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html;charset=utf-8"}
+{"ccn":"190007","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"190116","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"190779","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"200001","fmt":"","items":0,"error":"seed:-:subprocess:1:200001 ST JOSEPH HOSPITAL                                        0 items  ERR: p"}
+{"ccn":"220002","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"220030","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"230055","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"230092","fmt":"","items":0,"error":"seed:-:subprocess:1:230092 HENRY FORD ALLEGIANCE HEALTH             csv              0 items  OK"}
+{"ccn":"230097","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:230097 MUNSON MEDICAL CENTER                                     0 items  ERR: f"}
+{"ccn":"240001","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"240036","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"241322","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"241342","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"241356","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"230146","fmt":"","items":0,"error":"seed:-:subprocess:1:230146 WYANDOTTE HOSPITAL AND MEDICAL CENTER    csv              0 items  OK"}
+{"ccn":"241366","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"250017","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"250038","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"241369","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"250152","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"260034","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"241365","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"260200","fmt":"","items":0,"error":"seed:-:subprocess:1:260200 SSM ST JOSEPH HOSPITAL WEST              html             0 items  OK"}
+{"ccn":"261331","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"261333","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html; charset=UTF-8"}
+{"ccn":"271340","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"281300","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"281338","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"271332","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"281357","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"281361","fmt":"","items":0,"error":"seed:-:subprocess:1:281361 LEXINGTON REGIONAL HEALTH CENTER         html             0 items  OK"}
+{"ccn":"281353","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html; charset=UTF-8"}
+{"ccn":"281363","fmt":"","items":0,"error":"seed:-:subprocess:1:281363 COMMUNITY HOSPITAL                       html             0 items  OK"}
+{"ccn":"301300","fmt":"","items":0,"error":"seed:-:subprocess:1:301300 UPPER CONNECTICUT VALLEY HOSPITAL        xls-legacy       0 items  OK"}
+{"ccn":"310011","fmt":"","items":0,"error":"seed:-:subprocess:1:310011 CAPE REGIONAL MEDICAL CENTER INC         html             0 items  OK"}
+{"ccn":"310012","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html; charset=UTF-8"}
+{"ccn":"310022","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"313300","fmt":"","items":0,"error":"seed:-:subprocess:1:313300 CHILDREN'S SPECIALIZED HOSPITAL          xlsx             0 items  OK"}
+{"ccn":"330023","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:330023 VASSAR BROTHERS MEDICAL CENTER                            0 items  ERR: f"}
+{"ccn":"330047","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"330049","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:330049 NORTHERN DUTCHESS HOSPITAL                                0 items  ERR: f"}
+{"ccn":"330065","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"330094","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"330141","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:330141 LONG ISLAND COMMUNITY HOSPITAL           json             0 items  OK"}
+{"ccn":"330158","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"330169","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html;charset=UTF-8"}
+{"ccn":"330332","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:330332 CHSLI ST JOSEPH HOSPITAL                 json             0 items  OK"}
+{"ccn":"330799","fmt":"","items":0,"error":"rediscovered:-:probe_html:202:text/html"}
+{"ccn":"333301","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"340042","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"340156","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:340156 CHEROKEE INDIAN HOSPITAL AUTHORITY       xlsx             0 items  OK"}
+{"ccn":"340188","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html; charset=UTF-8"}
+{"ccn":"341315","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html; charset=UTF-8"}
+{"ccn":"341328","fmt":"","items":0,"error":"seed:-:subprocess:1:341328 ERLANGER MURPHY MEDICAL CENTER           html             0 items  OK"}
+{"ccn":"351302","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"351303","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"351331","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"360001","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"360016","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"340015","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:340015 NOVANT HEALTH ROWAN MEDICAL CENTER       json             0 items  OK"}
+{"ccn":"360059","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"360056","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"360041","fmt":"","items":0,"error":"seed:-:subprocess:1:360041 PARMA COMMUNITY GENERAL HOSPITAL         csv              0 items  OK"}
+{"ccn":"360066","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"360092","fmt":"","items":0,"error":"seed:-:subprocess:1:360092 MEMORIAL HOSPITAL                        html             0 items  OK"}
+{"ccn":"360086","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"360112","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"360172","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"360245","fmt":"","items":0,"error":"rediscovered:-:probe_reject:206:text/html"}
+{"ccn":"360361","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"361304","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"361306","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"361307","fmt":"","items":0,"error":"seed:-:subprocess:1:361307 UHHS MEMORIAL HOSPITAL OF GENEVA         csv              0 items  OK"}
+{"ccn":"370199","fmt":"","items":0,"error":"seed:-:subprocess:1:370199 LAKESIDE WOMEN'S HOSPITAL, A MEMBER OF I                  0 items  ERR: f"}
+{"ccn":"370243","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html; charset=UTF-8"}
+{"ccn":"380005","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"371322","fmt":"","items":0,"error":"seed:-:subprocess:1:371322 BEAVER COUNTY MEMORIAL HOSPITAL          html             0 items  OK"}
+{"ccn":"381310","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"381320","fmt":"","items":0,"error":"seed:-:subprocess:1:381320 COLUMBIA MEMORIAL HOSPITAL               json             0 items  OK"}
+{"ccn":"390006","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"390048","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"390067","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"390003","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"390137","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"390001","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"390237","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"390270","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"390337","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"391300","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"391305","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"393302","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"393304","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"400003","fmt":"","items":0,"error":"seed:-:probe_reject:202:text/html"}
+{"ccn":"400019","fmt":"","items":0,"error":"seed:-:probe_reject:202:text/html"}
+{"ccn":"400106","fmt":"","items":0,"error":"seed:-:probe_reject:202:text/html"}
+{"ccn":"400110","fmt":"","items":0,"error":"seed:-:probe_reject:202:text/html"}
+{"ccn":"400117","fmt":"","items":0,"error":"seed:-:probe_reject:202:text/html"}
+{"ccn":"400123","fmt":"","items":0,"error":"seed:-:probe_reject:202:text/html"}
+{"ccn":"400126","fmt":"","items":0,"error":"seed:-:probe_reject:202:text/html"}
+{"ccn":"400128","fmt":"","items":0,"error":"seed:-:probe_reject:202:text/html"}
+{"ccn":"400130","fmt":"","items":0,"error":"seed:-:probe_reject:202:text/html"}
+{"ccn":"390133","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:390133 LEHIGH VALLEY HOSPITAL                   json             0 items  OK"}
+{"ccn":"420033","fmt":"","items":0,"error":"rediscovered:-:probe_reject:200:text/html"}
+{"ccn":"420049","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"420073","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"431305","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"400140","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:400140 CENTRO MEDICO DEL NORESTE                html             0 items  OK"}
+{"ccn":"431310","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"431316","fmt":"","items":0,"error":"rediscovered:-:probe_html:202:text/html"}
+{"ccn":"431328","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"431339","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"440035","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"431309","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"440058","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"440102","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"440039","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:440039 VANDERBILT UNIVERSITY MEDICAL CENTER     json             0 items  OK"}
+{"ccn":"440120","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"440137","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:440137 VANDERBILT BEDFORD HOSPITAL              json             0 items  OK"}
+{"ccn":"440144","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:440144 VANDERBILT TULLAHOMA-HARTON HOSPITAL     json             0 items  OK"}
+{"ccn":"440218","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"440193","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:440193 VANDERBILT WILSON COUNTY HOSPITAL        json             0 items  OK"}
+{"ccn":"443303","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"450144","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html;charset=utf-8"}
+{"ccn":"450686","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"451309","fmt":"","items":0,"error":"seed:-:subprocess:1:451309 MC CAMEY HOSPITAL                        html             0 items  OK"}
+{"ccn":"451334","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"453300","fmt":"","items":0,"error":"seed:-:subprocess:1:453300 COOK CHILDRENS MEDICAL CENTER            html             0 items  OK"}
+{"ccn":"460006","fmt":"","items":0,"error":"seed:-:subprocess:1:460006 LDS HOSPITAL                             csv              0 items  OK"}
+{"ccn":"451310","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"460010","fmt":"","items":0,"error":"seed:-:subprocess:1:460010 INTERMOUNTAIN MEDICAL CENTER             csv              0 items  OK"}
+{"ccn":"460015","fmt":"","items":0,"error":"seed:-:subprocess:1:460015 LOGAN REGIONAL HOSPITAL                  csv              0 items  OK"}
+{"ccn":"460021","fmt":"","items":0,"error":"seed:-:subprocess:1:460021 ST. GEORGE REGIONAL HOSPITAL             csv              0 items  OK"}
+{"ccn":"460043","fmt":"","items":0,"error":"seed:-:subprocess:1:460043 OREM COMMUNITY HOSPITAL                  csv              0 items  OK"}
+{"ccn":"461301","fmt":"","items":0,"error":"seed:-:subprocess:1:461301 FILLMORE COMMUNITY HOSPITAL              csv              0 items  OK"}
+{"ccn":"461302","fmt":"","items":0,"error":"seed:-:probe_reject:202:text/html"}
+{"ccn":"470024","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html; charset=UTF-8"}
+{"ccn":"480001","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"490017","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"490032","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html"}
+{"ccn":"490050","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html;charset=utf-8"}
+{"ccn":"490059","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"490067","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"490069","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"490092","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"490094","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"490097","fmt":"","items":0,"error":"seed:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"490098","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html"}
+{"ccn":"491300","fmt":"","items":0,"error":"rediscovered:-:probe_html:202:text/html"}
+{"ccn":"500031","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html;charset=utf-8"}
+{"ccn":"500044","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"501321","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html"}
+{"ccn":"510029","fmt":"","items":0,"error":"seed:-:subprocess:1:510029 THOMAS MEMORIAL HOSPITAL                 html             0 items  OK"}
+{"ccn":"510091","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"511309","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html; charset=UTF-8"}
+{"ccn":"520028","fmt":"","items":0,"error":"seed:-:subprocess:1:520028 THE MONROE CLINIC                        html             0 items  OK"}
+{"ccn":"521307","fmt":"","items":0,"error":"seed:-:subprocess:1:521307 CHIPPEWA VALLEY HOSPITAL                 json             0 items  OK"}
+{"ccn":"521341","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"521358","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html; charset=utf-8"}
+{"ccn":"531311","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"650001","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"490084","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html"}

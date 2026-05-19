@@ -11,7 +11,7 @@ Also builds:
  - public/data/prices/index.json — CCN -> {n_items, top_codes}
  - public/data/cpt-index.json    — CPT code -> [{ccn, gross, cash, payers_count}]
 """
-import json, os, sys, glob, re
+import json, os, sys, glob, re, gzip, subprocess
 from collections import defaultdict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -195,18 +195,45 @@ if _full_run:
 payer_raw_handle = open(PAYER_RAW_JSONL, 'a')
 compliance_handle = open(COMPLIANCE_JSONL, 'a')
 
-parsed_paths = sorted(glob.glob(os.path.join(SRC, '*.json')))
+# Read both uncompressed and gzipped parsed files. After ingest, files may be
+# transparently gzipped to .json.gz to keep data/parsed/ from accumulating.
+# When both .json and .json.gz exist for the same CCN, the .json is the fresh
+# parse (mrf_parse writes uncompressed); prefer it over the stale .gz so a
+# re-ingest doesn't get shadowed.
+
+
+def _ccn_from_path(p):
+    base = os.path.basename(p)
+    if base.endswith('.json.gz'):
+        return base[:-len('.json.gz')]
+    if base.endswith('.json'):
+        return base[:-len('.json')]
+    return base
+
+
+_by_ccn = {}
+for _p in glob.glob(os.path.join(SRC, '*.json')) + glob.glob(os.path.join(SRC, '*.json.gz')):
+    _ccn = _ccn_from_path(_p)
+    # Prefer .json (fresh) over .json.gz (stale) when both exist.
+    if _ccn not in _by_ccn or not _p.endswith('.gz'):
+        _by_ccn[_ccn] = _p
+parsed_paths = sorted(_by_ccn.values())
+
 if requested_ccns:
-    parsed_paths = [
-        path for path in parsed_paths
-        if os.path.basename(path).replace('.json', '') in requested_ccns
-    ]
+    parsed_paths = [p for p in parsed_paths if _ccn_from_path(p) in requested_ccns]
+
+# Auto-gzip raw parsed files after a successful slim, unless disabled. This
+# turns data/parsed/ into a transient scratch dir instead of a 100+ GB
+# accumulator. Disable with SLIM_NO_GZIP=1 for debug runs.
+_auto_gzip = not env_bool('SLIM_NO_GZIP', False)
 
 for path in parsed_paths:
-    ccn = os.path.basename(path).replace('.json', '')
+    ccn = _ccn_from_path(path)
     try:
-        data = json.load(open(path))
-    except json.JSONDecodeError:
+        opener = gzip.open if path.endswith('.gz') else open
+        with opener(path, 'rt') as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError, gzip.BadGzipFile):
         continue
     items = data.get('items', [])
     # Filter + dedupe
@@ -306,6 +333,11 @@ for path in parsed_paths:
     generated_ccns.add(ccn)
     sz = os.path.getsize(out_path)
     print(f"  {ccn}: {len(slim):>6} items {compliance['grade']}/{compliance['score']:>3}, {sz/1024:.1f} KB")
+
+    # Raw parsed file has been consumed — gzip it so data/parsed/ stays bounded.
+    # No-op if already .gz. Failure is non-fatal; the priced file is the artifact.
+    if _auto_gzip and not path.endswith('.gz'):
+        subprocess.run(['gzip', '-9', '-f', path], check=False)
 
     summary_by_ccn[ccn] = {
         'ccn': ccn,

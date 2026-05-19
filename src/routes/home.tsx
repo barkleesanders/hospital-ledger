@@ -36,8 +36,8 @@ const totalFacilities = SITE_COUNTS.total_facilities ?? 5426;
 const cmsRequiredTotal = SITE_COUNTS.cms_required_total;
 const liveMrfRequired = SITE_COUNTS.compliant;
 const standardizedPriceHospitals =
-  SITE_COUNTS.standardized_price_hospitals ?? SITE_COUNTS.standardized_price_index_hospitals ?? 3587;
-const parsedMrfOutputs = SITE_COUNTS.standardized_price_index_hospitals ?? 3699;
+  SITE_COUNTS.standardized_price_hospitals ?? SITE_COUNTS.standardized_price_index_hospitals ?? 3654;
+const parsedMrfOutputs = SITE_COUNTS.standardized_price_index_hospitals ?? 3768;
 const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 62577586;
 const cptIndexedRows = SITE_COUNTS.cpt_indexed_rows ?? 14247687;
 const updatedDate = SITE_COUNTS.generated_at.slice(0, 10);
