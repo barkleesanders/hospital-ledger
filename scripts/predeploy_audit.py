@@ -196,7 +196,15 @@ def audit_live() -> list[str]:
 
     def fetch_json(path: str):
         url = f"{LIVE_BASE}{path}?cb={int(__import__('time').time())}"
-        req = urllib.request.Request(url, headers={"Cache-Control": "no-cache"})
+        # CF bot-blocks the default Python-urllib UA; use a real one.
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Cache-Control": "no-cache",
+                "User-Agent": "hospital-ledger-predeploy-audit/1.0 (curl-compatible)",
+                "Accept": "application/json",
+            },
+        )
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.load(r)
 
