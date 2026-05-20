@@ -230,3 +230,117 @@
 {"ccn":"451310","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
 {"ccn":"490084","fmt":"","items":0,"error":"rediscovered:-:probe_html:206:text/html"}
 {"ccn":"440193","fmt":"","items":0,"error":"rediscovered:-:timeout:600s"}
+{"ccn":"030138","fmt":"","items":0,"error":"seed:-:subprocess:1:030138 CITY OF HOPE CANCER CENTER PHOENIX                        0 items  ERR: f [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/030138.log]"}
+{"ccn":"060116","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"050546","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"061308","fmt":"","items":0,"error":"seed:-:subprocess:1:061308 SAN LUIS VALLEY HEALTH CONEJOS COUNTY HO html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/061308.log]"}
+{"ccn":"050145","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"051339","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:051339 PALO VERDE HOSPITAL                      csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/051339.log]"}
+{"ccn":"070004","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:070004 SHARON HOSPITAL                                           0 items  ERR: f [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/070004.log]"}
+{"ccn":"100287","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"110161","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"110008","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:110008 NORTHSIDE HOSPITAL CHEROKEE                               0 items  ERR: f [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/110008.log]"}
+{"ccn":"110252","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"121300","fmt":"","items":0,"error":"seed:-:subprocess:1:121300 KAUAI VETERANS MEMORIAL HOSPITAL         html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/121300.log]"}
+{"ccn":"140046","fmt":"","items":0,"error":"seed:-:subprocess:1:140046 GOOD SAMARITAN REGIONAL HLTH CENTER      html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/140046.log]"}
+{"ccn":"100113","fmt":"","items":0,"error":"rediscovered:-:probe:InvalidURL"}
+{"ccn":"100177","fmt":"","items":0,"error":"rediscovered:-:probe:InvalidURL"}
+{"ccn":"140011","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:140011 HERRIN HOSPITAL                                           0 items  ERR: s [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/140011.log]"}
+{"ccn":"220002","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"140100","fmt":"","items":0,"error":"seed:-:subprocess:1:140100 MIDWESTERN REGION MED CENTER, INC                         0 items  ERR: f [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/140100.log]"}
+{"ccn":"200001","fmt":"","items":0,"error":"seed:-:subprocess:1:200001 ST JOSEPH HOSPITAL                                        0 items  ERR: p [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/200001.log]"}
+{"ccn":"230092","fmt":"","items":0,"error":"seed:-:subprocess:1:230092 HENRY FORD ALLEGIANCE HEALTH             csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/230092.log]"}
+{"ccn":"230146","fmt":"","items":0,"error":"seed:-:subprocess:1:230146 WYANDOTTE HOSPITAL AND MEDICAL CENTER    csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/230146.log]"}
+{"ccn":"260200","fmt":"","items":0,"error":"seed:-:subprocess:1:260200 SSM ST JOSEPH HOSPITAL WEST              html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/260200.log]"}
+{"ccn":"281361","fmt":"","items":0,"error":"seed:-:subprocess:1:281361 LEXINGTON REGIONAL HEALTH CENTER         html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/281361.log]"}
+{"ccn":"281363","fmt":"","items":0,"error":"seed:-:subprocess:1:281363 COMMUNITY HOSPITAL                       html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/281363.log]"}
+{"ccn":"301300","fmt":"","items":0,"error":"seed:-:subprocess:1:301300 UPPER CONNECTICUT VALLEY HOSPITAL        xls-legacy       0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/301300.log]"}
+{"ccn":"310011","fmt":"","items":0,"error":"seed:-:subprocess:1:310011 CAPE REGIONAL MEDICAL CENTER INC         html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/310011.log]"}
+{"ccn":"230097","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:230097 MUNSON MEDICAL CENTER                                     0 items  ERR: f [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/230097.log]"}
+{"ccn":"330049","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:330049 NORTHERN DUTCHESS HOSPITAL                                0 items  ERR: f [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/330049.log]"}
+{"ccn":"313300","fmt":"","items":0,"error":"seed:-:subprocess:1:313300 CHILDREN'S SPECIALIZED HOSPITAL          xlsx             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/313300.log]"}
+{"ccn":"341328","fmt":"","items":0,"error":"seed:-:subprocess:1:341328 ERLANGER MURPHY MEDICAL CENTER           html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/341328.log]"}
+{"ccn":"340156","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:340156 CHEROKEE INDIAN HOSPITAL AUTHORITY       xlsx             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/340156.log]"}
+{"ccn":"360092","fmt":"","items":0,"error":"seed:-:subprocess:1:360092 MEMORIAL HOSPITAL                        html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/360092.log]"}
+{"ccn":"360041","fmt":"","items":0,"error":"seed:-:subprocess:1:360041 PARMA COMMUNITY GENERAL HOSPITAL         csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/360041.log]"}
+{"ccn":"370199","fmt":"","items":0,"error":"seed:-:subprocess:1:370199 LAKESIDE WOMEN'S HOSPITAL, A MEMBER OF I                  0 items  ERR: f [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/370199.log]"}
+{"ccn":"340015","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:340015 NOVANT HEALTH ROWAN MEDICAL CENTER                        0 items  ERR: s [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/340015.log]"}
+{"ccn":"380005","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"361307","fmt":"","items":0,"error":"seed:-:subprocess:1:361307 UHHS MEMORIAL HOSPITAL OF GENEVA         csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/361307.log]"}
+{"ccn":"371322","fmt":"","items":0,"error":"seed:-:subprocess:1:371322 BEAVER COUNTY MEMORIAL HOSPITAL          html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/371322.log]"}
+{"ccn":"381320","fmt":"","items":0,"error":"seed:-:subprocess:1:381320 COLUMBIA MEMORIAL HOSPITAL                                0 items  ERR: s [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/381320.log]"}
+{"ccn":"390048","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"390003","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:390003 GEISINGER-BLOOMSBURG HOSPITAL            html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/390003.log]"}
+{"ccn":"390270","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"390337","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"391300","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"451309","fmt":"","items":0,"error":"seed:-:subprocess:1:451309 MC CAMEY HOSPITAL                        html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/451309.log]"}
+{"ccn":"453300","fmt":"","items":0,"error":"seed:-:subprocess:1:453300 COOK CHILDRENS MEDICAL CENTER            html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/453300.log]"}
+{"ccn":"390001","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"390133","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:390133 LEHIGH VALLEY HOSPITAL                   json             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/390133.log]"}
+{"ccn":"460006","fmt":"","items":0,"error":"seed:-:subprocess:1:460006 LDS HOSPITAL                             csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/460006.log]"}
+{"ccn":"460010","fmt":"","items":0,"error":"seed:-:subprocess:1:460010 INTERMOUNTAIN MEDICAL CENTER             csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/460010.log]"}
+{"ccn":"460015","fmt":"","items":0,"error":"seed:-:subprocess:1:460015 LOGAN REGIONAL HOSPITAL                  csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/460015.log]"}
+{"ccn":"460021","fmt":"","items":0,"error":"seed:-:subprocess:1:460021 ST. GEORGE REGIONAL HOSPITAL             csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/460021.log]"}
+{"ccn":"510029","fmt":"","items":0,"error":"seed:-:subprocess:1:510029 THOMAS MEMORIAL HOSPITAL                 html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/510029.log]"}
+{"ccn":"520028","fmt":"","items":0,"error":"seed:-:subprocess:1:520028 THE MONROE CLINIC                        html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/520028.log]"}
+{"ccn":"460043","fmt":"","items":0,"error":"seed:-:subprocess:1:460043 OREM COMMUNITY HOSPITAL                  csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/460043.log]"}
+{"ccn":"461301","fmt":"","items":0,"error":"seed:-:subprocess:1:461301 FILLMORE COMMUNITY HOSPITAL              csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/461301.log]"}
+{"ccn":"180043","fmt":"","items":0,"error":"seed:-:subprocess:1:180043 AdventHealthManchester                                    0 items  ERR: s [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/180043.log]"}
+{"ccn":"521307","fmt":"","items":0,"error":"seed:-:subprocess:1:521307 CHIPPEWA VALLEY HOSPITAL                                  0 items  ERR: s [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/521307.log]"}
+{"ccn":"030138","fmt":"","items":0,"error":"seed:-:probe_http:403"}
+{"ccn":"060116","fmt":"","items":0,"error":"no_live_mrf"}
+{"ccn":"050546","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"061308","fmt":"","items":0,"error":"seed:-:subprocess:1:061308 SAN LUIS VALLEY HEALTH CONEJOS COUNTY HO html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/061308.log]"}
+{"ccn":"070004","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"050145","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"051339","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:051339 PALO VERDE HOSPITAL                      csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/051339.log]"}
+{"ccn":"100287","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=utf-8"}
+{"ccn":"110161","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"110252","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"110008","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"121300","fmt":"","items":0,"error":"seed:-:subprocess:1:121300 KAUAI VETERANS MEMORIAL HOSPITAL         html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/121300.log]"}
+{"ccn":"140011","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:140011 HERRIN HOSPITAL                                           0 items  ERR: s [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/140011.log]"}
+{"ccn":"140100","fmt":"","items":0,"error":"seed:-:probe_http:403"}
+{"ccn":"140046","fmt":"","items":0,"error":"seed:-:subprocess:1:140046 GOOD SAMARITAN REGIONAL HLTH CENTER      html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/140046.log]"}
+{"ccn":"100113","fmt":"","items":0,"error":"rediscovered:-:probe:InvalidURL"}
+{"ccn":"100177","fmt":"","items":0,"error":"rediscovered:-:probe:InvalidURL"}
+{"ccn":"200001","fmt":"","items":0,"error":"seed:-:subprocess:1:200001 ST JOSEPH HOSPITAL                                        0 items  ERR: p [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/200001.log]"}
+{"ccn":"220002","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"230146","fmt":"","items":0,"error":"seed:-:subprocess:1:230146 WYANDOTTE HOSPITAL AND MEDICAL CENTER    csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/230146.log]"}
+{"ccn":"230092","fmt":"","items":0,"error":"seed:-:subprocess:1:230092 HENRY FORD ALLEGIANCE HEALTH             csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/230092.log]"}
+{"ccn":"230097","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:230097 MUNSON MEDICAL CENTER                                     0 items  ERR: f [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/230097.log]"}
+{"ccn":"260200","fmt":"","items":0,"error":"seed:-:subprocess:1:260200 SSM ST JOSEPH HOSPITAL WEST              html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/260200.log]"}
+{"ccn":"281361","fmt":"","items":0,"error":"seed:-:subprocess:1:281361 LEXINGTON REGIONAL HEALTH CENTER         html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/281361.log]"}
+{"ccn":"301300","fmt":"","items":0,"error":"seed:-:subprocess:1:301300 UPPER CONNECTICUT VALLEY HOSPITAL        xls-legacy       0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/301300.log]"}
+{"ccn":"281363","fmt":"","items":0,"error":"seed:-:subprocess:1:281363 COMMUNITY HOSPITAL                       html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/281363.log]"}
+{"ccn":"330049","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"310011","fmt":"","items":0,"error":"seed:-:subprocess:1:310011 CAPE REGIONAL MEDICAL CENTER INC         html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/310011.log]"}
+{"ccn":"313300","fmt":"","items":0,"error":"seed:-:subprocess:1:313300 CHILDREN'S SPECIALIZED HOSPITAL          xlsx             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/313300.log]"}
+{"ccn":"340156","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:340156 CHEROKEE INDIAN HOSPITAL AUTHORITY       xlsx             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/340156.log]"}
+{"ccn":"341328","fmt":"","items":0,"error":"seed:-:subprocess:1:341328 ERLANGER MURPHY MEDICAL CENTER           html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/341328.log]"}
+{"ccn":"360092","fmt":"","items":0,"error":"seed:-:subprocess:1:360092 MEMORIAL HOSPITAL                        html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/360092.log]"}
+{"ccn":"340015","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:340015 NOVANT HEALTH ROWAN MEDICAL CENTER                        0 items  ERR: s [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/340015.log]"}
+{"ccn":"370199","fmt":"","items":0,"error":"seed:-:probe_http:403"}
+{"ccn":"360041","fmt":"","items":0,"error":"seed:-:subprocess:1:360041 PARMA COMMUNITY GENERAL HOSPITAL         csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/360041.log]"}
+{"ccn":"380005","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"371322","fmt":"","items":0,"error":"seed:-:subprocess:1:371322 BEAVER COUNTY MEMORIAL HOSPITAL          html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/371322.log]"}
+{"ccn":"381320","fmt":"","items":0,"error":"seed:-:subprocess:1:381320 COLUMBIA MEMORIAL HOSPITAL                                0 items  ERR: s [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/381320.log]"}
+{"ccn":"361307","fmt":"","items":0,"error":"seed:-:subprocess:1:361307 UHHS MEMORIAL HOSPITAL OF GENEVA         csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/361307.log]"}
+{"ccn":"390003","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"390048","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"390001","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"390270","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"390337","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"391300","fmt":"","items":0,"error":"rediscovered:-:probe_html:200:text/html; charset=UTF-8"}
+{"ccn":"451309","fmt":"","items":0,"error":"seed:-:subprocess:1:451309 MC CAMEY HOSPITAL                        html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/451309.log]"}
+{"ccn":"453300","fmt":"","items":0,"error":"seed:-:subprocess:1:453300 COOK CHILDRENS MEDICAL CENTER            html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/453300.log]"}
+{"ccn":"460010","fmt":"","items":0,"error":"seed:-:subprocess:1:460010 INTERMOUNTAIN MEDICAL CENTER             csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/460010.log]"}
+{"ccn":"460006","fmt":"","items":0,"error":"seed:-:subprocess:1:460006 LDS HOSPITAL                             csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/460006.log]"}
+{"ccn":"460015","fmt":"","items":0,"error":"seed:-:subprocess:1:460015 LOGAN REGIONAL HOSPITAL                  csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/460015.log]"}
+{"ccn":"461301","fmt":"","items":0,"error":"seed:-:subprocess:1:461301 FILLMORE COMMUNITY HOSPITAL              csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/461301.log]"}
+{"ccn":"510029","fmt":"","items":0,"error":"seed:-:subprocess:1:510029 THOMAS MEMORIAL HOSPITAL                 html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/510029.log]"}
+{"ccn":"520028","fmt":"","items":0,"error":"seed:-:subprocess:1:520028 THE MONROE CLINIC                        html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/520028.log]"}
+{"ccn":"460021","fmt":"","items":0,"error":"seed:-:subprocess:1:460021 ST. GEORGE REGIONAL HOSPITAL             csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/460021.log]"}
+{"ccn":"460043","fmt":"","items":0,"error":"seed:-:subprocess:1:460043 OREM COMMUNITY HOSPITAL                  csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/460043.log]"}
+{"ccn":"390133","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:390133 LEHIGH VALLEY HOSPITAL                   json             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/390133.log]"}
