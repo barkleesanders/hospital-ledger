@@ -3119,6 +3119,162 @@
           "probed_at": "2026-05-11T05:47:20Z"
         }
       ]
+    },
+    {
+      "ccn": "340156",
+      "failure_logs": [
+        "phase_b_parser_recovery"
+      ],
+      "hospital_name": "CHEROKEE INDIAN HOSPITAL AUTHORITY",
+      "note": "File is a UCR percentile fee schedule (Geozip, 50th-95th columns), not a CMS HPT machine-readable file \u2014 no gross / discounted-cash / payer-specific charge fields exist to parse.",
+      "original_url": "https://cherokeehospital.org/wp-content/uploads/2025/12/2026-Chargemaster.xlsx",
+      "provisional": true,
+      "reason": "non_standard_mrf_format",
+      "seed_probe_history": []
+    },
+    {
+      "ccn": "313300",
+      "failure_logs": [
+        "phase_b_parser_recovery"
+      ],
+      "hospital_name": "CHILDREN'S SPECIALIZED HOSPITAL",
+      "note": "XLSX has only Description + CHARGE columns with no procedure code and implausible charge values; not a parseable CMS HPT MRF.",
+      "original_url": "https://www.rwjbh.org/documents/csh/Childrens_Specialized_Hospital_CDM.xlsx",
+      "provisional": true,
+      "reason": "non_standard_mrf_format",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "http_status": 200,
+          "mrf_url": "https://www.rwjbh.org/documents/csh/Childrens_Specialized_Hospital_CDM.xlsx",
+          "probed_at": "2026-05-11T05:45:36Z"
+        }
+      ]
+    },
+    {
+      "ccn": "100113",
+      "failure_logs": [
+        "phase_b_parser_recovery"
+      ],
+      "hospital_name": "UF HEALTH SHANDS HOSPITAL",
+      "note": "Seed/rediscovered URL points to a Florida state aggregate dataset (AllFacilityData_MiamiDade.xlsx), not this hospital's MRF.",
+      "original_url": "https://quality.healthfinder.fl.gov/files/AllFacilityData_MiamiDade.xlsx",
+      "provisional": true,
+      "reason": "mrf_url_points_to_wrong_file",
+      "seed_probe_history": [
+        {
+          "alive": 0,
+          "content_type": "text/html; charset=UTF-8",
+          "http_status": 404,
+          "mrf_url": "https://ufhealth.org/sites/default/files/media/financial-assistance/59-1943502_ShandsTeachingHospitalandClinics_standardcharges.csv",
+          "probed_at": "2026-05-11T05:44:29Z"
+        }
+      ]
+    },
+    {
+      "ccn": "100177",
+      "failure_logs": [
+        "phase_b_parser_recovery"
+      ],
+      "hospital_name": "CAPE CANAVERAL HOSPITAL",
+      "note": "Seed/rediscovered URL points to a Florida state aggregate dataset (AllFacilityData_MiamiDade.xlsx), not this hospital's MRF.",
+      "original_url": "https://quality.healthfinder.fl.gov/files/AllFacilityData_MiamiDade.xlsx",
+      "provisional": true,
+      "reason": "mrf_url_points_to_wrong_file",
+      "seed_probe_history": []
+    },
+    {
+      "ccn": "301300",
+      "failure_logs": [
+        "phase_b_parser_recovery"
+      ],
+      "hospital_name": "UPPER CONNECTICUT VALLEY HOSPITAL",
+      "note": "Legacy .xls workbook is password-protected (filename ends \"-protected.xls\"); encrypted workbooks cannot be read programmatically.",
+      "original_url": "https://www.ucvh.org/wp-content/uploads/sites/2/2022/04/Chargemaster-10-1-19-for-website-posting.xls",
+      "provisional": true,
+      "reason": "mrf_password_protected",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "application/vnd.ms-excel",
+          "http_status": 200,
+          "mrf_url": "https://www.ucvh.org/wp-content/uploads/sites/2/2022/04/Chargemaster-10-1-19-for-website-posting.xls",
+          "probed_at": "2026-05-11T05:44:56Z"
+        }
+      ]
+    },
+    {
+      "ccn": "051339",
+      "failure_logs": [
+        "phase_b_parser_recovery"
+      ],
+      "hospital_name": "PALO VERDE HOSPITAL",
+      "note": "URL returns a one-cell document (\"Test\") rather than a chargemaster; no machine-readable price data present.",
+      "original_url": "https://www.paloverdehospital.org/DocumentCenter/View/325",
+      "provisional": true,
+      "reason": "mrf_url_returns_html_wrapper",
+      "seed_probe_history": []
+    },
+    {
+      "ccn": "260200",
+      "failure_logs": [
+        "phase_c_panacea_discovery"
+      ],
+      "hospital_name": "SSM ST JOSEPH HOSPITAL WEST",
+      "note": "SSM Health Panacea portal (ssmhealth.pt.panaceainc.com) is an Angular SPA whose per-hospital MRF download slug for Saint Joseph Hospital - Lake Saint Louis could not be resolved via DOM extraction, network capture, or slug guessing.",
+      "original_url": "https://mrf.panaceainc.com/Download.aspx",
+      "provisional": true,
+      "reason": "panacea_vendor_portal_unresolved",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "text/html; charset=utf-8",
+          "http_status": 200,
+          "mrf_url": "https://mrf.panaceainc.com/Download.aspx",
+          "probed_at": "2026-05-11T05:47:23Z"
+        }
+      ]
+    },
+    {
+      "ccn": "520028",
+      "failure_logs": [
+        "phase_c_panacea_discovery"
+      ],
+      "hospital_name": "THE MONROE CLINIC",
+      "note": "SSM Health Panacea portal SPA per-hospital MRF download slug for Monroe Hospital could not be resolved.",
+      "original_url": "https://mrf.panaceainc.com/Download.aspx",
+      "provisional": true,
+      "reason": "panacea_vendor_portal_unresolved",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "text/html; charset=utf-8",
+          "http_status": 200,
+          "mrf_url": "https://mrf.panaceainc.com/Download.aspx",
+          "probed_at": "2026-05-11T05:44:57Z"
+        }
+      ]
+    },
+    {
+      "ccn": "360092",
+      "failure_logs": [
+        "phase_c_panacea_discovery"
+      ],
+      "hospital_name": "MEMORIAL HOSPITAL",
+      "note": "Memorial Hospital (Marysville OH) uses the Panacea Download.aspx vendor portal; no resolvable .pt.panaceainc.com tenant hostname or direct MRF URL was discoverable.",
+      "original_url": "https://mrf.panaceainc.com/Download.aspx",
+      "provisional": true,
+      "reason": "panacea_vendor_portal_unresolved",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "text/html; charset=utf-8",
+          "http_status": 200,
+          "mrf_url": "https://mrf.panaceainc.com/Download.aspx",
+          "probed_at": "2026-05-11T05:44:52Z"
+        }
+      ]
     }
   ]
 }

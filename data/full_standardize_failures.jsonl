@@ -344,3 +344,11 @@
 {"ccn":"460021","fmt":"","items":0,"error":"seed:-:subprocess:1:460021 ST. GEORGE REGIONAL HOSPITAL             csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/460021.log]"}
 {"ccn":"460043","fmt":"","items":0,"error":"seed:-:subprocess:1:460043 OREM COMMUNITY HOSPITAL                  csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/460043.log]"}
 {"ccn":"390133","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:390133 LEHIGH VALLEY HOSPITAL                   json             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/390133.log]"}
+{"ccn":"301300","fmt":"","items":0,"error":"seed:-:subprocess:1:301300 UPPER CONNECTICUT VALLEY HOSPITAL        xls-legacy       0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/301300.log]"}
+{"ccn":"051339","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:051339 PALO VERDE HOSPITAL                      csv              0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/051339.log]"}
+{"ccn":"313300","fmt":"","items":0,"error":"seed:-:subprocess:1:313300 CHILDREN'S SPECIALIZED HOSPITAL          xlsx             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/313300.log]"}
+{"ccn":"340156","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:340156 CHEROKEE INDIAN HOSPITAL AUTHORITY       xlsx             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/340156.log]"}
+{"ccn":"100177","fmt":"","items":0,"error":"rediscovered:-:probe:InvalidURL"}
+{"ccn":"100113","fmt":"","items":0,"error":"rediscovered:-:probe:InvalidURL"}
+{"ccn":"390003","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:390003 GEISINGER-BLOOMSBURG HOSPITAL            html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/390003.log]"}
+{"ccn":"390133","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:390133 LEHIGH VALLEY HOSPITAL                   json             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/390133.log]"}

@@ -29,13 +29,13 @@ Numbers below are verified from the deployed site (`public/data/summary.json`,
 | Hospitals in the CMS universe | **5,426** | `hospitals` table |
 | CMS-required hospitals (the denominator for compliance) | **4,625** | `summary.json#cms_required_total` |
 | CMS-required hospitals with a verified live MRF | **3,986 (86.2%)** | `summary.json#compliant` / `#compliance_pct` |
-| Hospitals with a standardized on-site price preview | **3,769** | `public/data/prices/index.json` |
-| Standardized price rows across those hospitals | **67.2 M** | sum of `n` in prices index |
-| CPT- / HCPCS-coded rows (patient-comparable) | **14.4 M** | sum of `cpt_indexed` in prices index |
+| Hospitals with a standardized on-site price preview | **3,800** | `public/data/prices/index.json` |
+| Standardized price rows across those hospitals | **67.6 M** | sum of `n` in prices index |
+| CPT- / HCPCS-coded rows (patient-comparable) | **14.7 M** | sum of `cpt_indexed` in prices index |
 | Distinct CPT / HCPCS codes in the cross-hospital index | **5,000** | `/api/cpt-index` keys |
-| Payer-negotiated rate cells | **166.4 M** | sum of `n_rates` in `data/_payer_raw.jsonl` |
-| Hospitals with at least one payer-rate row | **3,119** | distinct CCN in `_payer_raw.jsonl` |
-| CCN × raw-payer-string rows | **76,329** | line count of `_payer_raw.jsonl` |
+| Payer-negotiated rate cells | **168.1 M** | sum of `n_rates` in `data/_payer_raw.jsonl` |
+| Hospitals with at least one payer-rate row | **3,138** | distinct CCN in `_payer_raw.jsonl` |
+| CCN × raw-payer-string rows | **76,706** | line count of `_payer_raw.jsonl` |
 | Canonical payer brands surfaced on site | **200 featured** (21,803 raw) | `/api/payers-index` |
 | CMS enforcement records loaded | **11,440** | `cms_enforcement` table |
 | Enforcement actions linked to required hospitals | **8,642** | `summary.json#enforcement_actions_total` |
@@ -53,7 +53,7 @@ under `public/data/`.
 | 1 | Seed CMS hospital universe (5,426 facilities) | done |
 | 2 | Load MRF URL seeds (7,191 from TPAFS) + probe liveness | done (in `mrf_probe`) |
 | 3 | URL rediscovery crawler for dead URLs | done (in `mrf_rediscovered`) |
-| 4 | Fetch + parse alive MRFs (CSV-tall/wide, JSON v2/v3, XLSX) | live (3,769 / 3,986 = 94.5% of required+live hospitals parsed; 163 terminal exceptions) |
+| 4 | Fetch + parse alive MRFs (CSV-tall/wide, JSON v2/v3, XLSX) | live (3,800 / 3,986 = 94.5% of required+live hospitals parsed; 163 terminal exceptions) |
 | 5 | Public API + UI (SSR on Cloudflare Workers + R2) | live at hospitalledger.com |
 | 6 | Compliance watchdog + CMS enforcement ingestion | live (`cms_enforcement` + `cms_enforcement_match`) |
 | 7 | Cross-hospital CPT / HCPCS price index | live (5,000 codes, R2-backed `/api/cpt-index`) |
@@ -161,5 +161,5 @@ curl -sS https://hospitalledger.com/api/payers-index | python3 -c \
 - Not affiliated with CMS, HHS, or any commercial transparency vendor.
 
 > Previously this section also said "Not a chargemaster aggregator (yet — Stage
-> 4)." That is now false: Stage 4 is live, and 3,769 hospitals' MRFs have been
+> 4)." That is now false: Stage 4 is live, and 3,800 hospitals' MRFs have been
 > parsed into a unified schema and indexed by CPT / HCPCS.
