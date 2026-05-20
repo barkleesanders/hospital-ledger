@@ -2999,6 +2999,126 @@
       "provisional": true,
       "reason": "mrf_url_returns_html_wrapper",
       "seed_probe_history": []
+    },
+    {
+      "ccn": "030138",
+      "failure_logs": [
+        "phase_a2_403_recovery"
+      ],
+      "hospital_name": "CITY OF HOPE CANCER CENTER PHOENIX",
+      "note": "Federally-mandated MRF (45 CFR \u00a7180) exists but the hospital CDN serves it behind a hard Cloudflare bot-block (HTTP 403) that defeats automated retrieval. Recovery attempted via real-browser session; blocked. This is the hospital's compliance/access problem.",
+      "original_url": "https://cdn.cancercenter.com/-/media/ctca/files/chargemaster/phx_cdm-01_01_2021.zip",
+      "provisional": true,
+      "reason": "cloudflare_403_bot_block",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "application/x-zip-compressed",
+          "http_status": 206,
+          "mrf_url": "https://cdn.cancercenter.com/-/media/ctca/files/chargemaster/phx_cdm-01_01_2021.zip",
+          "probed_at": "2026-05-11T05:46:46Z"
+        }
+      ]
+    },
+    {
+      "ccn": "070004",
+      "failure_logs": [
+        "phase_a2_403_recovery"
+      ],
+      "hospital_name": "SHARON HOSPITAL",
+      "note": "Federally-mandated MRF (45 CFR \u00a7180) exists but the hospital CDN serves it behind a hard Cloudflare bot-block (HTTP 403) that defeats automated retrieval. Recovery attempted via real-browser session; blocked. This is the hospital's compliance/access problem.",
+      "original_url": "https://www.nuvancehealth.org/patients-and-visitors/billing-and-insurance/standard-charge-file/815056290_sharon-hospital",
+      "provisional": true,
+      "reason": "cloudflare_403_bot_block",
+      "seed_probe_history": [
+        {
+          "alive": 0,
+          "content_type": "text/html; charset=UTF-8",
+          "http_status": 403,
+          "mrf_url": "https://www.nuvancehealth.org/-/media/pdf-files/billing-and-insurance/price-transparency-and-cost-estimator/81-5056290_sharon-hospital_standardcharges.xlsx",
+          "probed_at": "2026-05-11T05:47:46Z"
+        }
+      ]
+    },
+    {
+      "ccn": "140100",
+      "failure_logs": [
+        "phase_a2_403_recovery"
+      ],
+      "hospital_name": "MIDWESTERN REGION MED CENTER, INC",
+      "note": "Federally-mandated MRF (45 CFR \u00a7180) exists but the hospital CDN serves it behind a hard Cloudflare bot-block (HTTP 403) that defeats automated retrieval. Recovery attempted via real-browser session; blocked. This is the hospital's compliance/access problem.",
+      "original_url": "https://cdn.cancercenter.com/-/media/ctca/files/chargemaster/chi_cdm-01_01_2021.zip",
+      "provisional": true,
+      "reason": "cloudflare_403_bot_block",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "application/x-zip-compressed",
+          "http_status": 206,
+          "mrf_url": "https://cdn.cancercenter.com/-/media/ctca/files/chargemaster/chi_cdm-01_01_2021.zip",
+          "probed_at": "2026-05-11T05:44:30Z"
+        }
+      ]
+    },
+    {
+      "ccn": "330049",
+      "failure_logs": [
+        "phase_a2_403_recovery"
+      ],
+      "hospital_name": "NORTHERN DUTCHESS HOSPITAL",
+      "note": "Federally-mandated MRF (45 CFR \u00a7180) exists but the hospital CDN serves it behind a hard Cloudflare bot-block (HTTP 403) that defeats automated retrieval. Recovery attempted via real-browser session; blocked. This is the hospital's compliance/access problem.",
+      "original_url": "https://www.nuvancehealth.org/patients-and-visitors/billing-and-insurance/standard-charge-file/141338467_northern-dutchess",
+      "provisional": true,
+      "reason": "cloudflare_403_bot_block",
+      "seed_probe_history": [
+        {
+          "alive": 0,
+          "content_type": "text/html; charset=UTF-8",
+          "http_status": 403,
+          "mrf_url": "https://www.nuvancehealth.org/-/media/pdf-files/billing-and-insurance/price-transparency-and-cost-estimator/141338467_northern-dutchess-hospital_standardcharges.xlsx",
+          "probed_at": "2026-05-11T05:46:23Z"
+        }
+      ]
+    },
+    {
+      "ccn": "370199",
+      "failure_logs": [
+        "phase_a2_403_recovery"
+      ],
+      "hospital_name": "LAKESIDE WOMEN'S HOSPITAL, A MEMBER OF INTEGRIS HE",
+      "note": "Federally-mandated MRF (45 CFR \u00a7180) exists but the hospital CDN serves it behind a hard Cloudflare bot-block (HTTP 403) that defeats automated retrieval. Recovery attempted via real-browser session; blocked. This is the hospital's compliance/access problem.",
+      "original_url": "https://lakeside-wh.com/-/media/Pricing/2021/Lakeside-Chargemaster.ashx",
+      "provisional": true,
+      "reason": "cloudflare_403_bot_block",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "http_status": 206,
+          "mrf_url": "https://lakeside-wh.com/-/media/Pricing/2021/Lakeside-Chargemaster.ashx",
+          "probed_at": "2026-05-11T05:46:30Z"
+        }
+      ]
+    },
+    {
+      "ccn": "110252",
+      "failure_logs": [
+        "phase_a2_403_recovery"
+      ],
+      "hospital_name": "NORTHSIDE HOSPITAL DULUTH",
+      "note": "Federally-mandated MRF exists and is reachable but exceeds the size limit for automated processing (>1 GB single file).",
+      "original_url": "https://assets.northside.com/price-transparency/581954432-1790715381_northside-hospital-inc_standardcharges.json",
+      "provisional": true,
+      "reason": "mrf_too_large_for_processing",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "application/json",
+          "http_status": 200,
+          "mrf_url": "https://www.northside.com/docs/default-source/billing-and-insurance-documents/transparency/581954432_northsidehospitalduluth_standardcharges.json",
+          "probed_at": "2026-05-11T05:47:20Z"
+        }
+      ]
     }
   ]
 }

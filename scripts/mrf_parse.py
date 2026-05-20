@@ -1279,6 +1279,54 @@ def sanitize_utf8_chunks(chunks):
         yield tail.encode('utf-8')
 
 
+# Bytes that are legal JSON whitespace OUTSIDE a string token.
+_JSON_WS = frozenset(b' \t\n\r')
+
+
+def sanitize_json_control_chars(chunks):
+    """Escape raw control characters (0x00-0x1F) that appear inside JSON string
+    values. Strict JSON forbids unescaped control chars inside strings, but
+    several hospital MRF exports embed raw TAB/CR/LF (and occasionally NUL) in
+    description fields — strict parsers (and ijson) reject the whole file.
+
+    A single boolean tracks string state across the entire byte stream by
+    toggling on each unescaped double-quote. Control chars seen inside a string
+    are replaced with their \\uXXXX escape; outside a string they are left as-is
+    (structural whitespace). Operates on UTF-8 bytes already normalized by
+    sanitize_utf8_chunks, so multi-byte sequences are intact.
+    """
+    in_string = False
+    escaped = False
+    for chunk in chunks:
+        out = bytearray()
+        for b in chunk:
+            if in_string:
+                if escaped:
+                    out.append(b)
+                    escaped = False
+                    continue
+                if b == 0x5C:  # backslash
+                    out.append(b)
+                    escaped = True
+                    continue
+                if b == 0x22:  # closing quote
+                    out.append(b)
+                    in_string = False
+                    continue
+                if b < 0x20:  # raw control char inside string -> escape
+                    out.extend(b'\\u%04x' % b)
+                    continue
+                out.append(b)
+            else:
+                if b == 0x22:  # opening quote
+                    out.append(b)
+                    in_string = True
+                    continue
+                out.append(b)
+        if out:
+            yield bytes(out)
+
+
 def stream_parse_large_json(url, max_items=200_000):
     """Incrementally parse huge v2/v3 JSON files without loading them fully."""
     if ijson is None:
@@ -1309,6 +1357,19 @@ def stream_parse_large_json(url, max_items=200_000):
             # 'item' prefix would try to materialize that whole nested array as a
             # single Python object (OOM) and raises UnexpectedSymbol; 'item.item'
             # descends one level and streams the rows.
+            # NDJSON / object-stream detection: some vendor exports (e.g. the
+            # 'moad-outputs' template) are a stream of flat row objects, one
+            # per line, NOT wrapped in an array and NOT a CMS HPT object. They
+            # begin with '{' but carry no standard_charge_information /
+            # standard_charges / hospital_name key in the first 4 KB. Parsed
+            # with multiple_values=True at the root prefix '', each top-level
+            # object becomes one row.
+            head_keys = preview[:4096].lower()
+            looks_like_hpt_object = (
+                b'standard_charge_information' in head_keys
+                or b'standard_charges' in head_keys
+                or b'hospital_name' in head_keys
+            )
             nested_after_obj = re.match(rb'\[\{.*?\},\[', compact, re.DOTALL) is not None
             if compact.startswith(b'[['):
                 prefix = 'item.item'
@@ -1316,31 +1377,54 @@ def stream_parse_large_json(url, max_items=200_000):
                 prefix = 'item.item'
             elif compact.startswith(b'[{'):
                 prefix = 'item'
+            elif compact.startswith(b'{') and not looks_like_hpt_object:
+                prefix = ''
             else:
                 prefix = 'standard_charge_information.item'
 
             combined_chunks = itertools.chain([preview], chunks)
-            stream = IterStream(sanitize_utf8_chunks(combined_chunks))
+            stream = IterStream(
+                sanitize_json_control_chars(sanitize_utf8_chunks(combined_chunks))
+            )
             seen_entries = 0
+            # ijson raises JSONError ("Additional data found") or
+            # IncompleteJSONError once the root value ends but trailing bytes
+            # remain (a stray second object, a duplicated newline, etc). When
+            # that happens AFTER we have already streamed real entries, the
+            # parse is effectively complete — keep what we collected instead of
+            # discarding the whole file.
+            # multiple_values=True lets ijson stream a sequence of concatenated
+            # JSON documents (a handful of hospital MRFs duplicate the whole
+            # file, or append a second per-location document) instead of
+            # raising "trailing garbage" / "Additional data found" after the
+            # first root. For a normal single-document file it is a no-op.
             if prefix == 'standard_charge_information.item':
                 items = []
-                for entry in ijson.items(stream, prefix):
-                    seen_entries += 1
-                    items.extend(expand_json_v2_entry(entry))
-                    if seen_entries >= max_items:
-                        break
+                try:
+                    for entry in ijson.items(stream, prefix, multiple_values=True):
+                        seen_entries += 1
+                        items.extend(expand_json_v2_entry(entry))
+                        if seen_entries >= max_items:
+                            break
+                except (ijson.JSONError, ijson.IncompleteJSONError):
+                    if not seen_entries:
+                        raise
                 if seen_entries:
                     return items, str(r.url), r.headers.get('content-type', '')
                 return None
 
             grouped = {}
-            for entry in ijson.items(stream, prefix):
-                if not isinstance(entry, dict):
-                    continue
-                seen_entries += 1
-                merge_json_list_row(grouped, entry)
-                if seen_entries >= max_items:
-                    break
+            try:
+                for entry in ijson.items(stream, prefix, multiple_values=True):
+                    if not isinstance(entry, dict):
+                        continue
+                    seen_entries += 1
+                    merge_json_list_row(grouped, entry)
+                    if seen_entries >= max_items:
+                        break
+            except (ijson.JSONError, ijson.IncompleteJSONError):
+                if not seen_entries:
+                    raise
             if seen_entries:
                 return list(grouped.values()), str(r.url), r.headers.get('content-type', '')
     return None
