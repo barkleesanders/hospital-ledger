@@ -80,19 +80,42 @@ function homePage(url: string) {
             CMS-required hospitals have a live machine-readable file.
           </p>
           <p class="mt-3 text-xs text-zinc-500 max-w-2xl leading-relaxed">
-            Count definition: the headline uses only hospitals with <code class="mono text-zinc-300">n &gt; 0</code>{" "}
-            rows in <a href="/api/prices-index" class="underline hover:text-zinc-300">/api/prices-index</a>. The
-            summary is mirrored in <a href="/data/summary.json" class="underline hover:text-zinc-300">/data/summary.json</a>.
+            <span class="text-zinc-400">How we count:</span> the headline counts only hospitals with{" "}
+            <code class="mono text-zinc-300">n &gt; 0</code> price rows. Every number is mirrored in{" "}
+            <a href="/data/summary.json" class="underline hover:text-zinc-300">/data/summary.json</a> and{" "}
+            <a href="/api/prices-index" class="underline hover:text-zinc-300">/api/prices-index</a>.
           </p>
-          <p class="mt-2 text-xs text-zinc-500 max-w-2xl leading-relaxed">
-            Why the gap? <span class="tab-num">{fmt(liveMrfRequired - standardizedPriceHospitals)}</span> hospitals (
-            <span class="tab-num">{fmt(liveMrfRequired)}</span> live MRFs − <span class="tab-num">{fmt(standardizedPriceHospitals)}</span> standardized) have a published price file we couldn't turn into usable rows. Two distinct causes:{" "}
-            <span class="tab-num">{fmt(parsedMrfOutputs - standardizedPriceHospitals)}</span> parsed structurally but yielded
-            zero displayable price rows — the hospital uploaded an empty or placeholder file, a compliance gap on their
-            end rather than a parsing failure on ours. The remaining <span class="tab-num">{fmt(liveMrfRequired - parsedMrfOutputs)}</span>{" "}
-            are files we can't retrieve at all — blocked by the hospital's CDN, password-protected, or locked behind a
-            vendor download portal. Every CMS-required hospital with a live MRF is now classified; the recoverable
-            queue is closed. Full breakdown at <a href="/about-the-numbers" class="underline hover:text-zinc-300">/about-the-numbers</a>.
+          <div class="mt-3 text-xs text-zinc-500 max-w-2xl leading-relaxed">
+            <p>
+              <span class="text-zinc-400">Why isn't every hospital here?</span>{" "}
+              <span class="tab-num">{fmt(liveMrfRequired)}</span> hospitals have a live price file, but{" "}
+              <span class="tab-num">{fmt(liveMrfRequired - standardizedPriceHospitals)}</span> of them aren't in the{" "}
+              <span class="tab-num">{fmt(standardizedPriceHospitals)}</span> headline — for two reasons:
+            </p>
+            <ul class="mt-1.5 space-y-1 list-disc pl-5">
+              <li>
+                <span class="tab-num text-zinc-400">{fmt(parsedMrfOutputs - standardizedPriceHospitals)}</span> published
+                a file that is empty or a placeholder — zero usable price rows. That is a gap in the hospital's own
+                compliance, not a parsing failure on our side.
+              </li>
+              <li>
+                <span class="tab-num text-zinc-400">{fmt(liveMrfRequired - parsedMrfOutputs)}</span> publish a file we
+                cannot retrieve — blocked by the hospital's CDN, password-protected, or locked behind a vendor
+                download portal.
+              </li>
+            </ul>
+            <p class="mt-1.5">
+              Every CMS-required hospital with a live file is now accounted for. Full breakdown at{" "}
+              <a href="/about-the-numbers" class="underline hover:text-zinc-300">/about-the-numbers</a>.
+            </p>
+          </div>
+          <p class="mt-4 max-w-2xl border-t border-zinc-800/60 pt-3 text-xs text-zinc-600 leading-relaxed">
+            <span class="text-zinc-500">Disclaimer:</span> prices are reproduced as published in each hospital's
+            machine-readable file and may be incomplete, outdated, or inconsistent. They are not a quote and not a
+            guarantee of cost — what you actually pay depends on your insurance, the specific services, and
+            negotiated rates. Always confirm directly with the hospital and your insurer before relying on any
+            figure here. Hospital Ledger is an independent public-interest project, not affiliated with CMS, HHS,
+            or any hospital.
           </p>
 
           <ProcedureCarousel />
