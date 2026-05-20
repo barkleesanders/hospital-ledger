@@ -86,7 +86,13 @@ function homePage(url: string) {
           </p>
           <p class="mt-2 text-xs text-zinc-500 max-w-2xl leading-relaxed">
             Why the gap? <span class="tab-num">{fmt(liveMrfRequired - standardizedPriceHospitals)}</span> hospitals (
-            <span class="tab-num">{fmt(liveMrfRequired)}</span> live MRFs − <span class="tab-num">{fmt(standardizedPriceHospitals)}</span> standardized) are files we can download but haven't fully extracted usable rows from yet — <span class="tab-num">{fmt(parsedMrfOutputs - standardizedPriceHospitals)}</span> parsed to zero rows (empty/placeholder files) and the rest are still in the parse queue. Closing it is in progress; see <a href="/about-the-numbers" class="underline hover:text-zinc-300">/about-the-numbers</a>.
+            <span class="tab-num">{fmt(liveMrfRequired)}</span> live MRFs − <span class="tab-num">{fmt(standardizedPriceHospitals)}</span> standardized) have a published price file we couldn't turn into usable rows. Two distinct causes:{" "}
+            <span class="tab-num">{fmt(parsedMrfOutputs - standardizedPriceHospitals)}</span> parsed structurally but yielded
+            zero displayable price rows — the hospital uploaded an empty or placeholder file, a compliance gap on their
+            end rather than a parsing failure on ours. The remaining <span class="tab-num">{fmt(liveMrfRequired - parsedMrfOutputs)}</span>{" "}
+            are files we can't retrieve at all — blocked by the hospital's CDN, password-protected, or locked behind a
+            vendor download portal. Every CMS-required hospital with a live MRF is now classified; the recoverable
+            queue is closed. Full breakdown at <a href="/about-the-numbers" class="underline hover:text-zinc-300">/about-the-numbers</a>.
           </p>
 
           <ProcedureCarousel />
