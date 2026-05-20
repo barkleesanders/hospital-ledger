@@ -79,40 +79,41 @@ function homePage(url: string) {
             </span>{" "}
             CMS-required hospitals have a live machine-readable file.
           </p>
-          <p class="mt-3 text-xs text-zinc-500 max-w-2xl leading-relaxed">
-            <span class="text-zinc-400">How we count:</span> the headline counts only hospitals with{" "}
-            <code class="mono text-zinc-300">n &gt; 0</code> price rows. Every number is mirrored in{" "}
-            <a href="/data/summary.json" class="underline hover:text-zinc-300">/data/summary.json</a> and{" "}
-            <a href="/api/prices-index" class="underline hover:text-zinc-300">/api/prices-index</a>.
+          <p class="mt-5 text-sm sm:text-base text-zinc-400 max-w-2xl leading-relaxed">
+            <span class="font-semibold text-zinc-200">How we count:</span> the headline counts only hospitals with{" "}
+            <code class="mono text-zinc-200">n &gt; 0</code> price rows. Every number is mirrored in{" "}
+            <a href="/data/summary.json" class="underline hover:text-emerald-300">/data/summary.json</a> and{" "}
+            <a href="/api/prices-index" class="underline hover:text-emerald-300">/api/prices-index</a>.
           </p>
-          <div class="mt-3 text-xs text-zinc-500 max-w-2xl leading-relaxed">
-            <p>
-              <span class="text-zinc-400">Why isn't every hospital here?</span>{" "}
-              <span class="tab-num">{fmt(liveMrfRequired)}</span> hospitals have a live price file, but{" "}
-              <span class="tab-num">{fmt(liveMrfRequired - standardizedPriceHospitals)}</span> of them aren't in the{" "}
-              <span class="tab-num">{fmt(standardizedPriceHospitals)}</span> headline — for two reasons:
+          <div class="mt-5 text-sm sm:text-base text-zinc-400 max-w-2xl leading-relaxed">
+            <p class="font-semibold text-zinc-200">Why isn't every hospital here?</p>
+            <p class="mt-1.5">
+              <span class="tab-num text-zinc-200">{fmt(liveMrfRequired)}</span> hospitals have a live price file, but{" "}
+              <span class="tab-num text-zinc-200">{fmt(liveMrfRequired - standardizedPriceHospitals)}</span> of them
+              aren't in the <span class="tab-num text-zinc-200">{fmt(standardizedPriceHospitals)}</span> headline — for
+              two reasons:
             </p>
-            <ul class="mt-1.5 space-y-1 list-disc pl-5">
+            <ul class="mt-2.5 space-y-2.5 list-disc pl-6 marker:text-emerald-400">
               <li>
-                <span class="tab-num text-zinc-400">{fmt(parsedMrfOutputs - standardizedPriceHospitals)}</span> published
-                a file that is empty or a placeholder — zero usable price rows. That is a gap in the hospital's own
-                compliance, not a parsing failure on our side.
+                <span class="tab-num font-semibold text-zinc-100">{fmt(parsedMrfOutputs - standardizedPriceHospitals)}</span>{" "}
+                published a file that is empty or a placeholder — zero usable price rows. That is a gap in the
+                hospital's own compliance, not a parsing failure on our side.
               </li>
               <li>
-                <span class="tab-num text-zinc-400">{fmt(liveMrfRequired - parsedMrfOutputs)}</span> publish a file we
-                cannot retrieve — blocked by the hospital's CDN, password-protected, or locked behind a vendor
-                download portal.
+                <span class="tab-num font-semibold text-zinc-100">{fmt(liveMrfRequired - parsedMrfOutputs)}</span>{" "}
+                publish a file we cannot retrieve — blocked by the hospital's CDN, password-protected, or locked
+                behind a vendor download portal.
               </li>
             </ul>
-            <p class="mt-1.5">
+            <p class="mt-2.5">
               Every CMS-required hospital with a live file is now accounted for. Full breakdown at{" "}
-              <a href="/about-the-numbers" class="underline hover:text-zinc-300">/about-the-numbers</a>.
+              <a href="/about-the-numbers" class="underline hover:text-emerald-300">/about-the-numbers</a>.
             </p>
           </div>
-          <p class="mt-4 max-w-2xl border-t border-zinc-800/60 pt-3 text-xs text-zinc-600 leading-relaxed">
-            <span class="text-zinc-500">Disclaimer:</span> prices are reproduced as published in each hospital's
-            machine-readable file and may be incomplete, outdated, or inconsistent. They are not a quote and not a
-            guarantee of cost — what you actually pay depends on your insurance, the specific services, and
+          <p class="mt-6 max-w-2xl border-t border-zinc-800 pt-4 text-sm text-zinc-400 leading-relaxed">
+            <span class="font-semibold text-zinc-200">Disclaimer:</span> prices are reproduced as published in each
+            hospital's machine-readable file and may be incomplete, outdated, or inconsistent. They are not a quote
+            and not a guarantee of cost — what you actually pay depends on your insurance, the specific services, and
             negotiated rates. Always confirm directly with the hospital and your insurer before relying on any
             figure here. Hospital Ledger is an independent public-interest project, not affiliated with CMS, HHS,
             or any hospital.
