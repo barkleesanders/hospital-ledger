@@ -17,6 +17,7 @@ PRICED_INDEX = os.path.join(ROOT, 'public', 'data', 'prices', 'index.json')
 TERMINAL_EXCEPTIONS = os.path.join(ROOT, 'data', 'coverage_terminal_exceptions.json')
 STATUS_FILE = os.path.join(ROOT, 'data', 'full_standardize_status.json')
 FAILURES_FILE = os.path.join(ROOT, 'data', 'full_standardize_failures.jsonl')
+PARSE_ERRORS_DIR = os.path.join(ROOT, 'data', 'parse_errors')
 
 
 DIRECTISH_URL_HINTS = (
@@ -386,6 +387,38 @@ def clear_parsed_record(ccn):
             continue
 
 
+def write_parse_error_log(ccn, candidate, returncode, stderr, stdout, note=''):
+    """Persist the FULL stderr+stdout of a failed parse subprocess.
+
+    The inline progress UI / failures jsonl only keep an ~80-char summary, which
+    is undiagnosable. This writes everything to data/parse_errors/{ccn}.log so a
+    later pass can read the real traceback. Returns the log path on success, or
+    a short fallback string if the write itself fails (logging must never crash
+    the ingest worker).
+    """
+    try:
+        os.makedirs(PARSE_ERRORS_DIR, exist_ok=True)
+        log_path = os.path.join(PARSE_ERRORS_DIR, f'{ccn}.log')
+        url = (candidate or {}).get('url') or ''
+        source = (candidate or {}).get('source') or ''
+        ts = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+        with open(log_path, 'w') as f:
+            f.write(f"# parse failure log for CCN {ccn}\n")
+            f.write(f"# timestamp:  {ts}\n")
+            f.write(f"# returncode: {returncode}\n")
+            if note:
+                f.write(f"# note:       {note}\n")
+            f.write(f"# source:     {source}\n")
+            f.write(f"# url:        {url}\n")
+            f.write("\n===== STDERR =====\n")
+            f.write(stderr or '(empty)\n')
+            f.write("\n===== STDOUT =====\n")
+            f.write(stdout or '(empty)\n')
+        return log_path
+    except OSError as exc:
+        return f'(log_write_failed:{exc})'
+
+
 def ingest_candidate_subprocess(ccn, candidate, timeout_seconds):
     clear_parsed_record(ccn)
     url = candidate['url']
@@ -413,10 +446,13 @@ def ingest_candidate_subprocess(ccn, candidate, timeout_seconds):
     elapsed = time.time() - t0
     record = load_parsed_record(ccn)
     if proc.returncode != 0:
+        log_path = write_parse_error_log(ccn, candidate, proc.returncode, proc.stderr, proc.stdout)
         detail = (proc.stderr or proc.stdout or '').strip().replace('\n', ' ')
-        return False, 0, '', f"subprocess:{proc.returncode}:{detail[:80] or f'{elapsed:.1f}s'}"
+        summary = detail[:80] or f'{elapsed:.1f}s'
+        return False, 0, '', f"subprocess:{proc.returncode}:{summary} [log:{log_path}]"
     if not record:
-        return False, 0, '', f'no_output:{elapsed:.1f}s'
+        log_path = write_parse_error_log(ccn, candidate, 0, proc.stderr, proc.stdout, note='no_output')
+        return False, 0, '', f'no_output:{elapsed:.1f}s [log:{log_path}]'
 
     items = record.get('items') or []
     row_count = int(record.get('row_count') or len(items) or 0)

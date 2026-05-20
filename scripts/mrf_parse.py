@@ -1176,8 +1176,21 @@ def curl_fetch(url, max_bytes):
             pass
 
 
+# Large JSON MRFs are parsed incrementally with ijson rather than buffered
+# into memory and handed to json.load(). json.load() of a 280MB-1GB document
+# OOMs or gets OOM-killed; the streaming path holds only one entry at a time.
+# Files at or below this size still take the fast in-memory path.
+JSON_STREAM_THRESHOLD = 50 * 1024 * 1024
+
+
 def fetch(url, max_bytes=500 * 1024 * 1024):
-    """Stream-download MRF, cap at 500MB."""
+    """Stream-download MRF, cap at 500MB.
+
+    For JSON files larger than JSON_STREAM_THRESHOLD (50MB) the body is NOT
+    buffered — fetch() returns (b'', final_url, content_type, True) so that
+    ingest_one() routes to stream_parse_large_json(), which re-opens the URL
+    and parses it incrementally with ijson. This avoids OOM on 280MB-1GB MRFs.
+    """
     url = normalize_source_url(url)
     try:
         with httpx.Client(headers={'User-Agent': UA}, follow_redirects=True, timeout=60.0, verify=False) as client:
@@ -1186,10 +1199,15 @@ def fetch(url, max_bytes=500 * 1024 * 1024):
                 content_type = r.headers.get('content-type', '')
                 content_length = int(r.headers.get('content-length') or 0)
                 final_url = str(r.url)
-                if (
-                    content_length > max_bytes
-                    and ('.json' in final_url.lower() or 'json' in content_type.lower())
-                ):
+                is_json = '.json' in final_url.lower() or 'json' in content_type.lower()
+                # Route hard-over-cap JSON, or merely-large JSON, to the
+                # streaming parser. ijson is required for the streaming path;
+                # without it, only the >max_bytes case can be skipped (a
+                # too-large file would OOM anyway), and 50-500MB JSON falls
+                # through to the buffered path as before.
+                if is_json and content_length > max_bytes:
+                    return b'', final_url, content_type, True
+                if is_json and ijson is not None and content_length > JSON_STREAM_THRESHOLD:
                     return b'', final_url, content_type, True
                 buf = io.BytesIO()
                 total = 0
@@ -1197,6 +1215,16 @@ def fetch(url, max_bytes=500 * 1024 * 1024):
                 for chunk in r.iter_bytes():
                     buf.write(chunk)
                     total += len(chunk)
+                    # No-Content-Length fallback: a JSON body that crosses the
+                    # streaming threshold mid-download is abandoned and routed
+                    # to the streaming parser instead of being json.load()'d.
+                    if (
+                        is_json
+                        and ijson is not None
+                        and content_length <= JSON_STREAM_THRESHOLD
+                        and total > JSON_STREAM_THRESHOLD
+                    ):
+                        return b'', final_url, content_type, True
                     if total > max_bytes:
                         truncated = True
                         break
@@ -1271,7 +1299,20 @@ def stream_parse_large_json(url, max_items=200_000):
                 preview_size += len(chunk)
             preview = b''.join(preview_parts)
             compact = re.sub(rb'\s+', b'', preview[:256])
+            # Prefix selection for ijson.items():
+            #   '[['               -> nested array of rows               -> item.item
+            #   '[{...},[...'      -> [metadata-obj, [rows]] (AdventHealth) -> item.item
+            #   '[{"Code"...'      -> flat array of row objects           -> item
+            #   '{"standard_..."'  -> CMS HPT v2.0 object                 -> standard_charge_information.item
+            # The AdventHealth v3-style export wraps the row array behind one or
+            # more leading objects: [ {}, [ {row}, {row}, ... ] ]. ijson with the
+            # 'item' prefix would try to materialize that whole nested array as a
+            # single Python object (OOM) and raises UnexpectedSymbol; 'item.item'
+            # descends one level and streams the rows.
+            nested_after_obj = re.match(rb'\[\{.*?\},\[', compact, re.DOTALL) is not None
             if compact.startswith(b'[['):
+                prefix = 'item.item'
+            elif nested_after_obj:
                 prefix = 'item.item'
             elif compact.startswith(b'[{'):
                 prefix = 'item'
@@ -1366,6 +1407,10 @@ def ingest_one(ccn, name, url, save_raw=False):
             return True, len(items), 'json-stream', ''
         if stream_err:
             return False, 0, '', stream_err
+        # streamed is None with no exception: the streaming parser found no
+        # entries under any known prefix. raw is b'' here (the body was never
+        # buffered), so do NOT fall through to parse() — report it instead.
+        return False, 0, 'json-stream', 'stream:no_entries_under_known_prefix'
     try:
         fmt, items = parse(raw, final_url, hospital_name=name, ccn=ccn)
     except Exception as e:

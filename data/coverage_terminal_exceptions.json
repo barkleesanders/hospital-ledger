@@ -2855,6 +2855,150 @@
           "probed_at": "2026-05-11T05:47:36Z"
         }
       ]
+    },
+    {
+      "ccn": "390003",
+      "failure_logs": [
+        "data/full_standardize_failures.jsonl"
+      ],
+      "hospital_name": "GEISINGER-BLOOMSBURG HOSPITAL",
+      "original_url": "https://www.geisinger.org/-/media/OneGeisinger/pdfs/ghs/patient-care/patients-and-visitors/billing-and-insurance/hosp-charges-csv/23-2193572_GeisingerBloomsburgHospital_standardcharges.zip",
+      "provisional": true,
+      "reason": "mrf_url_returns_html_wrapper",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "text/html",
+          "http_status": 200,
+          "mrf_url": "https://www.geisinger.org/-/media/OneGeisinger/pdfs/ghs/patient-care/patients-and-visitors/billing-and-insurance/hosp-charges-csv/23-2193572_GeisingerBloomsburgHospital_standardcharges.zip",
+          "probed_at": "2026-05-11T05:47:28Z"
+        }
+      ]
+    },
+    {
+      "ccn": "390001",
+      "failure_logs": [
+        "data/full_standardize_failures.jsonl"
+      ],
+      "hospital_name": "GEISINGER-COMMUNITY MEDICAL CENTER",
+      "original_url": "https://www.geisinger.org/-/media/OneGeisinger/pdfs/ghs/patient-care/patients-and-visitors/billing-and-insurance/hosp-charges-csv/24-0862246_GeisingerCommunityMedicalCenter_standardcharges.zip",
+      "provisional": true,
+      "reason": "mrf_url_returns_html_wrapper",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "text/html",
+          "http_status": 200,
+          "mrf_url": "https://www.geisinger.org/-/media/OneGeisinger/pdfs/ghs/patient-care/patients-and-visitors/billing-and-insurance/hosp-charges-csv/24-0862246_GeisingerCommunityMedicalCenter_standardcharges.zip",
+          "probed_at": "2026-05-11T05:47:27Z"
+        }
+      ]
+    },
+    {
+      "ccn": "390048",
+      "failure_logs": [
+        "data/full_standardize_failures.jsonl"
+      ],
+      "hospital_name": "GEISINGER-LEWISTOWN HOSPITAL",
+      "original_url": "https://www.geisinger.org/-/media/OneGeisinger/pdfs/ghs/patient-care/patients-and-visitors/billing-and-insurance/hosp-charges-csv/23-13252187_GeisingerLewistownHospital_standardcharges.zip",
+      "provisional": true,
+      "reason": "mrf_url_returns_html_wrapper",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "text/html",
+          "http_status": 200,
+          "mrf_url": "https://www.geisinger.org/-/media/OneGeisinger/pdfs/ghs/patient-care/patients-and-visitors/billing-and-insurance/hosp-charges-csv/23-13252187_GeisingerLewistownHospital_standardcharges.zip",
+          "probed_at": "2026-05-11T05:47:45Z"
+        }
+      ]
+    },
+    {
+      "ccn": "390270",
+      "failure_logs": [
+        "data/full_standardize_failures.jsonl"
+      ],
+      "hospital_name": "GEISINGER WYOMING VALLEY MEDICAL CENTER",
+      "original_url": "https://www.geisinger.org/-/media/OneGeisinger/pdfs/ghs/patient-care/patients-and-visitors/billing-and-insurance/hosp-charges-csv/23-1996150_GeisingerWyomingValleyMedicalCenter_standardcharges.zip",
+      "provisional": true,
+      "reason": "mrf_url_returns_html_wrapper",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "text/html",
+          "http_status": 200,
+          "mrf_url": "https://www.geisinger.org/-/media/OneGeisinger/pdfs/ghs/patient-care/patients-and-visitors/billing-and-insurance/hosp-charges-csv/23-1996150_GeisingerWyomingValleyMedicalCenter_standardcharges.zip",
+          "probed_at": "2026-05-11T05:44:36Z"
+        }
+      ]
+    },
+    {
+      "ccn": "390337",
+      "failure_logs": [
+        "data/full_standardize_failures.jsonl"
+      ],
+      "hospital_name": "GEISINGER MEDICAL CENTER MUNCY",
+      "original_url": "https://www.geisinger.org/-/media/OneGeisinger/pdfs/ghs/patient-care/patients-and-visitors/billing-and-insurance/hosp-charges-csv/85-1226106_GeisingerMedicalCenterMuncy_standardcharges.zip",
+      "provisional": true,
+      "reason": "mrf_url_returns_html_wrapper",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "text/html",
+          "http_status": 200,
+          "mrf_url": "https://www.geisinger.org/-/media/OneGeisinger/pdfs/ghs/patient-care/patients-and-visitors/billing-and-insurance/hosp-charges-csv/85-1226106_GeisingerMedicalCenterMuncy_standardcharges.zip",
+          "probed_at": "2026-05-11T05:44:53Z"
+        }
+      ]
+    },
+    {
+      "ccn": "391300",
+      "failure_logs": [
+        "data/full_standardize_failures.jsonl"
+      ],
+      "hospital_name": "GEISINGER JERSEY SHORE HOSPITAL",
+      "original_url": "https://www.geisinger.org/-/media/OneGeisinger/pdfs/ghs/patient-care/patients-and-visitors/billing-and-insurance/hosp-charges-csv/24-0792115_GeisingerjerseyShoreHospital_standardcharges.zip",
+      "provisional": true,
+      "reason": "mrf_url_returns_html_wrapper",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "text/html",
+          "http_status": 200,
+          "mrf_url": "https://www.geisinger.org/-/media/OneGeisinger/pdfs/ghs/patient-care/patients-and-visitors/billing-and-insurance/hosp-charges-csv/24-0792115_GeisingerjerseyShoreHospital_standardcharges.zip",
+          "probed_at": "2026-05-11T05:44:53Z"
+        }
+      ]
+    },
+    {
+      "ccn": "060116",
+      "failure_logs": [
+        "data/full_standardize_failures.jsonl"
+      ],
+      "hospital_name": "GOOD SAMARITAN MEDICAL CENTER LLC",
+      "original_url": "https://www.sclhealth.org/-/media/431982139_good-samaritan-medical-center_standardcharges.csv",
+      "provisional": true,
+      "reason": "no_live_mrf_after_rediscovery",
+      "seed_probe_history": [
+        {
+          "alive": 1,
+          "content_type": "text/html; charset=utf-8",
+          "http_status": 200,
+          "mrf_url": "https://www.sclhealth.org/-/media/431982139_good-samaritan-medical-center_standardcharges.csv",
+          "probed_at": "2026-05-11T05:47:23Z"
+        }
+      ]
+    },
+    {
+      "ccn": "100287",
+      "failure_logs": [
+        "data/full_standardize_failures.jsonl"
+      ],
+      "hospital_name": "GOOD SAMARITAN MEDICAL CENTER",
+      "original_url": "https://wwwprod104-goodsamsanjose-sitecore-cloud.dpxmedcity.net/patient-resources/patient-financial-resources/pricing-transparency-cms-required-file-of-standard-charges",
+      "provisional": true,
+      "reason": "mrf_url_returns_html_wrapper",
+      "seed_probe_history": []
     }
   ]
 }

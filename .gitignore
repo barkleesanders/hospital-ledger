@@ -10,6 +10,7 @@ results/
 
 # Generated crawler/parser bulk artifacts. These are uploaded to R2, not GitHub.
 data/parsed/
+data/parse_errors/
 data/raw/
 data/_pages_bundle*/
 data/full_standardize_shards/
