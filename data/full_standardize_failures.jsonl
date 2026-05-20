@@ -352,3 +352,8 @@
 {"ccn":"100113","fmt":"","items":0,"error":"rediscovered:-:probe:InvalidURL"}
 {"ccn":"390003","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:390003 GEISINGER-BLOOMSBURG HOSPITAL            html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/390003.log]"}
 {"ccn":"390133","fmt":"","items":0,"error":"rediscovered:-:subprocess:1:390133 LEHIGH VALLEY HOSPITAL                   json             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/390133.log]"}
+{"ccn":"220002","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"380005","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"050145","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
+{"ccn":"510029","fmt":"","items":0,"error":"seed:-:subprocess:1:510029 THOMAS MEMORIAL HOSPITAL                 html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/510029.log]"}
+{"ccn":"050546","fmt":"","items":0,"error":"rediscovered:-:probe_http:403"}
