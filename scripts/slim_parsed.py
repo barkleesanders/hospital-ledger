@@ -488,31 +488,92 @@ if not keep_stale:
 
 # Trim CPT index to top codes by coverage. Strip the heavy payers_top5/desc
 # fields here — they live in cpt-detail/{code}.json (built by build_aggregates.py).
-cpt_arr = sorted(cpt_index.items(), key=lambda kv: -len(kv[1]))
-trimmed = {}
-for code, entries in cpt_arr[:5000]:
-    trimmed[code] = [
-        {k: v for k, v in e.items() if k not in ('payers_top5', 'desc')}
-        for e in entries
-    ]
-with open(CPT_INDEX, 'w') as f:
-    json.dump(trimmed, f, separators=(',', ':'))
+#
+# CPT_INDEX_ENTRY_CAP: cap the number of per-hospital entries kept per code.
+# Without a cap, public/data/cpt-index.json balloons to ~650 MB (6.1M entries,
+# median 1,133 hospitals/code) — far too large to serve as the /api/cpt-index
+# response. The homepage CPT search (public/home-client.js renderCptCodeResult)
+# only ever renders entries.slice(0, 25), so 25 is the evidence-driven cap that
+# preserves the full expanded table byte-for-byte. Entries are sorted
+# gross-present-first then gross-descending so the most useful price
+# comparisons survive the cap. The uncapped per-code hospital breakdown lives
+# in cpt-detail/{code}.json (build_aggregates.py, MAX_HOSPITALS_PER_PROCEDURE).
+# Regression context: a 2026-05-19 full slim produced a 650 MB cpt-index.json
+# that could not be served — see _cpt_index_entry_sort_key below.
+CPT_INDEX_ENTRY_CAP = 25
 
-# Dump the FULL cpt_index (with payers_top5 + desc) to a side-car JSONL the
-# build_aggregates.py script consumes to produce per-code detail files. Keeps
-# the top 10,000 codes by coverage so the search-by-procedure feature has more
-# than just the headline 5,000.
+
+def _cpt_index_entry_sort_key(entry):
+    """Sort cpt-index entries: gross-present first, then gross descending."""
+    gross = entry.get('gross')
+    if gross is None:
+        return (1, 0.0)
+    try:
+        return (0, -float(gross))
+    except (TypeError, ValueError):
+        return (0, 0.0)
+
+
+def _trim_cpt_index_entry(entry):
+    """Strip heavy/empty fields from a single cpt-index entry.
+
+    Drops payers_top5/desc (live in cpt-detail/{code}.json), None-valued keys,
+    and pc==0 (the frontend coerces a missing pc to 0 via `Number(row.pc || 0)`,
+    so omitting it is behaviour-identical and shrinks the JSON). ccn is always
+    kept — it is the join key the homepage uses to resolve hospital names.
+    """
+    out = {}
+    for k, v in entry.items():
+        if k in ('payers_top5', 'desc'):
+            continue
+        if v is None:
+            continue
+        if k == 'pc' and v == 0:
+            continue
+        out[k] = v
+    return out
+
+
+# cpt-index.json and _cpt_detail_raw.jsonl are CROSS-CORPUS artifacts: they are
+# only meaningful when accumulated over the FULL parsed corpus. On a targeted
+# run (CCNS / CCNS_FILE set), cpt_index only contains entries from the handful
+# of filtered files, so writing these files would TRUNCATE them to a near-empty
+# subset. Regression — 2026-05-19: a 114-CCN targeted slim during the Tier-1
+# coverage fix overwrote public/data/cpt-index.json with a tiny subset, which
+# was uploaded to r2://hl-mrf-parsed/indexes/cpt-index.json, making the live
+# /api/cpt-index pass-through serve `{}`. A targeted run must never touch these
+# full-corpus files; only a full slim (no CCN filter) rebuilds them.
 CPT_DETAIL_RAW = os.path.join(ROOT, 'data', '_cpt_detail_raw.jsonl')
-with open(CPT_DETAIL_RAW, 'w') as f:
-    for code, entries in cpt_arr[:10000]:
-        f.write(json.dumps({'code': code, 'entries': entries}) + '\n')
+trimmed = None
+if requested_ccns:
+    print(
+        "\ntargeted run (CCNS filter): skipping cross-corpus rebuild of "
+        "cpt-index.json + _cpt_detail_raw.jsonl (would truncate them)"
+    )
+else:
+    cpt_arr = sorted(cpt_index.items(), key=lambda kv: -len(kv[1]))
+    trimmed = {}
+    for code, entries in cpt_arr[:5000]:
+        capped = sorted(entries, key=_cpt_index_entry_sort_key)[:CPT_INDEX_ENTRY_CAP]
+        trimmed[code] = [_trim_cpt_index_entry(e) for e in capped]
+    with open(CPT_INDEX, 'w') as f:
+        json.dump(trimmed, f, separators=(',', ':'))
+
+    # Dump the FULL cpt_index (with payers_top5 + desc) to a side-car JSONL the
+    # build_aggregates.py script consumes to produce per-code detail files. Keeps
+    # the top 10,000 codes by coverage so the search-by-procedure feature has more
+    # than just the headline 5,000.
+    with open(CPT_DETAIL_RAW, 'w') as f:
+        for code, entries in cpt_arr[:10000]:
+            f.write(json.dumps({'code': code, 'entries': entries}) + '\n')
 
 # Close side-cars
 payer_raw_handle.close()
 compliance_handle.close()
 
 print(f"\nindex: {INDEX} ({os.path.getsize(INDEX)/1024:.1f} KB)")
-print(f"cpt-index: {CPT_INDEX} ({os.path.getsize(CPT_INDEX)/1024:.1f} KB, {len(trimmed)} CPTs)")
-print(f"cpt-detail-raw: {CPT_DETAIL_RAW} ({os.path.getsize(CPT_DETAIL_RAW)/1024:.1f} KB)")
+if trimmed is not None:
+    print(f"cpt-index: {CPT_INDEX} ({os.path.getsize(CPT_INDEX)/1024:.1f} KB, {len(trimmed)} CPTs)")
+    print(f"cpt-detail-raw: {CPT_DETAIL_RAW} ({os.path.getsize(CPT_DETAIL_RAW)/1024:.1f} KB)")
 print(f"payer-raw:     {PAYER_RAW_JSONL} ({os.path.getsize(PAYER_RAW_JSONL)/1024:.1f} KB)")
 print(f"compliance:    {COMPLIANCE_JSONL} ({os.path.getsize(COMPLIANCE_JSONL)/1024:.1f} KB)")
