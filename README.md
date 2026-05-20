@@ -33,9 +33,9 @@ Numbers below are verified from the deployed site (`public/data/summary.json`,
 | Standardized price rows across those hospitals | **65.4 M** | sum of `n` in prices index |
 | CPT- / HCPCS-coded rows (patient-comparable) | **14.4 M** | sum of `cpt_indexed` in prices index |
 | Distinct CPT / HCPCS codes in the cross-hospital index | **5,000** | `/api/cpt-index` keys |
-| Payer-negotiated rate cells | **111.0 M** | sum of `n_rates` in `data/_payer_raw.jsonl` |
-| Hospitals with at least one payer-rate row | **1,945** | distinct CCN in `_payer_raw.jsonl` |
-| CCN × raw-payer-string rows | **48,277** | line count of `_payer_raw.jsonl` |
+| Payer-negotiated rate cells | **166.2 M** | sum of `n_rates` in `data/_payer_raw.jsonl` |
+| Hospitals with at least one payer-rate row | **3,115** | distinct CCN in `_payer_raw.jsonl` |
+| CCN × raw-payer-string rows | **76,232** | line count of `_payer_raw.jsonl` |
 | Canonical payer brands surfaced on site | **200 featured** (21,803 raw) | `/api/payers-index` |
 | CMS enforcement records loaded | **11,440** | `cms_enforcement` table |
 | Enforcement actions linked to required hospitals | **8,642** | `summary.json#enforcement_actions_total` |
