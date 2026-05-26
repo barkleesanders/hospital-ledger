@@ -235,6 +235,24 @@ def audit_live() -> list[str]:
     except Exception as e:
         failures.append(f"failed to fetch /api/cpt-index: {e}")
 
+    # Random-priced-CCN smoke: pick 3 priced CCNs from the local index, curl each
+    # /api/prices/{ccn}, assert 200 + n_slim > 0. Catches the "R2 missing file"
+    # regression class we hit twice (Tier 1 + Phase B forgot stage4_refresh.py).
+    import random
+    try:
+        idx = json.load(open(SUMMARY.parent / "prices" / "index.json"))
+        priced = [h["ccn"] for h in idx.get("hospitals", []) if h.get("n", 0) > 0]
+        sample = random.sample(priced, min(3, len(priced))) if priced else []
+        for ccn in sample:
+            try:
+                d = fetch_json(f"/api/prices/{ccn}")
+                if not isinstance(d, dict) or d.get("n_slim", 0) <= 0:
+                    failures.append(f"/api/prices/{ccn} returns no n_slim (got {d.get('n_slim') if isinstance(d, dict) else type(d).__name__})")
+            except Exception as e:
+                failures.append(f"/api/prices/{ccn} fetch failed: {e}")
+    except Exception as e:
+        failures.append(f"random-priced-CCN smoke setup failed: {e}")
+
     return failures
 
 
