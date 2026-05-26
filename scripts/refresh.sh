@@ -24,6 +24,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# Use the project venv when present so all `python3 …` resolves to it
+# (mac-mini ships Python 3.9.6 system-wide; deps live in .venv only).
+if [ -x ".venv/bin/python3" ]; then
+  export PATH="$ROOT/.venv/bin:$PATH"
+fi
+
 # ---- args ------------------------------------------------------------------
 DRY_RUN=0; NO_DEPLOY=0; SKIP_INGEST=0; MAX_FAIL_PCT=50
 for arg in "$@"; do
