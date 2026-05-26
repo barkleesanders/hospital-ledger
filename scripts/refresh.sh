@@ -30,6 +30,16 @@ if [ -x ".venv/bin/python3" ]; then
   export PATH="$ROOT/.venv/bin:$PATH"
 fi
 
+# Cap to ~50% of system resources: put this script (and every child process)
+# into macOS background QoS class via taskpolicy. The OS aggressively yields
+# CPU to interactive processes when this class is set. nice -n 19 backs it up
+# for systems without taskpolicy. This is the difference between "refresh
+# hogs the mac mini for 75 min" and "refresh runs alongside everything else".
+if command -v taskpolicy >/dev/null 2>&1; then
+  taskpolicy -c background -p $$ 2>/dev/null || true
+fi
+renice -n 19 -p $$ >/dev/null 2>&1 || true
+
 # ---- args ------------------------------------------------------------------
 DRY_RUN=0; NO_DEPLOY=0; SKIP_INGEST=0; MAX_FAIL_PCT=50
 for arg in "$@"; do
@@ -78,7 +88,10 @@ if [ "$SKIP_INGEST" = 1 ]; then
   echo "(skipping ingest per --skip-ingest)"
 else
   run "Step 2: batch_ingest --resume --all" \
-    python3 scripts/batch_ingest.py --resume --all --workers 4 --item-timeout-seconds 1800
+    python3 scripts/batch_ingest.py --resume --all --workers 2 --item-timeout-seconds 1800
+  # workers=2 (was 4): with 10-core mac mini that's ~20% of CPU cores ingestion
+  # capacity. Combined with the background QoS class above, this stays well under
+  # 50% of system resources even when all workers + slim are busy.
   # Guard: if >MAX_FAIL_PCT of attempts failed, abort before deploy
   if [ "$DRY_RUN" != 1 ]; then
     FAIL_PCT=$(python3 -c "
