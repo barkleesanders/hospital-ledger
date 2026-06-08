@@ -80,3 +80,47 @@ history (would have wrecked the repo). The full slim regenerates it as a build
 artifact (consumed by `build_aggregates.py`, then discarded). `refresh.sh`
 commits a strict allowlist — never `-A`. The side-cars stay in the working
 tree, gitignored.
+
+## Status & remote monitoring (where this actually runs)
+
+**Hospital Ledger does not run on the dev laptop.** The autonomous pipeline runs
+on the **mac mini** and the live site runs on **Cloudflare** — the laptop is only
+a dev checkout. This section is the source of truth for "where is it, and how do
+I check it from anywhere."
+
+| Where | What runs | How |
+|---|---|---|
+| **mac mini** (`mac-mini` / Tailscale `100.93.165.20`; `pmset sleep 0` → never sleeps, so the Sunday slot never gets skipped) | The full 11-stage refresh, weekly **Sun 04:00 local** | launchd job `com.hospitalledger.refresh` (this plist) |
+| **Cloudflare Workers + R2** | Live `hospitalledger.com` site & API | `wrangler deploy` (refresh.sh step 8); buckets `hl-mrf-raw`, `hl-mrf-parsed` |
+| dev laptop / any other machine | nothing scheduled | just for editing code + manual `npm run refresh:dry` |
+
+Proof it fires weekly: `data/refresh_logs/run-*.log` has entries stamped exactly
+`Sun 04:00` (e.g. `run-2026-05-31T11-00-05Z`, `run-2026-06-07T11-00-01Z` = 04:00
+PT). Note: `launchctl print … | grep runs` can read `runs = 0` right after the
+job is re-bootstrapped (the counter resets on reload) — trust the run logs and
+the auto-commit history (`chore(refresh): weekly data refresh <date>`), not the
+counter.
+
+### Check it from anywhere (Tailscale SSH — works from laptop, another Mac, phone)
+
+```bash
+# Is the weekly cron loaded + when did it last run?
+ssh mac-mini 'launchctl list | grep hospitalledger; \
+  ls -lt ~/projects/hospital-ledger/data/refresh_logs/run-*.log | head -5'
+
+# Watch the most recent / in-progress run
+ssh mac-mini 'tail -F ~/projects/hospital-ledger/data/refresh_logs/launchd.out.log'
+
+# Last autonomous refresh commit (proves the weekly job shipped data)
+ssh mac-mini 'cd ~/projects/hospital-ledger && git log --oneline -3 --grep=refresh'
+
+# Trigger an out-of-band refresh by hand (runs ON the mini, not your laptop)
+ssh mac-mini 'launchctl kickstart -k gui/$(id -u)/com.hospitalledger.refresh'
+
+# Prove the LIVE site is current (cache-busted; runs from anywhere, no SSH)
+curl -sS "https://hospitalledger.com/api/summary?cb=$(date +%s)" | python3 -m json.tool | head
+```
+
+### Known gap
+There is **no failure alerting** yet — a broken weekly refresh is silent until
+someone looks (see "Daily health check" below). The weekly job itself is healthy.
