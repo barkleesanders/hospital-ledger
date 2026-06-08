@@ -40,6 +40,18 @@ if command -v taskpolicy >/dev/null 2>&1; then
 fi
 renice -n 19 -p $$ >/dev/null 2>&1 || true
 
+# Hard safety ceiling. Every step runs under scripts/mem_guard.sh, which kills
+# the step (and all its children) the moment resident memory crosses
+# MEM_GUARD_MAX_GB or free disk drops below MEM_GUARD_MIN_FREE_GB. This is the
+# backstop for the 2026-06-07 incident: slim_parsed.py grew to 11.8 GB on the
+# 16 GB mac mini, Jetsam thrashed, WindowServer missed its watchdog check-ins,
+# and the kernel PANICKED and rebooted the machine. macOS does NOT enforce
+# `ulimit -v` (verified), so the guard polls RSS externally and SIGKILLs on
+# breach — a runaway step now fails loudly instead of taking the desktop down.
+GUARD="$ROOT/scripts/mem_guard.sh"
+export MEM_GUARD_MAX_GB="${MEM_GUARD_MAX_GB:-8}"
+export MEM_GUARD_MIN_FREE_GB="${MEM_GUARD_MIN_FREE_GB:-3}"
+
 # ---- args ------------------------------------------------------------------
 DRY_RUN=0; NO_DEPLOY=0; SKIP_INGEST=0; MAX_FAIL_PCT=50
 for arg in "$@"; do
@@ -59,11 +71,46 @@ mkdir -p "$LOG_DIR"
 TS="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
 RUN_LOG="$LOG_DIR/run-$TS.log"
 
+# ── Telegram failure alert (Hermes shared secret store) ──────────────────────
+# Any non-zero exit (a step failing under set -e, a mem_guard kill = 137/138, an
+# explicit ABORT exit 1/2/3, or an unexpected crash) pings Telegram so a future
+# silent weekend failure can't leave the site stale for weeks again (the reason
+# this alert exists: the 2026-05-31 + 2026-06-07 runs died before deploy and
+# nobody knew). Secrets come from ~/.hermes/.env by env name — NEVER hardcoded
+# (global Hermes-Env rule). If the env file or token is absent the alert is a
+# silent no-op; it never blocks or fails the refresh.
+[ -r "$HOME/.hermes/.env" ] && . "$HOME/.hermes/.env"
+notify_failure() {
+  local code="$1"
+  local tok="${TELEGRAM_BOT_TOKEN:-}" chat="${TELEGRAM_CHAT_ID:-}"
+  [ -z "$tok" ] || [ -z "$chat" ] && return 0
+  local reason="exit ${code}"
+  case "$code" in
+    137) reason="exit 137 — mem_guard KILLED a step (RSS > ${MEM_GUARD_MAX_GB}GB ceiling)";;
+    138) reason="exit 138 — mem_guard KILLED a step (free disk < ${MEM_GUARD_MIN_FREE_GB}GB floor)";;
+  esac
+  local tail_log="(no run log)"
+  [ -f "${RUN_LOG:-}" ] && tail_log="$(tail -n 15 "$RUN_LOG" 2>/dev/null | tail -c 1000)"
+  curl -s -m 20 "https://api.telegram.org/bot${tok}/sendMessage" \
+    --data-urlencode "chat_id=${chat}" \
+    --data-urlencode "text=🏥❌ hospital-ledger weekly refresh FAILED
+host: $(hostname -s)   run: ${TS:-?}   ${reason}
+log: ${RUN_LOG:-?}
+── last log lines ──
+${tail_log}" >/dev/null 2>&1 || true
+}
+_on_exit() {
+  local code=$?
+  [ "$code" -ne 0 ] && [ "${DRY_RUN:-0}" != "1" ] && notify_failure "$code"
+  return "$code"
+}
+trap _on_exit EXIT
+
 run() {  # run a step; on dry-run, just print
   local msg="$1"; shift
   echo ""; echo "── $msg ──────────────────────────────────────────"
   if [ "$DRY_RUN" = 1 ]; then echo "DRY: $*"; return 0; fi
-  "$@" 2>&1 | tee -a "$RUN_LOG"
+  "$GUARD" "$@" 2>&1 | tee -a "$RUN_LOG"
   return "${PIPESTATUS[0]}"
 }
 
