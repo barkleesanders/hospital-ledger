@@ -1,49 +1,15 @@
 {
-  "all": false,
-  "done": 5,
-  "eligible": 5,
-  "eta_seconds": 0,
-  "failed": 5,
+  "all": true,
+  "done": 0,
+  "eligible": 3986,
+  "eta_seconds": null,
+  "failed": 0,
   "pending": 0,
-  "rate_per_second": 5.239,
-  "recent_failures": [
-    {
-      "ccn": "220002",
-      "error": "rediscovered:-:probe_http:403",
-      "fmt": "",
-      "items": 0
-    },
-    {
-      "ccn": "380005",
-      "error": "rediscovered:-:probe_http:403",
-      "fmt": "",
-      "items": 0
-    },
-    {
-      "ccn": "050145",
-      "error": "rediscovered:-:probe_http:403",
-      "fmt": "",
-      "items": 0
-    },
-    {
-      "ccn": "510029",
-      "error": "seed:-:subprocess:1:510029 THOMAS MEMORIAL HOSPITAL                 html             0 items  OK [log:/Users/barkleesanders/projects/hospital-ledger/data/parse_errors/510029.log]",
-      "fmt": "",
-      "items": 0
-    },
-    {
-      "ccn": "050546",
-      "error": "rediscovered:-:probe_http:403",
-      "fmt": "",
-      "items": 0
-    }
-  ],
-  "resume": false,
-  "skipped_existing": 0,
-  "started_at": "2026-05-20T08:41:55+00:00",
+  "resume": true,
+  "skipped_existing": 3986,
+  "started_at": "2026-06-08T10:22:20+00:00",
   "state": "",
   "success": 0,
   "total_items": 0,
-  "updated_at": "2026-05-20T08:41:56+00:00",
-  "workers": 3
+  "workers": 2
 }
