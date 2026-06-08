@@ -101,6 +101,10 @@ ${tail_log}" >/dev/null 2>&1 || true
 }
 _on_exit() {
   local code=$?
+  # Sweep orphaned CPT spill files: slim_parsed's atexit cleanup does NOT run when
+  # mem_guard SIGKILLs it (2026-06-08 leak: a 3.4GB cpt_stream temp survived a kill
+  # and pushed the disk to 99%). This belt-and-suspenders sweep runs on every exit.
+  find "$ROOT/data" -maxdepth 1 \( -name 'cpt_stream_*.tsv*' -o -name 'cpt_detail_*.tsv*' \) -delete 2>/dev/null || true
   [ "$code" -ne 0 ] && [ "${DRY_RUN:-0}" != "1" ] && notify_failure "$code"
   return "$code"
 }

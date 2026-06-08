@@ -11,8 +11,14 @@ Also builds:
  - public/data/prices/index.json — CCN -> {n_items, top_codes}
  - public/data/cpt-index.json    — CPT code -> [{ccn, gross, cash, payers_count}]
 """
-import json, os, sys, glob, re, gzip, subprocess, tempfile, atexit
+import json, os, sys, glob, re, gzip, subprocess, tempfile, atexit, io
 from collections import defaultdict
+
+# zstd binary for compressing the multi-GB CPT temp spill files (~6x smaller).
+# Without it the uncompressed spills (~9 GB transient) overrun a disk-tight box
+# (2026-06-08: mem_guard killed the run on the 3 GB free-disk floor). Falls back
+# to plain text when zstd is unavailable.
+_ZSTD = '/opt/homebrew/bin/zstd' if os.path.exists('/opt/homebrew/bin/zstd') else None
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'data', 'parsed')
@@ -217,11 +223,22 @@ _cpt_stream_handle = None
 _cpt_stream_path = None
 _cpt_coverage = {}   # code -> count; insertion-ordered for stable coverage sort
 _cpt_seq = 0
+_cpt_stream_zproc = None
 if _stream_cpt:
+    _sfx = '.tsv.zst' if _ZSTD else '.tsv'
     _stream_fd, _cpt_stream_path = tempfile.mkstemp(
-        prefix='cpt_stream_', suffix='.tsv', dir=os.path.dirname(PAYER_RAW_JSONL)
+        prefix='cpt_stream_', suffix=_sfx, dir=os.path.dirname(PAYER_RAW_JSONL)
     )
-    _cpt_stream_handle = os.fdopen(_stream_fd, 'w')
+    if _ZSTD:
+        # Pipe the entry stream through zstd on the way to disk so the spill stays
+        # ~1/6 its raw size (the binding constraint on this mac mini is free disk).
+        _sout = os.fdopen(_stream_fd, 'wb')
+        _cpt_stream_zproc = subprocess.Popen([_ZSTD, '-q', '-3', '-T0'],
+                                             stdin=subprocess.PIPE, stdout=_sout)
+        _sout.close()  # the zstd child now owns the fd
+        _cpt_stream_handle = io.TextIOWrapper(_cpt_stream_zproc.stdin, encoding='utf-8')
+    else:
+        _cpt_stream_handle = os.fdopen(_stream_fd, 'w')
 
     def _cleanup_cpt_stream():
         # Belt-and-suspenders: remove the temp TSV if the run dies before the
@@ -646,7 +663,7 @@ def _grouped_from_stream(stream_path, coverage):
     free). Falls back to BSD sort (uncompressed) if gsort/zstd are unavailable.
     """
     sort_bin = '/opt/homebrew/bin/gsort' if os.path.exists('/opt/homebrew/bin/gsort') else 'sort'
-    have_zstd = os.path.exists('/opt/homebrew/bin/zstd') and sort_bin.endswith('gsort')
+    have_zstd = _ZSTD is not None and sort_bin.endswith('gsort')
     rank_of = {}
     for r, (code, _cnt) in enumerate(sorted(coverage.items(), key=lambda kv: -kv[1])):
         rank_of[code] = r
@@ -654,22 +671,43 @@ def _grouped_from_stream(stream_path, coverage):
     env = dict(os.environ, LC_ALL='C')
     sort_dir = os.path.dirname(stream_path)
 
-    def _sort_cmd(key_args, infile):
+    def _sort_cmd(key_args, infile=None):
         cmd = [sort_bin, '-t', '\t', *key_args, '-T', sort_dir]
         if have_zstd:
             cmd += ['--compress-program=zstd', '-S', '512M']
-        cmd += [infile]
+        if infile is not None:
+            cmd += [infile]
         return cmd
 
-    # Pass A: group entries by code (lexical), original order within code.
-    proc = subprocess.Popen(
-        _sort_cmd(['-k1,1', '-k2,2n'], stream_path),
-        stdout=subprocess.PIPE, env=env, text=True, bufsize=1 << 20,
-    )
+    # Pass A: group entries by code (lexical), original order within code. The
+    # stream spill may be zstd-compressed (.zst) — decompress it into the sort.
+    _dec = None
+    if _ZSTD and stream_path.endswith('.zst'):
+        _dec = subprocess.Popen([_ZSTD, '-dc', stream_path],
+                                stdout=subprocess.PIPE, env=env)
+        proc = subprocess.Popen(
+            _sort_cmd(['-k1,1', '-k2,2n']),
+            stdin=_dec.stdout, stdout=subprocess.PIPE, env=env, text=True, bufsize=1 << 20,
+        )
+        _dec.stdout.close()
+    else:
+        proc = subprocess.Popen(
+            _sort_cmd(['-k1,1', '-k2,2n'], stream_path),
+            stdout=subprocess.PIPE, env=env, text=True, bufsize=1 << 20,
+        )
     # Detail-raw lines, rank-prefixed, spilled to a temp we then sort by rank so
     # the final file is coverage-ordered (byte-identical to the legacy slice).
-    detail_fd, detail_tmp = tempfile.mkstemp(prefix='cpt_detail_', suffix='.tsv', dir=sort_dir)
-    detail_tmp_h = os.fdopen(detail_fd, 'w')
+    _dsfx = '.tsv.zst' if _ZSTD else '.tsv'
+    detail_fd, detail_tmp = tempfile.mkstemp(prefix='cpt_detail_', suffix=_dsfx, dir=sort_dir)
+    _detail_zproc = None
+    if _ZSTD:
+        _dout = os.fdopen(detail_fd, 'wb')
+        _detail_zproc = subprocess.Popen([_ZSTD, '-q', '-3', '-T0'],
+                                         stdin=subprocess.PIPE, stdout=_dout)
+        _dout.close()
+        detail_tmp_h = io.TextIOWrapper(_detail_zproc.stdin, encoding='utf-8')
+    else:
+        detail_tmp_h = os.fdopen(detail_fd, 'w')
     try:
         cur_code = None
         cur_entries = []
@@ -693,15 +731,29 @@ def _grouped_from_stream(stream_path, coverage):
             _flush(cur_code, cur_entries)
     finally:
         detail_tmp_h.close()
+        if _detail_zproc is not None:
+            _detail_zproc.wait()
         proc.stdout.close()
         proc.wait()
+        if _dec is not None:
+            _dec.wait()
 
-    # Pass B: sort the rank-prefixed detail temp so groups come out in coverage
-    # order, then yield them. Strip the rank prefix on the way out.
-    proc2 = subprocess.Popen(
-        _sort_cmd(['-k1,1n'], detail_tmp),
-        stdout=subprocess.PIPE, env=env, text=True, bufsize=1 << 20,
-    )
+    # Pass B: sort the rank-prefixed (zstd-compressed) detail temp by rank so
+    # groups come out in coverage order, then yield them. Strip the rank prefix.
+    _dec2 = None
+    if _ZSTD and detail_tmp.endswith('.zst'):
+        _dec2 = subprocess.Popen([_ZSTD, '-dc', detail_tmp],
+                                 stdout=subprocess.PIPE, env=env)
+        proc2 = subprocess.Popen(
+            _sort_cmd(['-k1,1n']),
+            stdin=_dec2.stdout, stdout=subprocess.PIPE, env=env, text=True, bufsize=1 << 20,
+        )
+        _dec2.stdout.close()
+    else:
+        proc2 = subprocess.Popen(
+            _sort_cmd(['-k1,1n'], detail_tmp),
+            stdout=subprocess.PIPE, env=env, text=True, bufsize=1 << 20,
+        )
     try:
         for raw in proc2.stdout:
             _rank, line = raw.rstrip('\n').split('\t', 1)
@@ -710,6 +762,8 @@ def _grouped_from_stream(stream_path, coverage):
     finally:
         proc2.stdout.close()
         proc2.wait()
+        if _dec2 is not None:
+            _dec2.wait()
         try:
             os.remove(detail_tmp)
         except OSError:
@@ -727,6 +781,8 @@ elif _stream_cpt:
     # emit from disk in bounded memory.
     if _cpt_stream_handle is not None:
         _cpt_stream_handle.close()
+    if _cpt_stream_zproc is not None:
+        _cpt_stream_zproc.wait()  # flush + finish the zstd writer before reading
     try:
         trimmed = _emit_cpt_outputs(_grouped_from_stream(_cpt_stream_path, _cpt_coverage))
     finally:
