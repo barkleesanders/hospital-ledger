@@ -13,7 +13,7 @@
     "refresh:dry": "bash scripts/refresh.sh --dry-run",
     "refresh:quick": "bash scripts/refresh.sh --quick",
     "predeploy": "python3 scripts/predeploy_audit.py",
-    "deploy": "vite build && wrangler deploy -c wrangler.jsonc",
+    "deploy": "bash scripts/deploy.sh",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
