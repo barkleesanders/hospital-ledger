@@ -3,6 +3,7 @@
   "name": "hospital-ledger",
   "main": "dist/index.js",
   "compatibility_date": "2025-11-01",
+  "cache": { "enabled": true },
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
