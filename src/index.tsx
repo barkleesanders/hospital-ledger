@@ -36,6 +36,15 @@ app.use("*", async (c, next) => {
   if (!h.has("Strict-Transport-Security")) {
     h.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
   }
+  // CSP (added 2026-07-06, /ship Phase 4.05b): self + Google Fonts (the only
+  // external loads in rendered HTML) + inline style/script blocks the SSR
+  // pages emit. External <a href> targets need no CSP entries.
+  if (!h.has("Content-Security-Policy")) {
+    h.set(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+    );
+  }
 });
 
 // URL normalization: 301-redirect trailing-slash and uppercase entity paths
