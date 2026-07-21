@@ -36,10 +36,9 @@ const totalFacilities = SITE_COUNTS.total_facilities ?? 5426;
 const cmsRequiredTotal = SITE_COUNTS.cms_required_total;
 const liveMrfRequired = SITE_COUNTS.compliant;
 const standardizedPriceHospitals =
-  SITE_COUNTS.standardized_price_hospitals ?? SITE_COUNTS.standardized_price_index_hospitals ?? 3587;
-const parsedMrfOutputs = SITE_COUNTS.standardized_price_index_hospitals ?? 3699;
+  SITE_COUNTS.standardized_price_hospitals ?? SITE_COUNTS.standardized_price_index_hospitals ?? 3654;
+const parsedMrfOutputs = SITE_COUNTS.standardized_price_index_hospitals ?? 3768;
 const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 62577586;
-const cptIndexedHospitals = SITE_COUNTS.cpt_indexed_hospitals ?? 2210;
 const cptIndexedRows = SITE_COUNTS.cpt_indexed_rows ?? 14247687;
 const updatedDate = SITE_COUNTS.generated_at.slice(0, 10);
 const fmt = (n: number) => n.toLocaleString("en-US");
@@ -80,10 +79,44 @@ function homePage(url: string) {
             </span>{" "}
             CMS-required hospitals have a live machine-readable file.
           </p>
-          <p class="mt-3 text-xs text-zinc-500 max-w-2xl leading-relaxed">
-            Count definition: the headline uses only hospitals with <code class="mono text-zinc-300">n &gt; 0</code>{" "}
-            rows in <a href="/api/prices-index" class="underline hover:text-zinc-300">/api/prices-index</a>. The
-            summary is mirrored in <a href="/data/summary.json" class="underline hover:text-zinc-300">/data/summary.json</a>.
+          <p class="mt-5 text-sm sm:text-base text-zinc-400 max-w-2xl leading-relaxed">
+            <span class="font-semibold text-zinc-200">How we count:</span> the headline counts only hospitals with{" "}
+            <code class="mono text-zinc-200">n &gt; 0</code> price rows. Every number is mirrored in{" "}
+            <a href="/data/summary.json" class="underline hover:text-emerald-300">/data/summary.json</a> and{" "}
+            <a href="/api/prices-index" class="underline hover:text-emerald-300">/api/prices-index</a>.
+          </p>
+          <div class="mt-5 text-sm sm:text-base text-zinc-400 max-w-2xl leading-relaxed">
+            <p class="font-semibold text-zinc-200">Why isn't every hospital here?</p>
+            <p class="mt-1.5">
+              <span class="tab-num text-zinc-200">{fmt(liveMrfRequired)}</span> hospitals have a live price file, but{" "}
+              <span class="tab-num text-zinc-200">{fmt(liveMrfRequired - standardizedPriceHospitals)}</span> of them
+              aren't in the <span class="tab-num text-zinc-200">{fmt(standardizedPriceHospitals)}</span> headline — for
+              two reasons:
+            </p>
+            <ul class="mt-2.5 space-y-2.5 list-disc pl-6 marker:text-emerald-400">
+              <li>
+                <span class="tab-num font-semibold text-zinc-100">{fmt(parsedMrfOutputs - standardizedPriceHospitals)}</span>{" "}
+                published a file that is empty or a placeholder — zero usable price rows. That is a gap in the
+                hospital's own compliance, not a parsing failure on our side.
+              </li>
+              <li>
+                <span class="tab-num font-semibold text-zinc-100">{fmt(liveMrfRequired - parsedMrfOutputs)}</span>{" "}
+                publish a file we cannot retrieve — blocked by the hospital's CDN, password-protected, or locked
+                behind a vendor download portal.
+              </li>
+            </ul>
+            <p class="mt-2.5">
+              Every CMS-required hospital with a live file is now accounted for. Full breakdown at{" "}
+              <a href="/about-the-numbers" class="underline hover:text-emerald-300">/about-the-numbers</a>.
+            </p>
+          </div>
+          <p class="mt-6 max-w-2xl border-t border-zinc-800 pt-4 text-sm text-zinc-400 leading-relaxed">
+            <span class="font-semibold text-zinc-200">Disclaimer:</span> prices are reproduced as published in each
+            hospital's machine-readable file and may be incomplete, outdated, or inconsistent. They are not a quote
+            and not a guarantee of cost — what you actually pay depends on your insurance, the specific services, and
+            negotiated rates. Always confirm directly with the hospital and your insurer before relying on any
+            figure here. Hospital Ledger is an independent public-interest project, not affiliated with CMS, HHS,
+            or any hospital.
           </p>
 
           <ProcedureCarousel />
@@ -334,6 +367,21 @@ function homePage(url: string) {
               <li class="flex gap-3">
                 <span class="text-emerald-400 mt-1">▸</span>
                 <span>
+                  The{" "}
+                  <span class="tab-num">{fmt(liveMrfRequired - standardizedPriceHospitals)}</span>-hospital gap between
+                  "live MRF" and "standardized prices" is the parser's coverage hole — files we can download but
+                  haven't fully extracted usable rows from yet ({fmt(parsedMrfOutputs - standardizedPriceHospitals)}{" "}
+                  parsed to zero rows, {fmt(liveMrfRequired - parsedMrfOutputs)} still in the parse queue). Closing it
+                  is in progress; see{" "}
+                  <a href="/about-the-numbers" class="text-emerald-300 underline">
+                    /about-the-numbers
+                  </a>{" "}
+                  for the live breakdown.
+                </span>
+              </li>
+              <li class="flex gap-3">
+                <span class="text-emerald-400 mt-1">▸</span>
+                <span>
                   Mark Cuban built{" "}
                   <a href="https://costplusdrugs.com" class="text-emerald-300 underline">
                     Cost Plus Drugs
@@ -433,7 +481,7 @@ function homePage(url: string) {
                   </tr>
                   <tr>
                     <td class="py-2 pr-3">Canonicalize payer names (Aetna vs AETNA vs Aetna Health Inc.)</td>
-                    <td class="py-2 pr-3">74,747 raw rows</td>
+                    <td class="py-2 pr-3">76,645 raw rows</td>
                     <td class="py-2 pr-3">~250 wpm reading + ~500 unique merges</td>
                     <td class="py-2 pr-3 text-right text-emerald-300">50</td>
                   </tr>

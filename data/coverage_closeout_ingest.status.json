@@ -1,79 +1,79 @@
 {
   "all": false,
-  "done": 232,
-  "eligible": 872,
-  "eta_seconds": 10151,
-  "failed": 63,
-  "pending": 640,
-  "rate_per_second": 0.063,
+  "done": 329,
+  "eligible": 329,
+  "eta_seconds": 0,
+  "failed": 225,
+  "pending": 0,
+  "rate_per_second": 0.546,
   "recent_failures": [
     {
-      "ccn": "141313",
-      "error": "seed:-:subprocess:1:141313 MASON DISTRICT HOSPITAL                  xlsx             0 items  OK",
+      "ccn": "510029",
+      "error": "seed:-:subprocess:1:510029 THOMAS MEMORIAL HOSPITAL                 html             0 items  OK",
       "fmt": "",
       "items": 0
     },
     {
-      "ccn": "141329",
-      "error": "rediscovered:-:subprocess:1:141329 MORRISON COMMUNITY HOSPITAL                               0 items  ERR: f",
-      "fmt": "",
-      "items": 0
-    },
-    {
-      "ccn": "141330",
+      "ccn": "510091",
       "error": "no_live_mrf",
       "fmt": "",
       "items": 0
     },
     {
-      "ccn": "141339",
+      "ccn": "511309",
+      "error": "rediscovered:-:probe_html:206:text/html; charset=UTF-8",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "520028",
+      "error": "seed:-:subprocess:1:520028 THE MONROE CLINIC                        html             0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "521307",
+      "error": "seed:-:subprocess:1:521307 CHIPPEWA VALLEY HOSPITAL                 json             0 items  OK",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "521341",
       "error": "no_live_mrf",
       "fmt": "",
       "items": 0
     },
     {
-      "ccn": "141352",
+      "ccn": "521358",
+      "error": "rediscovered:-:probe_html:206:text/html; charset=utf-8",
+      "fmt": "",
+      "items": 0
+    },
+    {
+      "ccn": "531311",
       "error": "no_live_mrf",
       "fmt": "",
       "items": 0
     },
     {
-      "ccn": "150048",
-      "error": "rediscovered:-:subprocess:1:150048 REID HEALTH                              html             0 items  OK",
+      "ccn": "650001",
+      "error": "rediscovered:-:probe_html:200:text/html; charset=UTF-8",
       "fmt": "",
       "items": 0
     },
     {
-      "ccn": "150051",
-      "error": "rediscovered:-:subprocess:1:150051 INDIANA UNIVERSITY HEALTH BLOOMINGTON HO html             0 items  OK",
-      "fmt": "",
-      "items": 0
-    },
-    {
-      "ccn": "150056",
-      "error": "rediscovered:-:subprocess:1:150056 INDIANA UNIVERSITY HEALTH                html             0 items  OK",
-      "fmt": "",
-      "items": 0
-    },
-    {
-      "ccn": "150075",
-      "error": "rediscovered:-:subprocess:1:150075 BLUFFTON REGIONAL MEDICAL CENTER                          0 items  ERR: p",
-      "fmt": "",
-      "items": 0
-    },
-    {
-      "ccn": "150007",
-      "error": "rediscovered:-:subprocess:1:150007 COMMUNITY HOWARD REGIONAL HEALTH INC.                     0 items  ERR: f",
+      "ccn": "490084",
+      "error": "rediscovered:-:probe_html:206:text/html",
       "fmt": "",
       "items": 0
     }
   ],
   "resume": true,
   "skipped_existing": 0,
-  "started_at": "2026-05-13T06:24:42+00:00",
+  "started_at": "2026-05-19T03:34:53+00:00",
   "state": "",
-  "success": 169,
-  "total_items": 5930922,
-  "updated_at": "2026-05-13T07:26:02+00:00",
-  "workers": 4
+  "success": 104,
+  "total_items": 5552548,
+  "updated_at": "2026-05-19T03:44:55+00:00",
+  "workers": 6
 }

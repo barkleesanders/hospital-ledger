@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import glob
+import gzip
 import json
 import os
 import re
@@ -20,7 +21,7 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 PARSED_DIR = DATA_DIR / "parsed"
-SITE_PRICE_INDEX = ROOT / "site" / "data" / "prices" / "index.json"
+SITE_PRICE_INDEX = ROOT / "public" / "data" / "prices" / "index.json"
 DB_PATH = ROOT / "db" / "hospital_ledger.db"
 STATUS_FILE = DATA_DIR / "coverage_closeout_status.json"
 GAP_FILE = DATA_DIR / "coverage_gap_ccns.txt"
@@ -103,14 +104,23 @@ def load_target_rows() -> list[tuple[str, str]]:
 
 
 def parsed_row_count(ccn: str) -> int:
-    path = PARSED_DIR / f"{ccn}.json"
-    try:
-        with path.open("rb") as handle:
-            head = handle.read(512)
-    except OSError:
-        return 0
-    match = ROW_COUNT_RE.search(head)
-    return int(match.group(1)) if match else 0
+    """Return parsed row count for a CCN. Reads .json or .json.gz transparently."""
+    for path in (PARSED_DIR / f"{ccn}.json", PARSED_DIR / f"{ccn}.json.gz"):
+        if not path.exists():
+            continue
+        try:
+            if path.suffix == ".gz":
+                with gzip.open(path, "rb") as handle:
+                    head = handle.read(512)
+            else:
+                with path.open("rb") as handle:
+                    head = handle.read(512)
+        except (OSError, gzip.BadGzipFile):
+            continue
+        match = ROW_COUNT_RE.search(head)
+        if match:
+            return int(match.group(1))
+    return 0
 
 
 def load_preview_rows() -> list[dict[str, object]]:

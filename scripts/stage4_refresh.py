@@ -13,6 +13,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 import datetime as dt
 from pathlib import Path
 
@@ -21,8 +22,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 PARSED_DIR = ROOT / "data" / "parsed"
 RAW_DIR = ROOT / "data" / "raw"
-SITE_PRICE_DIR = ROOT / "site" / "data" / "prices"
-CPT_INDEX = ROOT / "site" / "data" / "cpt-index.json"
+SITE_PRICE_DIR = ROOT / "public" / "data" / "prices"
+CPT_INDEX = ROOT / "public" / "data" / "cpt-index.json"
 WRANGLER_PUT_LIMIT_BYTES = 300 * 1024 * 1024
 DEFAULT_R2_MANIFEST = ROOT / "data" / "r2_upload_manifest.json"
 CF_GLOBAL_KEY_FILE = Path.home() / ".cloudflared" / "cf-global-api-key.json"
@@ -54,6 +55,29 @@ def run(cmd: list[str], *, dry_run: bool = False) -> None:
     if dry_run:
         return
     subprocess.run(cmd, cwd=ROOT, check=True)
+
+
+def run_retry(cmd: list[str], *, dry_run: bool = False, retries: int = 4, base_delay: float = 2.0) -> None:
+    """run() with exponential-backoff retry, for transient remote (R2/network)
+    failures. A single transient `wrangler r2 object put` 5xx/timeout used to
+    abort the entire weekly refresh before deploy (2026-06-08); a bulk upload of
+    hundreds of files must tolerate the occasional blip."""
+    printable = " ".join(shlex.quote(part) for part in cmd)
+    print(f"$ {printable}")
+    if dry_run:
+        return
+    last: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            subprocess.run(cmd, cwd=ROOT, check=True)
+            return
+        except subprocess.CalledProcessError as exc:
+            last = exc
+            if attempt < retries:
+                delay = base_delay * (2 ** (attempt - 1))
+                print(f"  ⚠️ attempt {attempt}/{retries} failed (exit {exc.returncode}); retrying in {delay:.0f}s")
+                time.sleep(delay)
+    raise last  # type: ignore[misc]
 
 
 def load_cloudflare_env() -> None:
@@ -140,7 +164,7 @@ def put_r2_object(
     )
     if use_rclone:
         remote_path = f"{rclone_remote.rstrip(':')}:{bucket}/{key}"
-        run(
+        run_retry(
             [
                 "rclone",
                 "copyto",
@@ -166,7 +190,7 @@ def put_r2_object(
             f"wrangler put limit {WRANGLER_PUT_LIMIT_BYTES}; set R2_UPLOAD_MODE=rclone"
         )
         return False
-    run(["wrangler", "r2", "object", "put", f"{bucket}/{key}", "-f", str(path), "--remote"], dry_run=dry_run)
+    run_retry(["wrangler", "r2", "object", "put", f"{bucket}/{key}", "-f", str(path), "--remote"], dry_run=dry_run)
     stats["uploaded"] = stats.get("uploaded", 0) + 1
     if manifest is not None and not dry_run:
         manifest[manifest_key] = signature | {"uploaded_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}

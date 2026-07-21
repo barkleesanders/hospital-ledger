@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  macOS launchd job: weekly hospitalledger.com refresh on the mac mini.
+  Runs scripts/refresh.sh every Sunday at 04:00 local time (low traffic).
+
+  Install:
+    cp ops/com.hospitalledger.refresh.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hospitalledger.refresh.plist
+    launchctl enable  gui/$(id -u)/com.hospitalledger.refresh
+
+  Trigger manually (for the first test run):
+    launchctl kickstart -k gui/$(id -u)/com.hospitalledger.refresh
+
+  Tail the log:
+    tail -F ~/projects/hospital-ledger/data/refresh_logs/launchd.out.log
+
+  Disable / uninstall:
+    launchctl bootout  gui/$(id -u)/com.hospitalledger.refresh
+    rm ~/Library/LaunchAgents/com.hospitalledger.refresh.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hospitalledger.refresh</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>cd $HOME/projects/hospital-ledger &amp;&amp; bash scripts/refresh.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key><integer>0</integer>
+        <key>Hour</key><integer>4</integer>
+        <key>Minute</key><integer>0</integer>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/barkleesanders/projects/hospital-ledger</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/barkleesanders/projects/hospital-ledger/data/refresh_logs/launchd.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/barkleesanders/projects/hospital-ledger/data/refresh_logs/launchd.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/barkleesanders</string>
+    </dict>
+
+    <!-- Don't run if mac is asleep on Sunday 4am; just wait for next week's slot. -->
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

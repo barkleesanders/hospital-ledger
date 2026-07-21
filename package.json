@@ -7,7 +7,13 @@
     "dev": "wrangler dev",
     "build": "vite build",
     "preview": "wrangler dev",
-    "deploy": "vite build && wrangler deploy",
+    "audit:copy": "python3 scripts/predeploy_audit.py",
+    "audit:copy:live": "python3 scripts/predeploy_audit.py --check-live",
+    "refresh": "bash scripts/refresh.sh",
+    "refresh:dry": "bash scripts/refresh.sh --dry-run",
+    "refresh:quick": "bash scripts/refresh.sh --quick",
+    "predeploy": "python3 scripts/predeploy_audit.py",
+    "deploy": "bash scripts/deploy.sh",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -19,6 +25,6 @@
     "@hono/vite-dev-server": "^0.18.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.7",
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.107.0"
   }
 }

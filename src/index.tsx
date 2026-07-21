@@ -8,6 +8,7 @@ import { payersIndexHandler } from "./routes/api/payers-index";
 import { pricesHandler } from "./routes/api/prices";
 import { pricesIndexHandler } from "./routes/api/prices-index";
 import { procedureHandler } from "./routes/api/procedure";
+import { aboutNumbersPageHandler } from "./routes/about-the-numbers";
 import { homePageHandler } from "./routes/home";
 import { hospitalPageHandler } from "./routes/hospital";
 import { payerPageHandler } from "./routes/payer";
@@ -34,6 +35,15 @@ app.use("*", async (c, next) => {
   if (!h.has("Permissions-Policy")) h.set("Permissions-Policy", "interest-cohort=()");
   if (!h.has("Strict-Transport-Security")) {
     h.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  }
+  // CSP (added 2026-07-06, /ship Phase 4.05b): self + Google Fonts (the only
+  // external loads in rendered HTML) + inline style/script blocks the SSR
+  // pages emit. External <a href> targets need no CSP entries.
+  if (!h.has("Content-Security-Policy")) {
+    h.set(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+    );
   }
 });
 
@@ -154,5 +164,9 @@ app.get("/hospital/:ccn", hospitalPageHandler);
 
 // SSR home page.
 app.get("/", homePageHandler);
+
+// SSR methodology page explaining the gap between CMS-required, live MRF,
+// and standardized-price counts. Linked from the home-page hero + Section 03.
+app.get("/about-the-numbers", aboutNumbersPageHandler);
 
 export default app;
