@@ -36,13 +36,32 @@ app.use("*", async (c, next) => {
   if (!h.has("Strict-Transport-Security")) {
     h.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
   }
-  // CSP (added 2026-07-06, /ship Phase 4.05b): self + Google Fonts (the only
-  // external loads in rendered HTML) + inline style/script blocks the SSR
-  // pages emit. External <a href> targets need no CSP entries.
+  // CSP (added 2026-07-06, /ship Phase 4.05b; FIXED 2026-08-02).
+  //
+  // The original directive allow-listed Google Fonts as "the only external loads
+  // in rendered HTML" — that enumeration came from the <link> tags and MISSED the
+  // <script src="https://cdn.tailwindcss.com"> in Layout.tsx (added 79e66b3,
+  // 2026-05-13). Result: from 2026-07-06 the browser blocked Tailwind entirely
+  // ("Loading the script ... violates the following Content Security Policy
+  // directive"), so all ~484 utility classes in the markup rendered inert and the
+  // site was visually unstyled in production for ~4 weeks. Only the ~1.9 KB inline
+  // <style> below survived, which is why it looked broken but not blank.
+  //
+  // When changing this header, enumerate external hosts from EVERY tag that loads
+  // a subresource (<script>, <link>, <img>, fetch/XHR) — not just <link> — and
+  // then browser-verify: load the page and confirm zero "Refused to.../violates
+  // the following Content Security Policy" console entries. A CSP that is merely
+  // *present* is not a CSP that is *correct*.
+  //
+  // NOTE: cdn.tailwindcss.com is Tailwind's Play CDN, which Tailwind documents as
+  // development-only, not for production (https://tailwindcss.com/docs/installation/play-cdn).
+  // It is allow-listed here to restore production immediately; the correct
+  // long-term fix is a Tailwind CLI build served from 'self' so this entry — and
+  // the render-blocking third-party script — can be removed. See TODO below.
   if (!h.has("Content-Security-Policy")) {
     h.set(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+      "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
     );
   }
 });
