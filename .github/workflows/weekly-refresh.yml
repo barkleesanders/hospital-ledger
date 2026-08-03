@@ -29,6 +29,8 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+      - name: Install Python test dependencies
+        run: python -m pip install --disable-pip-version-check httpx==0.28.1 boto3==1.40.76
       - run: npm ci
       - name: Validate Python and shell
         run: |
