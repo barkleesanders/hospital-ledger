@@ -38,18 +38,21 @@ def make_client(workers: int):
     if boto3 is None or Config is None:
         raise SystemExit("missing boto3; install requirements.txt before using R2")
     account_id = required_env("R2_ACCOUNT_ID")
-    return boto3.client(
-        "s3",
-        endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
-        aws_access_key_id=required_env("R2_ACCESS_KEY_ID"),
-        aws_secret_access_key=required_env("R2_SECRET_ACCESS_KEY"),
-        region_name="auto",
-        config=Config(
+    client_options = {
+        "endpoint_url": f"https://{account_id}.r2.cloudflarestorage.com",
+        "aws_access_key_id": required_env("R2_ACCESS_KEY_ID"),
+        "aws_secret_access_key": required_env("R2_SECRET_ACCESS_KEY"),
+        "region_name": "auto",
+        "config": Config(
             signature_version="s3v4",
             max_pool_connections=max(workers * 2, 16),
             retries={"mode": "adaptive", "max_attempts": 10},
         ),
-    )
+    }
+    session_token = os.environ.get("R2_SESSION_TOKEN", "").strip()
+    if session_token:
+        client_options["aws_session_token"] = session_token
+    return boto3.client("s3", **client_options)
 
 
 def sha256_file(path: Path) -> str:
@@ -327,7 +330,15 @@ def acquire_lock(
     raise SystemExit("refresh lock changed repeatedly; another run is starting")
 
 
-def release_lock(client, *, bucket: str, key: str, owner: str) -> str:
+def release_lock(
+    client,
+    *,
+    bucket: str,
+    key: str,
+    owner: str,
+    current_time: dt.datetime | None = None,
+) -> str:
+    now = current_time or utc_now()
     try:
         head = client.head_object(Bucket=bucket, Key=key)
     except ClientError as exc:
@@ -341,8 +352,24 @@ def release_lock(client, *, bucket: str, key: str, owner: str) -> str:
     etag = str(head.get("ETag") or "")
     if not etag:
         raise SystemExit("refresh lock has no ETag; refusing an unsafe release")
+    acquired_at = str(metadata.get("acquired-at") or "") or now.isoformat(
+        timespec="seconds"
+    ).replace("+00:00", "Z")
+    expires_at = now.isoformat(timespec="seconds").replace("+00:00", "Z")
+    body = json.dumps(
+        {"owner": owner, "acquired_at": acquired_at, "expires_at": expires_at},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
     try:
-        client.delete_object(Bucket=bucket, Key=key, IfMatch=etag)
+        client.put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=body,
+            ContentType="application/json",
+            Metadata={"owner": owner, "acquired-at": acquired_at, "expires-at": expires_at},
+            IfMatch=etag,
+        )
     except ClientError as exc:
         if is_precondition_failed(exc):
             raise SystemExit("refresh lock changed before release") from exc

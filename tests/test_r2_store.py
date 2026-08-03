@@ -1,8 +1,10 @@
 import importlib.util
 import hashlib
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "r2_store.py"
 SPEC = importlib.util.spec_from_file_location("r2_store", SCRIPT)
@@ -28,6 +30,8 @@ class FakePaginator:
 class FakeS3:
     def __init__(self):
         self.objects = {}
+        self.delete_calls = []
+        self.before_conditional_put = None
 
     def head_object(self, *, Bucket, Key):
         value = self.objects.get((Bucket, Key))
@@ -53,6 +57,10 @@ class FakeS3:
         IfNoneMatch=None,
         IfMatch=None,
     ):
+        if IfMatch is not None and self.before_conditional_put is not None:
+            callback = self.before_conditional_put
+            self.before_conditional_put = None
+            callback(self, Bucket, Key)
         existing = self.objects.get((Bucket, Key))
         if IfNoneMatch == "*" and existing is not None:
             raise ClientError(
@@ -90,6 +98,7 @@ class FakeS3:
         }
 
     def delete_object(self, *, Bucket, Key, IfMatch=None):
+        self.delete_calls.append({"Bucket": Bucket, "Key": Key, "IfMatch": IfMatch})
         existing = self.objects.get((Bucket, Key))
         if IfMatch is not None and (existing is None or existing["etag"] != IfMatch):
             raise ClientError(
@@ -116,6 +125,22 @@ class R2StoreTests(unittest.TestCase):
             "metadata": metadata or {},
             "etag": hashlib.md5(body).hexdigest(),
         }
+
+    def test_make_client_passes_optional_session_token(self):
+        if MODULE.boto3 is None:
+            self.skipTest("boto3 is not installed")
+        environment = {
+            "R2_ACCOUNT_ID": "test-account",
+            "R2_ACCESS_KEY_ID": "test-access-key",
+            "R2_SECRET_ACCESS_KEY": "test-secret-key",
+            "R2_SESSION_TOKEN": "test-session-token",
+        }
+        with (
+            mock.patch.dict(MODULE.os.environ, environment, clear=True),
+            mock.patch.object(MODULE.boto3, "client") as make_boto_client,
+        ):
+            MODULE.make_client(2)
+        self.assertEqual(make_boto_client.call_args.kwargs["aws_session_token"], "test-session-token")
 
     def test_list_and_delete_keys_are_explicit(self):
         client = FakeS3()
@@ -329,6 +354,96 @@ class R2StoreTests(unittest.TestCase):
             current_time=later,
         )
         self.assertEqual(result["status"], "replaced_stale")
+
+    def test_release_lock_writes_expired_tombstone_without_delete(self):
+        client = FakeS3()
+        acquired = MODULE.dt.datetime(2026, 8, 3, 4, 17, tzinfo=MODULE.dt.timezone.utc)
+        released = acquired + MODULE.dt.timedelta(minutes=30)
+        key = "_pipeline/locks/cloud-refresh.json"
+        MODULE.acquire_lock(
+            client,
+            bucket="bucket",
+            key=key,
+            owner="run-a",
+            ttl_seconds=3600,
+            current_time=acquired,
+        )
+
+        result = MODULE.release_lock(
+            client,
+            bucket="bucket",
+            key=key,
+            owner="run-a",
+            current_time=released,
+        )
+
+        self.assertEqual(result, "released")
+        self.assertEqual(client.delete_calls, [])
+        tombstone = client.objects[("bucket", key)]
+        expected_expiry = "2026-08-03T04:47:00Z"
+        self.assertEqual(tombstone["metadata"]["owner"], "run-a")
+        self.assertEqual(tombstone["metadata"]["expires-at"], expected_expiry)
+        self.assertEqual(json.loads(tombstone["body"])["expires_at"], expected_expiry)
+        self.assertLessEqual(
+            MODULE.lock_timestamp(tombstone["metadata"]["expires-at"]),
+            released,
+        )
+
+        takeover = MODULE.acquire_lock(
+            client,
+            bucket="bucket",
+            key=key,
+            owner="run-b",
+            ttl_seconds=3600,
+            current_time=released,
+        )
+        self.assertEqual(takeover["status"], "replaced_stale")
+
+    def test_release_lock_fails_if_concurrent_takeover_changes_etag(self):
+        client = FakeS3()
+        acquired = MODULE.dt.datetime(2026, 8, 3, 4, 17, tzinfo=MODULE.dt.timezone.utc)
+        released = acquired + MODULE.dt.timedelta(minutes=30)
+        key = "_pipeline/locks/cloud-refresh.json"
+        MODULE.acquire_lock(
+            client,
+            bucket="bucket",
+            key=key,
+            owner="run-a",
+            ttl_seconds=3600,
+            current_time=acquired,
+        )
+
+        def concurrent_takeover(fake, bucket, object_key):
+            body = json.dumps(
+                {
+                    "owner": "run-b",
+                    "acquired_at": "2026-08-03T04:46:59Z",
+                    "expires_at": "2026-08-03T05:46:59Z",
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+            fake.objects[(bucket, object_key)] = self.object(
+                body,
+                {
+                    "owner": "run-b",
+                    "acquired-at": "2026-08-03T04:46:59Z",
+                    "expires-at": "2026-08-03T05:46:59Z",
+                },
+            )
+
+        client.before_conditional_put = concurrent_takeover
+        with self.assertRaisesRegex(SystemExit, "refresh lock changed before release"):
+            MODULE.release_lock(
+                client,
+                bucket="bucket",
+                key=key,
+                owner="run-a",
+                current_time=released,
+            )
+
+        self.assertEqual(client.delete_calls, [])
+        self.assertEqual(client.objects[("bucket", key)]["metadata"]["owner"], "run-b")
 
 
 if __name__ == "__main__":

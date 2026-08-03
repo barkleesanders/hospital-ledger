@@ -10,16 +10,27 @@ The production worker needs at least 8 GB RAM, 60 GB free disk, Python 3.12, Nod
 
 ## Required authentication
 
-Provide these values to the worker through its secret store. Never commit them.
+The preferred unattended path uses the Cloudflare Global API Key that is already
+kept in the owner's private operations backup. Load these values into the process
+without printing or committing them:
 
 ```text
 R2_ACCOUNT_ID
-R2_ACCESS_KEY_ID
-R2_SECRET_ACCESS_KEY
-CLOUDFLARE_API_TOKEN
+CLOUDFLARE_EMAIL
+CLOUDFLARE_API_KEY
 ```
 
-`CLOUDFLARE_API_TOKEN` may be replaced by an authenticated Wrangler OAuth session. R2's S3-compatible API still requires its own scoped access key pair.
+At startup, `cloud_refresh.sh` exchanges that credential for an account-owned R2
+token scoped only to `hl-mrf-parsed`. The token expires after 72 hours and is
+revoked by the exit handler after the lock is released. The plaintext token value
+is converted in memory to the R2 S3 secret-key format and is never logged. The
+temporary environment file is mode `0600` and is deleted on exit. Expiration is
+the fallback if the worker is terminated too abruptly to run its exit handler.
+
+An externally managed `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` pair remains
+supported as an override. With that override, Wrangler must also have either
+`CLOUDFLARE_API_TOKEN` or the Global API Key credentials above. The runner never
+revokes externally managed R2 credentials.
 
 ## Run lifecycle
 
@@ -27,12 +38,13 @@ CLOUDFLARE_API_TOKEN
 2. Acquire an R2-backed distributed lock, clear all derived hydration targets, then hydrate the validator state, SQLite database, public indexes, and gzipped parsed corpus from R2.
 3. Probe every preferred hospital MRF URL concurrently.
 4. Compare URL, ETag, Last-Modified, content length, and a bounded content sample. Schedule a deterministic forced refresh when a server exposes weak validators.
-5. Parse only the explicit changed-hospital worklist in bounded shards. The planner records the exact selected URL for every CCN, and each ingest shard consumes that map without independently re-ranking candidates. Each shard is slimmed and gzipped immediately, so the first rebuild never accumulates the roughly 107 GB uncompressed corpus. A failed parse restores the prior raw record so global indexes retain last-known-good data.
-6. Rebuild and audit all public aggregates.
-7. Snapshot every R2 key that will change and record the active Worker version.
-8. Upload changed hospital objects and the CPT index, deploy the Worker, and run the live audit.
-9. If publication or the live audit fails, roll back both the Worker version and R2 snapshot.
-10. Upload parsed checkpoints and public indexes. Upload the validator state last as the atomic completion marker.
+5. Store the immutable plan, post-probe SQLite database, and an upload-complete marker in an isolated `_pipeline/staging/<run-id>/` prefix.
+6. Parse only the explicit changed-hospital worklist in bounded shards. The planner records the exact selected URL for every CCN, and each ingest shard consumes that map without independently re-ranking candidates. Each successful shard is slimmed, gzipped, and checkpointed to staging immediately, so the first rebuild never accumulates the roughly 107 GB uncompressed corpus and an interrupted run resumes from its completed shards. A failed parse restores the prior raw record so global indexes retain last-known-good data.
+7. Rebuild and audit all public aggregates.
+8. Snapshot every R2 key that will change and record the active Worker version.
+9. Upload changed hospital objects and the CPT index, deploy the Worker, and run the live audit.
+10. If publication or the live audit fails, roll back both the Worker version and R2 snapshot.
+11. Upload parsed checkpoints and public indexes. Upload the validator state last as the atomic completion marker, then remove staging.
 
 Run heartbeats are stored at:
 
@@ -42,6 +54,7 @@ r2://hl-mrf-parsed/_pipeline/runs/<run-id>.json
 ```
 
 Rollback manifests and server-side object snapshots are stored below `_pipeline/rollback/<run-id>/`.
+Resumable shard checkpoints are stored below `_pipeline/staging/<run-id>/` until a generation commits.
 The refresh lock is stored at `_pipeline/locks/cloud-refresh.json`. It blocks overlapping manual and scheduled runs and expires after 48 hours if a worker is terminated before cleanup.
 Before the first live object changes, the runner writes a durable `publishing` heartbeat containing the rollback manifest key and prior Worker version. A later worker automatically restores both layers if the earlier worker was terminated before writing the `committed` heartbeat.
 

@@ -34,9 +34,11 @@ jobs:
         run: |
           python -m unittest discover -s tests -v
           python -m py_compile \
+            scripts/bootstrap_r2_credentials.py \
             scripts/prepare_incremental_refresh.py \
             scripts/batch_ingest.py \
             scripts/r2_store.py \
+            scripts/refresh_resume.py \
             scripts/refresh_artifacts.py \
             scripts/validate_refresh_output.py
           bash -n scripts/cloud_refresh.sh scripts/refresh.sh scripts/mem_guard.sh

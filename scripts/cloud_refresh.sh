@@ -38,7 +38,13 @@ PUBLICATION_KEYS="$RUN_DIR/publication-keys.txt"
 REMOTE_AGGREGATE_KEYS="$RUN_DIR/remote-aggregate-keys.txt"
 ROLLBACK_KEYS="$RUN_DIR/rollback-keys.txt"
 STALE_KEYS="$RUN_DIR/stale-keys.txt"
+PIPELINE_ROLLBACK_KEYS="$RUN_DIR/pipeline-rollback-keys.txt"
 DEPLOYMENTS_JSON="$RUN_DIR/deployments-before.json"
+RESUME_DIR="$RUN_DIR/resume"
+RESUME_COMPLETED_FILE="$RUN_DIR/resume-completed.txt"
+RESUME_REMAINING_FILE="$RUN_DIR/resume-remaining.txt"
+STAGING_KEYS="$RUN_DIR/staging-keys.txt"
+R2_CREDENTIALS_FILE="$RUN_DIR/r2-bootstrap.env"
 mkdir -p "$RUN_DIR"
 
 PLAN_ONLY=0
@@ -64,6 +70,15 @@ PREVIOUS_WORKER_VERSION=""
 ROLLBACK_FAILURES=0
 PRODUCTION_STARTED=0
 BOOTSTRAP=0
+RESUME_ID=""
+RESUME_PHASE="starting"
+RESUME_COMPLETED=0
+RESUME_TOTAL=0
+STAGING_PREFIX=""
+FULL_SLIM_READY=0
+STATE_COMMITTED=0
+BOOTSTRAPPED_R2=0
+BOOTSTRAPPED_R2_TOKEN_ID=""
 
 write_run_status() {
   local status="$1" detail="${2:-}"
@@ -73,13 +88,25 @@ write_run_status() {
     recovery_version="$PREVIOUS_WORKER_VERSION"
   fi
   "$PYTHON" - "$RUN_ID" "$status" "$detail" "$RUN_STATUS_FILE" \
-    "$recovery_manifest" "$recovery_version" <<'PY'
+    "$recovery_manifest" "$recovery_version" "$RESUME_ID" "$RESUME_PHASE" \
+    "$RESUME_COMPLETED" "$RESUME_TOTAL" <<'PY'
 import datetime as dt
 import json
 import sys
 from pathlib import Path
 
-run_id, status, detail, output, recovery_manifest, recovery_version = sys.argv[1:]
+(
+    run_id,
+    status,
+    detail,
+    output,
+    recovery_manifest,
+    recovery_version,
+    resume_id,
+    phase,
+    completed,
+    total,
+) = sys.argv[1:]
 try:
     plan = json.loads(Path("data/cloud_refresh_plan.json").read_text())
 except (OSError, json.JSONDecodeError):
@@ -88,6 +115,10 @@ payload = {
     "run_id": run_id,
     "status": status,
     "detail": detail,
+    "resume_id": resume_id,
+    "phase": phase,
+    "completed": int(completed),
+    "total": int(total),
     "updated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     "plan": {
         "candidates": plan.get("candidate_count", plan.get("probed", 0)),
@@ -119,6 +150,20 @@ upload_run_status() {
 renew_refresh_lock() {
   "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" renew-lock \
     "$BUCKET" "$LOCK_KEY" "$RUN_ID" --ttl-seconds "$LOCK_TTL_SECONDS"
+}
+
+cleanup_staging() {
+  local attempt
+  for attempt in 1 2 3; do
+    if "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" list-keys \
+      "$BUCKET" "$STAGING_KEYS" "$STAGING_PREFIX/" && \
+      "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" delete-keys \
+      "$BUCKET" "$STAGING_KEYS"; then
+      return 0
+    fi
+    echo "Staging cleanup attempt $attempt failed." >&2
+  done
+  return 1
 }
 
 recover_incomplete_publication() {
@@ -171,23 +216,31 @@ on_exit() {
   trap - EXIT
   set +e
   if [ "$code" -ne 0 ]; then
-    if [ "$WORKER_ROLLBACK_ARMED" = 1 ] && [ -n "$PREVIOUS_WORKER_VERSION" ]; then
-      echo "Rolling Worker back to version $PREVIOUS_WORKER_VERSION" >&2
-      wrangler rollback "$PREVIOUS_WORKER_VERSION" --yes \
-        --message "Automatic rollback after failed Hospital Ledger refresh $RUN_ID" || ROLLBACK_FAILURES=$((ROLLBACK_FAILURES + 1))
-    fi
-    if [ "$R2_ROLLBACK_ARMED" = 1 ] && [ -s "$ROLLBACK_MANIFEST" ]; then
-      echo "Restoring live R2 objects from the pre-publication snapshot" >&2
-      "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" \
-        restore-snapshot "$ROLLBACK_MANIFEST" || ROLLBACK_FAILURES=$((ROLLBACK_FAILURES + 1))
-    fi
-    if [ "$PRODUCTION_STARTED" = 1 ]; then
-      local failure_status="failed"
-      if [ "$ROLLBACK_FAILURES" -gt 0 ]; then
-        failure_status="recovery_required"
-      fi
-      write_run_status "$failure_status" "exit $code; rollback_failures=$ROLLBACK_FAILURES"
+    if [ "$STATE_COMMITTED" = 1 ]; then
+      # Live and canonical state are already one verified generation. Preserve
+      # the durable committed marker so a cleanup interruption is retried as
+      # cleanup, never misclassified as resumable ingestion.
+      write_run_status "committed" "publication committed; post-commit cleanup exited $code"
       upload_run_status || true
+    else
+      if [ "$WORKER_ROLLBACK_ARMED" = 1 ] && [ -n "$PREVIOUS_WORKER_VERSION" ]; then
+        echo "Rolling Worker back to version $PREVIOUS_WORKER_VERSION" >&2
+        wrangler rollback "$PREVIOUS_WORKER_VERSION" --yes \
+          --message "Automatic rollback after failed Hospital Ledger refresh $RUN_ID" || ROLLBACK_FAILURES=$((ROLLBACK_FAILURES + 1))
+      fi
+      if [ "$R2_ROLLBACK_ARMED" = 1 ] && [ -s "$ROLLBACK_MANIFEST" ]; then
+        echo "Restoring live R2 objects from the pre-publication snapshot" >&2
+        "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" \
+          restore-snapshot "$ROLLBACK_MANIFEST" || ROLLBACK_FAILURES=$((ROLLBACK_FAILURES + 1))
+      fi
+      if [ "$PRODUCTION_STARTED" = 1 ]; then
+        local failure_status="failed"
+        if [ "$ROLLBACK_FAILURES" -gt 0 ]; then
+          failure_status="recovery_required"
+        fi
+        write_run_status "$failure_status" "exit $code; rollback_failures=$ROLLBACK_FAILURES"
+        upload_run_status || true
+      fi
     fi
     notify_failure "$code"
   fi
@@ -199,6 +252,20 @@ on_exit() {
       echo "Failed to release the distributed refresh lock; it will expire automatically." >&2
       code=1
     fi
+  fi
+  if [ "$BOOTSTRAPPED_R2" = 1 ]; then
+    if ! "$PYTHON" scripts/bootstrap_r2_credentials.py revoke \
+      "$BOOTSTRAPPED_R2_TOKEN_ID"; then
+      echo "Failed to revoke the short-lived R2 credential; its expiry remains the backstop." >&2
+      code=1
+    fi
+    unset R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_CREDENTIALS_EXPIRES_ON
+    "$PYTHON" - "$R2_CREDENTIALS_FILE" <<'PY' || code=1
+import sys
+from pathlib import Path
+
+Path(sys.argv[1]).unlink(missing_ok=True)
+PY
   fi
   exit "$code"
 }
@@ -226,6 +293,8 @@ if missing:
     raise SystemExit("missing Python runtime packages: " + ", ".join(missing))
 PY
   test -x node_modules/.bin/wrangler
+  test -f scripts/bootstrap_r2_credentials.py
+  test -f scripts/refresh_resume.py
   test -f src/index.tsx
   test -f public/.assetsignore
   local free_gb
@@ -234,6 +303,34 @@ PY
     echo "insufficient free disk: ${free_gb} GiB" >&2
     return 1
   fi
+}
+
+configure_r2_credentials() {
+  if [ -z "${R2_ACCOUNT_ID:-}" ] && [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+    export R2_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID"
+  fi
+  : "${R2_ACCOUNT_ID:?missing R2_ACCOUNT_ID}"
+
+  if [ -n "${R2_ACCESS_KEY_ID:-}" ] && [ -n "${R2_SECRET_ACCESS_KEY:-}" ]; then
+    return 0
+  fi
+  if [ -n "${R2_ACCESS_KEY_ID:-}" ] || [ -n "${R2_SECRET_ACCESS_KEY:-}" ]; then
+    echo "R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be provided together." >&2
+    return 2
+  fi
+
+  : "${CLOUDFLARE_EMAIL:?missing CLOUDFLARE_EMAIL for R2 credential bootstrap}"
+  : "${CLOUDFLARE_API_KEY:?missing CLOUDFLARE_API_KEY for R2 credential bootstrap}"
+  "$PYTHON" scripts/bootstrap_r2_credentials.py create \
+    --bucket "$BUCKET" \
+    --output "$R2_CREDENTIALS_FILE" \
+    --ttl-hours "${R2_BOOTSTRAP_TTL_HOURS:-72}"
+  # The file is generated by bootstrap_r2_credentials.py with validated names,
+  # shell-quoted values, and mode 0600.
+  # shellcheck disable=SC1090
+  source "$R2_CREDENTIALS_FILE"
+  BOOTSTRAPPED_R2_TOKEN_ID="$R2_ACCESS_KEY_ID"
+  BOOTSTRAPPED_R2=1
 }
 
 current_worker_version() {
@@ -278,11 +375,11 @@ if [ "$PLAN_ONLY" = 1 ]; then
 fi
 
 require_runtime
-: "${R2_ACCOUNT_ID:?missing R2_ACCOUNT_ID}"
-: "${R2_ACCESS_KEY_ID:?missing R2_ACCESS_KEY_ID}"
-: "${R2_SECRET_ACCESS_KEY:?missing R2_SECRET_ACCESS_KEY}"
+configure_r2_credentials
 if [ "$NO_DEPLOY" != 1 ]; then
-  wrangler whoami >/dev/null
+  # A real account read verifies that Wrangler can reach the target account.
+  # `wrangler whoami` can succeed with an unusable or stale local profile.
+  wrangler deployments list --json > "$DEPLOYMENTS_JSON"
 fi
 
 echo "Hospital Ledger cloud refresh $RUN_ID"
@@ -293,7 +390,21 @@ echo "workers: probe=$PROBE_WORKERS ingest=$INGEST_WORKERS r2=$R2_WORKERS"
   "$BUCKET" "$LOCK_KEY" "$RUN_ID" --ttl-seconds "$LOCK_TTL_SECONDS"
 LOCK_HELD=1
 recover_incomplete_publication
+COMPLETED_STAGING_ID="$("$PYTHON" scripts/refresh_resume.py cleanup-id "$PREVIOUS_STATUS_FILE")"
+if [ -n "$COMPLETED_STAGING_ID" ]; then
+  echo "Cleaning staging left by committed refresh $COMPLETED_STAGING_ID"
+  "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" list-keys \
+    "$BUCKET" "$STAGING_KEYS" "_pipeline/staging/$COMPLETED_STAGING_ID/"
+  "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" delete-keys \
+    "$BUCKET" "$STAGING_KEYS"
+fi
+RESUME_ID="$("$PYTHON" scripts/refresh_resume.py resume-id "$PREVIOUS_STATUS_FILE")"
+if [ -n "$RESUME_ID" ]; then
+  STAGING_PREFIX="_pipeline/staging/$RESUME_ID"
+  echo "Found resumable staged refresh $RESUME_ID"
+fi
 PRODUCTION_STARTED=1
+RESUME_PHASE="hydrating"
 write_run_status "running" "hydrating durable state"
 upload_run_status
 
@@ -327,22 +438,116 @@ fi
 "$PYTHON" scripts/refresh_artifacts.py backup-public "$BASELINE_DIR"
 "$PYTHON" scripts/build_db.py
 "$PYTHON" scripts/ingest_cms_enforcement.py
-run_planner
 
 CHANGED_FILE="$ROOT/data/cloud_refresh_changed_ccns.txt"
 WORKLIST_FILE="$ROOT/data/cloud_refresh_worklist.json"
 PARSE_SUCCESS_FILE="$RUN_DIR/parse-success.txt"
 SUCCESS_FILE="$RUN_DIR/publish-success.txt"
 FAILURES_FILE="$ROOT/data/refresh_logs/ingest-$RUN_ID.failures.jsonl"
+INGEST_FILE="$CHANGED_FILE"
+
+if [ -n "$RESUME_ID" ]; then
+  "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" download-prefix \
+    "$BUCKET" "$STAGING_PREFIX/" "$RESUME_DIR"
+  "$PYTHON" scripts/refresh_resume.py restore \
+    "$RESUME_DIR" "$RESUME_COMPLETED_FILE" "$RESUME_REMAINING_FILE"
+  INGEST_FILE="$RESUME_REMAINING_FILE"
+  RESUME_COMPLETED="$(wc -l < "$RESUME_COMPLETED_FILE" | tr -d ' ')"
+  RESUME_TOTAL="$((RESUME_COMPLETED + $(wc -l < "$RESUME_REMAINING_FILE" | tr -d ' ')))"
+  if [ "$RESUME_COMPLETED" -gt 0 ]; then
+    # Recreate compact per-hospital output from the staged parsed checkpoints.
+    # A zero-remaining resume can use the bounded streaming full-corpus path
+    # immediately. Otherwise, use small targeted shards because one targeted
+    # invocation over a full bootstrap would accumulate its CPT map in memory.
+    if [ ! -s "$RESUME_REMAINING_FILE" ]; then
+      SLIM_KEEP_STALE=1 SLIM_MERGE_INDEX=1 \
+        bash scripts/mem_guard.sh "$PYTHON" scripts/slim_parsed.py
+      FULL_SLIM_READY=1
+    else
+      RESUME_SLIM_DIR="$RUN_DIR/resume-slim-shards"
+      mkdir -p "$RESUME_SLIM_DIR"
+      split -l "${INGEST_SHARD_SIZE:-50}" -d -a 4 \
+        "$RESUME_COMPLETED_FILE" "$RESUME_SLIM_DIR/shard-"
+      for resume_slim_shard in "$RESUME_SLIM_DIR"/shard-*; do
+        [ -s "$resume_slim_shard" ] || continue
+        CCNS_FILE="$resume_slim_shard" SLIM_KEEP_STALE=1 SLIM_MERGE_INDEX=1 \
+          bash scripts/mem_guard.sh "$PYTHON" scripts/slim_parsed.py
+      done
+    fi
+    RESUMED_DISPLAY_FILE="$RUN_DIR/resumed-display.txt"
+    "$PYTHON" scripts/refresh_artifacts.py classify-display \
+      "$RESUME_COMPLETED_FILE" "$RESUMED_DISPLAY_FILE"
+    if ! cmp -s "$RESUME_COMPLETED_FILE" "$RESUMED_DISPLAY_FILE"; then
+      echo "Staged parsed checkpoints did not recreate every completed display artifact." >&2
+      exit 2
+    fi
+  fi
+  echo "Resuming $RESUME_COMPLETED of $RESUME_TOTAL completed hospitals"
+else
+  run_planner
+  RESUME_TOTAL="$(wc -l < "$CHANGED_FILE" | tr -d ' ')"
+  if [ "$RESUME_TOTAL" -gt 0 ]; then
+    CANDIDATE_RESUME_ID="$RUN_ID"
+    STAGING_PREFIX="_pipeline/staging/$CANDIDATE_RESUME_ID"
+    "$PYTHON" scripts/refresh_resume.py init "$RESUME_DIR" "$CANDIDATE_RESUME_ID"
+    "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-prefix \
+      "$BUCKET" "$STAGING_PREFIX/inputs/" "$RESUME_DIR/inputs"
+    "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-file \
+      "$BUCKET" "$STAGING_PREFIX/resume.json" "$RESUME_DIR/resume.json"
+    "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-file \
+      "$BUCKET" "$STAGING_PREFIX/completed.json" "$RESUME_DIR/completed.json"
+    # The ready marker is the final seed object. Do not expose RESUME_ID in the
+    # durable run status until all immutable inputs can be validated remotely.
+    "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-file \
+      "$BUCKET" "$STAGING_PREFIX/ready.json" "$RESUME_DIR/ready.json"
+    RESUME_ID="$CANDIDATE_RESUME_ID"
+  fi
+fi
+
 CHANGED_COUNT="$(wc -l < "$CHANGED_FILE" | tr -d ' ')"
+REMAINING_COUNT="$(wc -l < "$INGEST_FILE" | tr -d ' ')"
 echo "planned changed hospitals: $CHANGED_COUNT"
+echo "remaining changed hospitals: $REMAINING_COUNT"
+
+RESUME_PHASE="planned"
+write_run_status "running" "durable plan is ready"
+upload_run_status
 
 if [ "$CHANGED_COUNT" -eq 0 ]; then
-  "$PYTHON" scripts/prepare_incremental_refresh.py --commit --processed-file "$CHANGED_FILE"
+  if [ "$NO_DEPLOY" = 1 ]; then
+    RESUME_PHASE="validated"
+    write_run_status "validated_no_deploy" "no content changes; production checkpoints were not changed"
+    upload_run_status
+    exit 0
+  fi
+  printf '%s\n' \
+    "_pipeline/db/hospital_ledger.db" \
+    "_pipeline/state/cloud_refresh_state.json" > "$PIPELINE_ROLLBACK_KEYS"
+  wrangler deployments list --json > "$DEPLOYMENTS_JSON"
+  PREVIOUS_WORKER_VERSION="$(current_worker_version)"
+  "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" snapshot-keys \
+    "$BUCKET" "_pipeline/rollback/$RUN_ID" "$PIPELINE_ROLLBACK_KEYS" "$ROLLBACK_MANIFEST"
+  "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-file \
+    "$BUCKET" "$ROLLBACK_MANIFEST_KEY" "$ROLLBACK_MANIFEST"
+  R2_ROLLBACK_ARMED=1
+  RESUME_PHASE="publishing"
+  write_run_status "publishing" "committing unchanged probe and database checkpoints"
+  upload_run_status
   "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-file \
     "$BUCKET" "_pipeline/db/hospital_ledger.db" db/hospital_ledger.db
+  "$PYTHON" scripts/prepare_incremental_refresh.py --commit --processed-file "$CHANGED_FILE"
   "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-file \
     "$BUCKET" "_pipeline/state/cloud_refresh_state.json" data/cloud_refresh_state.json
+  RESUME_PHASE="committed"
+  write_run_status "committed" "unchanged probe and database checkpoints are durable"
+  upload_run_status
+  STATE_COMMITTED=1
+  R2_ROLLBACK_ARMED=0
+  if ! "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" prune-snapshots \
+    "$BUCKET" "_pipeline/rollback" --retain 2; then
+    echo "Rollback snapshot pruning failed; a later run can retry it." >&2
+  fi
+  RESUME_PHASE="complete"
   write_run_status "no_changes" "all reachable MRF validators were unchanged"
   upload_run_status
   echo "No MRF content changed. Probe, database, and heartbeat checkpoints were updated."
@@ -354,15 +559,20 @@ export MEM_GUARD_MIN_FREE_GB="${MEM_GUARD_MIN_FREE_GB:-5}"
 : > "$PARSE_SUCCESS_FILE"
 : > "$SUCCESS_FILE"
 : > "$FAILURES_FILE"
+if [ "$RESUME_COMPLETED" -gt 0 ]; then
+  cp "$RESUME_COMPLETED_FILE" "$PARSE_SUCCESS_FILE"
+  cp "$RESUME_COMPLETED_FILE" "$SUCCESS_FILE"
+fi
 
 # The first bootstrap recreates roughly 107 GB of uncompressed parsed JSON but
 # only about 5.8 GB once gzipped. Process bounded shards and slim each shard
 # immediately so an ephemeral worker never needs room for the whole raw corpus.
 SHARD_DIR="$RUN_DIR/ingest-shards"
 mkdir -p "$SHARD_DIR"
-split -l "${INGEST_SHARD_SIZE:-50}" -d -a 4 "$CHANGED_FILE" "$SHARD_DIR/shard-"
+split -l "${INGEST_SHARD_SIZE:-50}" -d -a 4 "$INGEST_FILE" "$SHARD_DIR/shard-"
 SHARD_TOTAL="$(find "$SHARD_DIR" -maxdepth 1 -type f -name 'shard-*' | wc -l | tr -d ' ')"
 SHARD_DONE=0
+RESUME_PHASE="ingesting"
 for shard in "$SHARD_DIR"/shard-*; do
   [ -s "$shard" ] || continue
   shard_name="$(basename "$shard")"
@@ -390,14 +600,31 @@ for shard in "$SHARD_DIR"/shard-*; do
     : > "$shard_display"
   fi
   "$PYTHON" scripts/refresh_artifacts.py restore-except "$shard" "$shard_display" "$shard_backup"
+
+  # A completed CCN becomes resumable only after its compressed parsed record
+  # is durable in the isolated staging prefix. The manifest is uploaded last,
+  # so an interrupted transfer can never claim a missing checkpoint.
+  "$PYTHON" scripts/refresh_resume.py complete "$RESUME_DIR" "$shard_display"
+  "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-ccns \
+    "$BUCKET" "$STAGING_PREFIX/parsed/" "$RESUME_DIR/parsed" \
+    "$shard_display" --extension .json.gz
+  "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-file \
+    "$BUCKET" "$STAGING_PREFIX/completed.json" "$RESUME_DIR/completed.json"
+
   cat "$shard_parsed" >> "$PARSE_SUCCESS_FILE"
   cat "$shard_display" >> "$SUCCESS_FILE"
   find "$shard_backup" -depth -delete 2>/dev/null || true
   SHARD_DONE=$((SHARD_DONE + 1))
+  RESUME_COMPLETED="$("$PYTHON" - "$RESUME_DIR/completed.json" <<'PY'
+import json
+import sys
+print(len(json.load(open(sys.argv[1]))["completed"]))
+PY
+)"
+  write_run_status "running" "completed $RESUME_COMPLETED of $RESUME_TOTAL hospitals"
+  upload_run_status
   if [ $((SHARD_DONE % 5)) -eq 0 ] || [ "$SHARD_DONE" -eq "$SHARD_TOTAL" ]; then
     renew_refresh_lock
-    write_run_status "running" "processed ingest shard $SHARD_DONE of $SHARD_TOTAL"
-    upload_run_status
   fi
 done
 sort -u -o "$PARSE_SUCCESS_FILE" "$PARSE_SUCCESS_FILE"
@@ -425,8 +652,13 @@ fi
 
 # Rebuild global indexes from all durable parsed checkpoints. Existing compact
 # files and index rows survive when a source is temporarily unavailable.
-SLIM_KEEP_STALE=1 SLIM_MERGE_INDEX=1 \
-  bash scripts/mem_guard.sh "$PYTHON" scripts/slim_parsed.py
+RESUME_PHASE="aggregating"
+write_run_status "running" "building and validating aggregate output"
+upload_run_status
+if [ "$FULL_SLIM_READY" != 1 ]; then
+  SLIM_KEEP_STALE=1 SLIM_MERGE_INDEX=1 \
+    bash scripts/mem_guard.sh "$PYTHON" scripts/slim_parsed.py
+fi
 "$PYTHON" scripts/refresh_artifacts.py reset-aggregate-dirs
 bash scripts/mem_guard.sh "$PYTHON" scripts/promote_terminal_exceptions.py
 bash scripts/mem_guard.sh "$PYTHON" scripts/build_aggregates.py
@@ -447,6 +679,7 @@ npm run typecheck
 npm run build
 
 if [ "$NO_DEPLOY" = 1 ]; then
+  RESUME_PHASE="validated"
   write_run_status "validated_no_deploy" "local build and audits passed"
   upload_run_status
   echo "Local build and audits succeeded. Production publication was skipped."
@@ -460,7 +693,17 @@ renew_refresh_lock
 "$PYTHON" scripts/refresh_artifacts.py publication-keys "$SUCCESS_FILE" "$PUBLICATION_KEYS"
 "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" list-keys \
   "$BUCKET" "$REMOTE_AGGREGATE_KEYS" "aggregates/payer/" "aggregates/cpt-detail/"
-sort -u "$PUBLICATION_KEYS" "$REMOTE_AGGREGATE_KEYS" > "$ROLLBACK_KEYS"
+{
+  sed 's#^#_pipeline/parsed/#; s#$#.json.gz#' "$SUCCESS_FILE"
+  printf '%s\n' \
+    "_pipeline/db/hospital_ledger.db" \
+    "_pipeline/public/prices-index.json" \
+    "_pipeline/public/hospitals.json" \
+    "_pipeline/public/summary.json" \
+    "_pipeline/public/cpt-index.json" \
+    "_pipeline/state/cloud_refresh_state.json"
+} | sort -u > "$PIPELINE_ROLLBACK_KEYS"
+sort -u "$PUBLICATION_KEYS" "$REMOTE_AGGREGATE_KEYS" "$PIPELINE_ROLLBACK_KEYS" > "$ROLLBACK_KEYS"
 comm -23 "$REMOTE_AGGREGATE_KEYS" "$PUBLICATION_KEYS" > "$STALE_KEYS"
 
 wrangler deployments list --json > "$DEPLOYMENTS_JSON"
@@ -472,8 +715,15 @@ PREVIOUS_WORKER_VERSION="$(current_worker_version)"
   "$BUCKET" "$ROLLBACK_MANIFEST_KEY" "$ROLLBACK_MANIFEST"
 R2_ROLLBACK_ARMED=1
 
+RESUME_PHASE="publishing"
 write_run_status "publishing" "rollback snapshot is durable; beginning live publication"
 upload_run_status
+
+# Canonicalize the validated parsed records before changing live objects. The
+# canonical keys are in the rollback manifest, so any subsequent failure
+# restores both the prior pipeline checkpoint and the prior live dataset.
+"$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-ccns \
+  "$BUCKET" "_pipeline/parsed/" data/parsed "$SUCCESS_FILE" --extension .json.gz
 
 "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-ccns \
   "$BUCKET" "prices/" public/data/prices "$SUCCESS_FILE" --extension .json
@@ -495,17 +745,9 @@ WORKER_ROLLBACK_ARMED=1
 npm run deploy
 audit_live_with_retry
 
-write_run_status "committed" "live Worker and R2 publication passed validation"
-upload_run_status
-
-# The new live data is verified. Subsequent checkpoint failures should alert
-# and retry next run, but should not undo a valid publication.
-WORKER_ROLLBACK_ARMED=0
-R2_ROLLBACK_ARMED=0
-
-"$PYTHON" scripts/prepare_incremental_refresh.py --commit --processed-file "$SUCCESS_FILE"
-"$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-ccns \
-  "$BUCKET" "_pipeline/parsed/" data/parsed "$SUCCESS_FILE" --extension .json.gz
+# Persist the matching database and public checkpoints while rollback is still
+# armed. The validator state advances exactly once, after live publication has
+# passed its audit and every parsed checkpoint is canonical.
 "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-file \
   "$BUCKET" "_pipeline/db/hospital_ledger.db" db/hospital_ledger.db
 "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-file \
@@ -516,12 +758,32 @@ R2_ROLLBACK_ARMED=0
   "$BUCKET" "_pipeline/public/summary.json" public/data/summary.json
 "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-file \
   "$BUCKET" "_pipeline/public/cpt-index.json" public/data/cpt-index.json
+"$PYTHON" scripts/prepare_incremental_refresh.py --commit --processed-file "$SUCCESS_FILE"
 "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-file \
   "$BUCKET" "_pipeline/state/cloud_refresh_state.json" data/cloud_refresh_state.json
-"$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" prune-snapshots \
-  "$BUCKET" "_pipeline/rollback" --retain 2
 
-write_run_status "published" "live Worker and R2 publication passed validation"
+RESUME_COMPLETED="$SUCCESS_COUNT"
+RESUME_PHASE="committed"
+write_run_status "committed" "live data and canonical checkpoints passed validation"
+upload_run_status
+STATE_COMMITTED=1
+
+# The live and canonical data now form one committed generation. Staging is no
+# longer needed. A cleanup interruption can leave harmless orphaned objects,
+# but cannot cause a completed run to be resumed or rolled back.
+WORKER_ROLLBACK_ARMED=0
+R2_ROLLBACK_ARMED=0
+PUBLISHED_DETAIL="live Worker and R2 publication passed validation"
+if ! cleanup_staging; then
+  PUBLISHED_DETAIL="$PUBLISHED_DETAIL; staging cleanup is pending"
+fi
+if ! "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" prune-snapshots \
+  "$BUCKET" "_pipeline/rollback" --retain 2; then
+  echo "Rollback snapshot pruning failed; a later run can retry it." >&2
+fi
+
+RESUME_PHASE="complete"
+write_run_status "published" "$PUBLISHED_DETAIL"
 upload_run_status
 
 echo "Hospital Ledger refresh published and verified: $RUN_ID"
