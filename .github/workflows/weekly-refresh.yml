@@ -1,0 +1,53 @@
+name: Weekly Hospital Ledger refresh
+
+on:
+  schedule:
+    # The off-hour minute reduces GitHub schedule delays.
+    - cron: "17 4 * * 0"
+      timezone: "America/Los_Angeles"
+  workflow_dispatch:
+
+concurrency:
+  group: hospital-ledger-production-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    # Configure a persistent Linux runner with labels: self-hosted, linux,
+    # hospital-ledger. The corpus requires at least 60 GB free disk and 8 GB RAM.
+    runs-on: [self-hosted, linux, hospital-ledger]
+    timeout-minutes: 720
+    env:
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rclone sqlite3 zstd
+          python -m pip install -r requirements.txt
+          npm ci
+      - name: Verify capacity
+        run: |
+          test "$(df --output=avail -BG . | tail -1 | tr -dc '0-9')" -ge 60
+          test "$(awk '/MemTotal/ {print int($2/1024/1024)}' /proc/meminfo)" -ge 8
+      - name: Refresh, validate, publish, and verify
+        run: bash scripts/cloud_refresh.sh
