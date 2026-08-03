@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import datetime as dt
 import hashlib
 import json
 import mimetypes
@@ -246,6 +247,159 @@ def is_missing(exc: ClientError) -> bool:
     return code in {"404", "NoSuchKey", "NotFound"}
 
 
+def is_precondition_failed(exc: ClientError) -> bool:
+    code = str(exc.response.get("Error", {}).get("Code", ""))
+    return code in {"409", "412", "ConditionalRequestConflict", "PreconditionFailed"}
+
+
+def utc_now() -> dt.datetime:
+    return dt.datetime.now(dt.timezone.utc)
+
+
+def lock_timestamp(value: str) -> dt.datetime | None:
+    try:
+        parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return parsed.astimezone(dt.timezone.utc)
+
+
+def acquire_lock(
+    client,
+    *,
+    bucket: str,
+    key: str,
+    owner: str,
+    ttl_seconds: int,
+    current_time: dt.datetime | None = None,
+) -> dict[str, str]:
+    now = current_time or utc_now()
+    expires = now + dt.timedelta(seconds=ttl_seconds)
+    acquired_at = now.isoformat(timespec="seconds").replace("+00:00", "Z")
+    expires_at = expires.isoformat(timespec="seconds").replace("+00:00", "Z")
+    body = json.dumps(
+        {"owner": owner, "acquired_at": acquired_at, "expires_at": expires_at},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    request = {
+        "Bucket": bucket,
+        "Key": key,
+        "Body": body,
+        "ContentType": "application/json",
+        "Metadata": {"owner": owner, "acquired-at": acquired_at, "expires-at": expires_at},
+    }
+
+    for _ in range(5):
+        try:
+            client.put_object(**request, IfNoneMatch="*")
+            return {"status": "acquired", "owner": owner, "expires_at": expires_at}
+        except ClientError as exc:
+            if not is_precondition_failed(exc):
+                raise
+
+        try:
+            head = client.head_object(Bucket=bucket, Key=key)
+        except ClientError as exc:
+            if is_missing(exc):
+                continue
+            raise
+        metadata = head.get("Metadata") or {}
+        current_owner = str(metadata.get("owner") or "unknown")
+        current_expiry = str(metadata.get("expires-at") or "")
+        parsed_expiry = lock_timestamp(current_expiry)
+        if parsed_expiry is None or parsed_expiry > now:
+            raise SystemExit(
+                f"refresh lock is held by {current_owner} until {current_expiry or 'an unknown time'}"
+            )
+        etag = str(head.get("ETag") or "")
+        if not etag:
+            raise SystemExit("stale refresh lock has no ETag; refusing an unsafe takeover")
+        try:
+            client.put_object(**request, IfMatch=etag)
+            return {"status": "replaced_stale", "owner": owner, "expires_at": expires_at}
+        except ClientError as exc:
+            if is_precondition_failed(exc):
+                continue
+            raise
+    raise SystemExit("refresh lock changed repeatedly; another run is starting")
+
+
+def release_lock(client, *, bucket: str, key: str, owner: str) -> str:
+    try:
+        head = client.head_object(Bucket=bucket, Key=key)
+    except ClientError as exc:
+        if is_missing(exc):
+            return "absent"
+        raise
+    metadata = head.get("Metadata") or {}
+    current_owner = str(metadata.get("owner") or "")
+    if current_owner != owner:
+        raise SystemExit(f"refresh lock belongs to {current_owner or 'an unknown owner'}, not {owner}")
+    etag = str(head.get("ETag") or "")
+    if not etag:
+        raise SystemExit("refresh lock has no ETag; refusing an unsafe release")
+    try:
+        client.delete_object(Bucket=bucket, Key=key, IfMatch=etag)
+    except ClientError as exc:
+        if is_precondition_failed(exc):
+            raise SystemExit("refresh lock changed before release") from exc
+        raise
+    return "released"
+
+
+def renew_lock(
+    client,
+    *,
+    bucket: str,
+    key: str,
+    owner: str,
+    ttl_seconds: int,
+    current_time: dt.datetime | None = None,
+) -> dict[str, str]:
+    now = current_time or utc_now()
+    try:
+        head = client.head_object(Bucket=bucket, Key=key)
+    except ClientError as exc:
+        if is_missing(exc):
+            raise SystemExit("refresh lock disappeared before renewal") from exc
+        raise
+    metadata = head.get("Metadata") or {}
+    current_owner = str(metadata.get("owner") or "")
+    if current_owner != owner:
+        raise SystemExit(f"refresh lock belongs to {current_owner or 'an unknown owner'}, not {owner}")
+    etag = str(head.get("ETag") or "")
+    if not etag:
+        raise SystemExit("refresh lock has no ETag; refusing an unsafe renewal")
+    acquired_at = str(metadata.get("acquired-at") or "") or now.isoformat(
+        timespec="seconds"
+    ).replace("+00:00", "Z")
+    expires_at = (now + dt.timedelta(seconds=ttl_seconds)).isoformat(
+        timespec="seconds"
+    ).replace("+00:00", "Z")
+    body = json.dumps(
+        {"owner": owner, "acquired_at": acquired_at, "expires_at": expires_at},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    try:
+        client.put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=body,
+            ContentType="application/json",
+            Metadata={"owner": owner, "acquired-at": acquired_at, "expires-at": expires_at},
+            IfMatch=etag,
+        )
+    except ClientError as exc:
+        if is_precondition_failed(exc):
+            raise SystemExit("refresh lock changed before renewal") from exc
+        raise
+    return {"status": "renewed", "owner": owner, "expires_at": expires_at}
+
+
 def read_keys(path: Path) -> list[str]:
     return sorted({line.strip().lstrip("/") for line in path.read_text().splitlines() if line.strip()})
 
@@ -422,6 +576,23 @@ def main() -> int:
     prune.add_argument("prefix")
     prune.add_argument("--retain", type=int, default=2)
 
+    lock = subparsers.add_parser("acquire-lock")
+    lock.add_argument("bucket")
+    lock.add_argument("key")
+    lock.add_argument("owner")
+    lock.add_argument("--ttl-seconds", type=int, default=172800)
+
+    unlock = subparsers.add_parser("release-lock")
+    unlock.add_argument("bucket")
+    unlock.add_argument("key")
+    unlock.add_argument("owner")
+
+    renew = subparsers.add_parser("renew-lock")
+    renew.add_argument("bucket")
+    renew.add_argument("key")
+    renew.add_argument("owner")
+    renew.add_argument("--ttl-seconds", type=int, default=172800)
+
     args = parser.parse_args()
     client = make_client(args.workers)
 
@@ -523,6 +694,34 @@ def main() -> int:
         print(
             f"snapshot_runs={result['runs']} retained={result['retained']} "
             f"deleted_objects={result['deleted']}"
+        )
+        return 0
+    if args.command == "acquire-lock":
+        result = acquire_lock(
+            client,
+            bucket=args.bucket,
+            key=args.key,
+            owner=args.owner,
+            ttl_seconds=args.ttl_seconds,
+        )
+        print(
+            f"lock={result['status']} owner={result['owner']} expires_at={result['expires_at']}"
+        )
+        return 0
+    if args.command == "release-lock":
+        result = release_lock(client, bucket=args.bucket, key=args.key, owner=args.owner)
+        print(f"lock={result} owner={args.owner}")
+        return 0
+    if args.command == "renew-lock":
+        result = renew_lock(
+            client,
+            bucket=args.bucket,
+            key=args.key,
+            owner=args.owner,
+            ttl_seconds=args.ttl_seconds,
+        )
+        print(
+            f"lock={result['status']} owner={result['owner']} expires_at={result['expires_at']}"
         )
         return 0
     raise SystemExit("unsupported command")

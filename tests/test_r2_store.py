@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -38,12 +39,43 @@ class FakeS3:
         return {
             "ContentLength": len(value["body"]),
             "Metadata": value["metadata"],
+            "ETag": value["etag"],
+        }
+
+    def put_object(
+        self,
+        *,
+        Bucket,
+        Key,
+        Body,
+        ContentType,
+        Metadata,
+        IfNoneMatch=None,
+        IfMatch=None,
+    ):
+        existing = self.objects.get((Bucket, Key))
+        if IfNoneMatch == "*" and existing is not None:
+            raise ClientError(
+                {"Error": {"Code": "PreconditionFailed", "Message": "exists"}},
+                "PutObject",
+            )
+        if IfMatch is not None and (existing is None or existing["etag"] != IfMatch):
+            raise ClientError(
+                {"Error": {"Code": "PreconditionFailed", "Message": "changed"}},
+                "PutObject",
+            )
+        body = bytes(Body)
+        self.objects[(Bucket, Key)] = {
+            "body": body,
+            "metadata": dict(Metadata),
+            "etag": hashlib.md5(body).hexdigest(),
         }
 
     def upload_file(self, source, bucket, key, ExtraArgs):
         self.objects[(bucket, key)] = {
             "body": Path(source).read_bytes(),
             "metadata": dict(ExtraArgs["Metadata"]),
+            "etag": MODULE.sha256_file(Path(source)),
         }
 
     def download_file(self, bucket, key, destination):
@@ -54,9 +86,16 @@ class FakeS3:
         self.objects[(Bucket, Key)] = {
             "body": value["body"],
             "metadata": dict(value["metadata"]),
+            "etag": value["etag"],
         }
 
-    def delete_object(self, *, Bucket, Key):
+    def delete_object(self, *, Bucket, Key, IfMatch=None):
+        existing = self.objects.get((Bucket, Key))
+        if IfMatch is not None and (existing is None or existing["etag"] != IfMatch):
+            raise ClientError(
+                {"Error": {"Code": "PreconditionFailed", "Message": "changed"}},
+                "DeleteObject",
+            )
         self.objects.pop((Bucket, Key), None)
 
     def get_paginator(self, name):
@@ -70,11 +109,19 @@ class FakeS3:
 
 
 class R2StoreTests(unittest.TestCase):
+    @staticmethod
+    def object(body=b"x", metadata=None):
+        return {
+            "body": body,
+            "metadata": metadata or {},
+            "etag": hashlib.md5(body).hexdigest(),
+        }
+
     def test_list_and_delete_keys_are_explicit(self):
         client = FakeS3()
-        client.objects[("bucket", "aggregates/payer/a.json")] = {"body": b"a", "metadata": {}}
-        client.objects[("bucket", "aggregates/cpt-detail/1.json")] = {"body": b"1", "metadata": {}}
-        client.objects[("bucket", "prices/keep.json")] = {"body": b"p", "metadata": {}}
+        client.objects[("bucket", "aggregates/payer/a.json")] = self.object(b"a")
+        client.objects[("bucket", "aggregates/cpt-detail/1.json")] = self.object(b"1")
+        client.objects[("bucket", "prices/keep.json")] = self.object(b"p")
         keys = MODULE.list_keys(
             client,
             bucket="bucket",
@@ -99,8 +146,8 @@ class R2StoreTests(unittest.TestCase):
             "2026-08-03T04-17-00Z",
         ):
             key = f"_pipeline/rollback/{run_id}/prices/index.json"
-            client.objects[("bucket", key)] = {"body": run_id.encode(), "metadata": {}}
-        client.objects[("bucket", "_pipeline/rollback/notes.txt")] = {"body": b"keep", "metadata": {}}
+            client.objects[("bucket", key)] = self.object(run_id.encode())
+        client.objects[("bucket", "_pipeline/rollback/notes.txt")] = self.object(b"keep")
         result = MODULE.prune_snapshots(
             client,
             bucket="bucket",
@@ -137,7 +184,8 @@ class R2StoreTests(unittest.TestCase):
                 workers=1,
             )
             client.objects[("bucket", "prices/old.json")]["body"] = b"changed"
-            client.objects[("bucket", "prices/new.json")] = {"body": b"new", "metadata": {}}
+            client.objects[("bucket", "prices/old.json")]["etag"] = hashlib.md5(b"changed").hexdigest()
+            client.objects[("bucket", "prices/new.json")] = self.object(b"new")
             result = MODULE.restore_snapshot(client, manifest_path=manifest, workers=1)
             self.assertEqual(result, {"restored": 1, "deleted": 1})
             self.assertEqual(client.objects[("bucket", "prices/old.json")]["body"], b"old")
@@ -203,6 +251,84 @@ class R2StoreTests(unittest.TestCase):
                 [path.name for path in paths],
                 ["123456.json.gz", "654321.json.gz"],
             )
+
+    def test_refresh_lock_blocks_overlap_and_releases_owner(self):
+        client = FakeS3()
+        now = MODULE.dt.datetime(2026, 8, 3, tzinfo=MODULE.dt.timezone.utc)
+        result = MODULE.acquire_lock(
+            client,
+            bucket="bucket",
+            key="_pipeline/locks/cloud-refresh.json",
+            owner="run-a",
+            ttl_seconds=3600,
+            current_time=now,
+        )
+        self.assertEqual(result["status"], "acquired")
+        renewed = MODULE.renew_lock(
+            client,
+            bucket="bucket",
+            key="_pipeline/locks/cloud-refresh.json",
+            owner="run-a",
+            ttl_seconds=7200,
+            current_time=now,
+        )
+        self.assertEqual(renewed["status"], "renewed")
+        with self.assertRaises(SystemExit):
+            MODULE.acquire_lock(
+                client,
+                bucket="bucket",
+                key="_pipeline/locks/cloud-refresh.json",
+                owner="run-b",
+                ttl_seconds=3600,
+                current_time=now,
+            )
+        with self.assertRaises(SystemExit):
+            MODULE.release_lock(
+                client,
+                bucket="bucket",
+                key="_pipeline/locks/cloud-refresh.json",
+                owner="run-b",
+            )
+        with self.assertRaises(SystemExit):
+            MODULE.renew_lock(
+                client,
+                bucket="bucket",
+                key="_pipeline/locks/cloud-refresh.json",
+                owner="run-b",
+                ttl_seconds=3600,
+                current_time=now,
+            )
+        self.assertEqual(
+            MODULE.release_lock(
+                client,
+                bucket="bucket",
+                key="_pipeline/locks/cloud-refresh.json",
+                owner="run-a",
+            ),
+            "released",
+        )
+
+    def test_refresh_lock_replaces_expired_owner_conditionally(self):
+        client = FakeS3()
+        first = MODULE.dt.datetime(2026, 8, 1, tzinfo=MODULE.dt.timezone.utc)
+        later = MODULE.dt.datetime(2026, 8, 3, tzinfo=MODULE.dt.timezone.utc)
+        MODULE.acquire_lock(
+            client,
+            bucket="bucket",
+            key="_pipeline/locks/cloud-refresh.json",
+            owner="old-run",
+            ttl_seconds=3600,
+            current_time=first,
+        )
+        result = MODULE.acquire_lock(
+            client,
+            bucket="bucket",
+            key="_pipeline/locks/cloud-refresh.json",
+            owner="new-run",
+            ttl_seconds=3600,
+            current_time=later,
+        )
+        self.assertEqual(result["status"], "replaced_stale")
 
 
 if __name__ == "__main__":

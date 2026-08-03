@@ -19,6 +19,8 @@ if [ ! -x "$PYTHON" ]; then
 fi
 
 BUCKET="${PARSED_R2_BUCKET:-hl-mrf-parsed}"
+LOCK_KEY="${REFRESH_LOCK_KEY:-_pipeline/locks/cloud-refresh.json}"
+LOCK_TTL_SECONDS="${REFRESH_LOCK_TTL_SECONDS:-172800}"
 R2_WORKERS="${R2_WORKERS:-16}"
 PROBE_WORKERS="${PROBE_CONCURRENCY:-32}"
 INGEST_WORKERS="${INGEST_WORKERS:-4}"
@@ -30,6 +32,8 @@ BASELINE_DIR="$RUN_DIR/baseline-data"
 RUN_LOG="$ROOT/data/refresh_logs/cloud-$RUN_ID.log"
 RUN_STATUS_FILE="$RUN_DIR/run-status.json"
 ROLLBACK_MANIFEST="$RUN_DIR/r2-rollback.json"
+ROLLBACK_MANIFEST_KEY="_pipeline/rollback/$RUN_ID/manifest.json"
+PREVIOUS_STATUS_FILE="$RUN_DIR/previous-latest.json"
 PUBLICATION_KEYS="$RUN_DIR/publication-keys.txt"
 REMOTE_AGGREGATE_KEYS="$RUN_DIR/remote-aggregate-keys.txt"
 ROLLBACK_KEYS="$RUN_DIR/rollback-keys.txt"
@@ -55,6 +59,7 @@ done
 
 R2_ROLLBACK_ARMED=0
 WORKER_ROLLBACK_ARMED=0
+LOCK_HELD=0
 PREVIOUS_WORKER_VERSION=""
 ROLLBACK_FAILURES=0
 PRODUCTION_STARTED=0
@@ -62,13 +67,19 @@ BOOTSTRAP=0
 
 write_run_status() {
   local status="$1" detail="${2:-}"
-  "$PYTHON" - "$RUN_ID" "$status" "$detail" "$RUN_STATUS_FILE" <<'PY'
+  local recovery_manifest="" recovery_version=""
+  if [ -s "$ROLLBACK_MANIFEST" ] && [ -n "$PREVIOUS_WORKER_VERSION" ]; then
+    recovery_manifest="$ROLLBACK_MANIFEST_KEY"
+    recovery_version="$PREVIOUS_WORKER_VERSION"
+  fi
+  "$PYTHON" - "$RUN_ID" "$status" "$detail" "$RUN_STATUS_FILE" \
+    "$recovery_manifest" "$recovery_version" <<'PY'
 import datetime as dt
 import json
 import sys
 from pathlib import Path
 
-run_id, status, detail, output = sys.argv[1:]
+run_id, status, detail, output, recovery_manifest, recovery_version = sys.argv[1:]
 try:
     plan = json.loads(Path("data/cloud_refresh_plan.json").read_text())
 except (OSError, json.JSONDecodeError):
@@ -86,6 +97,11 @@ payload = {
         "changed": len(plan.get("changed", [])) if isinstance(plan.get("changed"), list) else 0,
     },
 }
+if recovery_manifest and recovery_version:
+    payload["recovery"] = {
+        "rollback_manifest_key": recovery_manifest,
+        "previous_worker_version": recovery_version,
+    }
 path = Path(output)
 temporary = path.with_suffix(path.suffix + ".tmp")
 temporary.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
@@ -98,6 +114,36 @@ upload_run_status() {
     "$BUCKET" "_pipeline/runs/$RUN_ID.json" "$RUN_STATUS_FILE"
   "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-file \
     "$BUCKET" "_pipeline/runs/latest.json" "$RUN_STATUS_FILE"
+}
+
+renew_refresh_lock() {
+  "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" renew-lock \
+    "$BUCKET" "$LOCK_KEY" "$RUN_ID" --ttl-seconds "$LOCK_TTL_SECONDS"
+}
+
+recover_incomplete_publication() {
+  local recovery previous_run manifest_key worker_version recovery_manifest
+  "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" download-file \
+    "$BUCKET" "_pipeline/runs/latest.json" "$PREVIOUS_STATUS_FILE" --optional
+  [ -s "$PREVIOUS_STATUS_FILE" ] || return 0
+  recovery="$("$PYTHON" scripts/refresh_artifacts.py recovery-target "$PREVIOUS_STATUS_FILE")"
+  [ -n "$recovery" ] || return 0
+  IFS=$'\t' read -r previous_run manifest_key worker_version <<< "$recovery"
+  if [ "$NO_DEPLOY" = 1 ]; then
+    echo "Run $previous_run has an incomplete production publication; rerun without --no-deploy to recover it." >&2
+    return 2
+  fi
+  echo "Recovering incomplete publication from run $previous_run" >&2
+  recovery_manifest="$RUN_DIR/recovery-$previous_run.json"
+  "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" download-file \
+    "$BUCKET" "$manifest_key" "$recovery_manifest"
+  wrangler rollback "$worker_version" --yes \
+    --message "Recover incomplete Hospital Ledger refresh $previous_run"
+  "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" \
+    restore-snapshot "$recovery_manifest"
+  PRODUCTION_STARTED=1
+  write_run_status "recovered" "restored incomplete publication $previous_run"
+  upload_run_status
 }
 
 notify_failure() {
@@ -136,13 +182,24 @@ on_exit() {
         restore-snapshot "$ROLLBACK_MANIFEST" || ROLLBACK_FAILURES=$((ROLLBACK_FAILURES + 1))
     fi
     if [ "$PRODUCTION_STARTED" = 1 ]; then
-      write_run_status "failed" "exit $code; rollback_failures=$ROLLBACK_FAILURES"
+      local failure_status="failed"
+      if [ "$ROLLBACK_FAILURES" -gt 0 ]; then
+        failure_status="recovery_required"
+      fi
+      write_run_status "$failure_status" "exit $code; rollback_failures=$ROLLBACK_FAILURES"
       upload_run_status || true
     fi
     notify_failure "$code"
   fi
   find "$ROOT/data" -maxdepth 1 \
     \( -name 'cpt_stream_*.tsv*' -o -name 'cpt_detail_*.tsv*' \) -delete 2>/dev/null || true
+  if [ "$LOCK_HELD" = 1 ]; then
+    if ! "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" release-lock \
+      "$BUCKET" "$LOCK_KEY" "$RUN_ID"; then
+      echo "Failed to release the distributed refresh lock; it will expire automatically." >&2
+      code=1
+    fi
+  fi
   exit "$code"
 }
 trap on_exit EXIT
@@ -232,11 +289,16 @@ echo "Hospital Ledger cloud refresh $RUN_ID"
 echo "workers: probe=$PROBE_WORKERS ingest=$INGEST_WORKERS r2=$R2_WORKERS"
 
 "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" check --bucket "$BUCKET"
+"$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" acquire-lock \
+  "$BUCKET" "$LOCK_KEY" "$RUN_ID" --ttl-seconds "$LOCK_TTL_SECONDS"
+LOCK_HELD=1
+recover_incomplete_publication
 PRODUCTION_STARTED=1
 write_run_status "running" "hydrating durable state"
 upload_run_status
 
 # Hydrate both durable pipeline state and every live last-known-good artifact.
+"$PYTHON" scripts/refresh_artifacts.py reset-hydration-targets
 "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" download-file \
   "$BUCKET" "_pipeline/state/cloud_refresh_state.json" data/cloud_refresh_state.json --optional
 "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" download-file \
@@ -333,6 +395,7 @@ for shard in "$SHARD_DIR"/shard-*; do
   find "$shard_backup" -depth -delete 2>/dev/null || true
   SHARD_DONE=$((SHARD_DONE + 1))
   if [ $((SHARD_DONE % 5)) -eq 0 ] || [ "$SHARD_DONE" -eq "$SHARD_TOTAL" ]; then
+    renew_refresh_lock
     write_run_status "running" "processed ingest shard $SHARD_DONE of $SHARD_TOTAL"
     upload_run_status
   fi
@@ -390,6 +453,8 @@ if [ "$NO_DEPLOY" = 1 ]; then
   exit 0
 fi
 
+renew_refresh_lock
+
 # Determine the complete live key set, including obsolete aggregate objects
 # that must be deleted and therefore must also be restorable.
 "$PYTHON" scripts/refresh_artifacts.py publication-keys "$SUCCESS_FILE" "$PUBLICATION_KEYS"
@@ -404,8 +469,11 @@ PREVIOUS_WORKER_VERSION="$(current_worker_version)"
 "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" snapshot-keys \
   "$BUCKET" "_pipeline/rollback/$RUN_ID" "$ROLLBACK_KEYS" "$ROLLBACK_MANIFEST"
 "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-file \
-  "$BUCKET" "_pipeline/rollback/$RUN_ID/manifest.json" "$ROLLBACK_MANIFEST"
+  "$BUCKET" "$ROLLBACK_MANIFEST_KEY" "$ROLLBACK_MANIFEST"
 R2_ROLLBACK_ARMED=1
+
+write_run_status "publishing" "rollback snapshot is durable; beginning live publication"
+upload_run_status
 
 "$PYTHON" scripts/r2_store.py --workers "$R2_WORKERS" upload-ccns \
   "$BUCKET" "prices/" public/data/prices "$SUCCESS_FILE" --extension .json
@@ -426,6 +494,9 @@ R2_ROLLBACK_ARMED=1
 WORKER_ROLLBACK_ARMED=1
 npm run deploy
 audit_live_with_retry
+
+write_run_status "committed" "live Worker and R2 publication passed validation"
+upload_run_status
 
 # The new live data is verified. Subsequent checkpoint failures should alert
 # and retry next run, but should not undo a valid publication.

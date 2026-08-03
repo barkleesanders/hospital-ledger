@@ -24,7 +24,7 @@ CLOUDFLARE_API_TOKEN
 ## Run lifecycle
 
 1. Verify the target R2 bucket and write a `running` heartbeat.
-2. Hydrate the validator state, SQLite database, public indexes, and gzipped parsed corpus from R2.
+2. Acquire an R2-backed distributed lock, clear all derived hydration targets, then hydrate the validator state, SQLite database, public indexes, and gzipped parsed corpus from R2.
 3. Probe every preferred hospital MRF URL concurrently.
 4. Compare URL, ETag, Last-Modified, content length, and a bounded content sample. Schedule a deterministic forced refresh when a server exposes weak validators.
 5. Parse only the explicit changed-hospital worklist in bounded shards. The planner records the exact selected URL for every CCN, and each ingest shard consumes that map without independently re-ranking candidates. Each shard is slimmed and gzipped immediately, so the first rebuild never accumulates the roughly 107 GB uncompressed corpus. A failed parse restores the prior raw record so global indexes retain last-known-good data.
@@ -42,6 +42,8 @@ r2://hl-mrf-parsed/_pipeline/runs/<run-id>.json
 ```
 
 Rollback manifests and server-side object snapshots are stored below `_pipeline/rollback/<run-id>/`.
+The refresh lock is stored at `_pipeline/locks/cloud-refresh.json`. It blocks overlapping manual and scheduled runs and expires after 48 hours if a worker is terminated before cleanup.
+Before the first live object changes, the runner writes a durable `publishing` heartbeat containing the rollback manifest key and prior Worker version. A later worker automatically restores both layers if the earlier worker was terminated before writing the `committed` heartbeat.
 
 ## First cloud run
 

@@ -74,6 +74,64 @@ class RefreshArtifactsTests(unittest.TestCase):
         self.assertIn("aggregates/payer/aetna.json", keys)
         self.assertIn("aggregates/cpt-detail/99213.json", keys)
 
+    def test_hydration_reset_removes_only_derived_state(self):
+        seed = MODULE.ROOT / "seed" / "hospitals.csv"
+        seed.parent.mkdir(parents=True)
+        seed.write_text("ccn,name\n123456,Keep Me\n")
+        summary = MODULE.PUBLIC_DATA / "summary.json"
+        hospitals = MODULE.PUBLIC_DATA / "hospitals.json"
+        prices_index = MODULE.PRICES / "index.json"
+        summary.write_text('{"keep":true}')
+        hospitals.write_text('[{"ccn":"123456"}]')
+        prices_index.write_text('{"hospitals":[]}')
+        stale_paths = (
+            MODULE.PARSED / "123456.json.gz",
+            MODULE.PRICES / "123456.json",
+            MODULE.PUBLIC_DATA / "payer" / "old.json",
+            MODULE.PUBLIC_DATA / "cpt-detail" / "old.json",
+            MODULE.ROOT / "data" / "cloud_refresh_state.json",
+            MODULE.ROOT / "data" / "_payer_raw.jsonl",
+            MODULE.ROOT / "data" / "_compliance_per_hospital.jsonl",
+            MODULE.ROOT / "data" / "_cpt_detail_raw.jsonl",
+            MODULE.ROOT / "data" / "parse_errors" / "old.json",
+            MODULE.ROOT / "db" / "hospital_ledger.db",
+            MODULE.ROOT / "db" / "hospital_ledger.db-wal",
+            MODULE.ROOT / ".prices_build_stash" / "123456.json",
+        )
+        for path in stale_paths:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("stale")
+
+        MODULE.reset_hydration_targets()
+
+        self.assertTrue(seed.exists())
+        self.assertTrue(summary.exists())
+        self.assertTrue(hospitals.exists())
+        self.assertTrue(prices_index.exists())
+        for path in stale_paths:
+            self.assertFalse(path.exists(), path)
+        self.assertTrue(MODULE.PARSED.is_dir())
+        self.assertTrue(MODULE.PRICES.is_dir())
+        self.assertTrue((MODULE.PUBLIC_DATA / "payer").is_dir())
+        self.assertTrue((MODULE.PUBLIC_DATA / "cpt-detail").is_dir())
+
+    def test_recovery_target_only_accepts_incomplete_publication(self):
+        status = MODULE.ROOT / "latest.json"
+        status.write_text('{"run_id":"run-a","status":"published"}')
+        self.assertIsNone(MODULE.recovery_target(status))
+        status.write_text(json.dumps({
+            "run_id": "run-a",
+            "status": "publishing",
+            "recovery": {
+                "rollback_manifest_key": "_pipeline/rollback/run-a/manifest.json",
+                "previous_worker_version": "version-a",
+            },
+        }))
+        self.assertEqual(
+            MODULE.recovery_target(status),
+            ("run-a", "_pipeline/rollback/run-a/manifest.json", "version-a"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

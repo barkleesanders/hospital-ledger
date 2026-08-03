@@ -142,6 +142,78 @@ def reset_aggregate_dirs() -> None:
             path.unlink()
 
 
+def reset_hydration_targets() -> None:
+    """Remove derived state before restoring the authoritative R2 snapshot.
+
+    Codex workers can be reused and repository checkouts may contain smoke-test
+    artifacts. R2 prefix downloads are additive, so leaving those files in
+    place can make an empty first-run checkpoint look populated or preserve
+    objects that no longer exist remotely.
+    """
+    for directory in (
+        PARSED,
+        ROOT / "data" / "parse_errors",
+        PUBLIC_DATA / "payer",
+        PUBLIC_DATA / "cpt-detail",
+        ROOT / ".prices_build_stash",
+    ):
+        shutil.rmtree(directory, ignore_errors=True)
+    PARSED.mkdir(parents=True, exist_ok=True)
+    (PUBLIC_DATA / "payer").mkdir(parents=True, exist_ok=True)
+    (PUBLIC_DATA / "cpt-detail").mkdir(parents=True, exist_ok=True)
+
+    # Keep the tracked index as a first-bootstrap fallback, but remove every
+    # per-hospital preview and partial download before the authoritative
+    # required `prices/` R2 prefix is restored.
+    PRICES.mkdir(parents=True, exist_ok=True)
+    for path in PRICES.iterdir():
+        if path.is_file() and path.name == "index.json":
+            continue
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink(missing_ok=True)
+
+    for path in (
+        ROOT / "data" / "cloud_refresh_state.json",
+        ROOT / "data" / "cloud_refresh_probe.json",
+        ROOT / "data" / "cloud_refresh_plan.json",
+        ROOT / "data" / "cloud_refresh_worklist.json",
+        ROOT / "data" / "cloud_refresh_changed_ccns.txt",
+        ROOT / "data" / "_payer_raw.jsonl",
+        ROOT / "data" / "_compliance_per_hospital.jsonl",
+        ROOT / "data" / "_cpt_detail_raw.jsonl",
+        ROOT / "db" / "hospital_ledger.db",
+        ROOT / "db" / "hospital_ledger.db-journal",
+        ROOT / "db" / "hospital_ledger.db-wal",
+        ROOT / "db" / "hospital_ledger.db-shm",
+        PUBLIC_DATA / "cpt-index.json",
+        PUBLIC_DATA / "compliance-ranking.json",
+        PUBLIC_DATA / "payers-index.json",
+    ):
+        path.unlink(missing_ok=True)
+
+
+def recovery_target(status_file: Path) -> tuple[str, str, str] | None:
+    try:
+        payload = json.loads(status_file.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"invalid pipeline status {status_file}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise SystemExit("pipeline status must be an object")
+    if payload.get("status") not in {"publishing", "recovery_required"}:
+        return None
+    recovery = payload.get("recovery")
+    if not isinstance(recovery, dict):
+        raise SystemExit("incomplete publication has no recovery metadata")
+    run_id = str(payload.get("run_id") or "")
+    manifest_key = str(recovery.get("rollback_manifest_key") or "")
+    worker_version = str(recovery.get("previous_worker_version") or "")
+    if not run_id or not manifest_key.startswith("_pipeline/rollback/") or not worker_version:
+        raise SystemExit("incomplete publication has invalid recovery metadata")
+    return run_id, manifest_key, worker_version
+
+
 def publication_keys(success_file: Path, output_file: Path) -> list[str]:
     keys = {
         "prices/index.json",
@@ -184,6 +256,10 @@ def main() -> int:
     public_parser.add_argument("backup_dir", type=Path)
 
     subparsers.add_parser("reset-aggregate-dirs")
+    subparsers.add_parser("reset-hydration-targets")
+
+    recovery_parser = subparsers.add_parser("recovery-target")
+    recovery_parser.add_argument("status_file", type=Path)
 
     keys_parser = subparsers.add_parser("publication-keys")
     keys_parser.add_argument("success_file", type=Path)
@@ -205,6 +281,12 @@ def main() -> int:
         backup_public(args.backup_dir)
     elif args.command == "reset-aggregate-dirs":
         reset_aggregate_dirs()
+    elif args.command == "reset-hydration-targets":
+        reset_hydration_targets()
+    elif args.command == "recovery-target":
+        target = recovery_target(args.status_file)
+        if target:
+            print("\t".join(target))
     elif args.command == "publication-keys":
         values = publication_keys(args.success_file, args.output_file)
         print(f"publication_keys={len(values)}")
