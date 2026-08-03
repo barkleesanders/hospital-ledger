@@ -26,6 +26,7 @@ STATE = ROOT / "data" / "cloud_refresh_state.json"
 STAGED = ROOT / "data" / "cloud_refresh_probe.json"
 PLAN = ROOT / "data" / "cloud_refresh_plan.json"
 CHANGED = ROOT / "data" / "cloud_refresh_changed_ccns.txt"
+WORKLIST = ROOT / "data" / "cloud_refresh_worklist.json"
 PARSED = ROOT / "data" / "parsed"
 
 USER_AGENT = "HospitalLedgerBot/1.0 (+https://hospitalledger.com)"
@@ -346,8 +347,23 @@ def plan_refresh(*, workers: int, force_all: bool = False) -> dict[str, object]:
         "changed": changed,
         "reasons": reasons,
     }
+    worklist = {
+        "schema_version": 1,
+        "generated_at": staged["generated_at"],
+        "hospitals": {
+            ccn: {
+                # This is the exact candidate URL that produced the reachable
+                # probe result. Ingestion must not independently re-rank it.
+                "url": str(current[ccn].get("url") or ""),
+                "final_url": str(current[ccn].get("final_url") or ""),
+                "reason": reasons[ccn],
+            }
+            for ccn in changed
+        },
+    }
     write_json_atomic(STAGED, staged)
     write_json_atomic(PLAN, plan)
+    write_json_atomic(WORKLIST, worklist)
     write_lines_atomic(CHANGED, changed)
     return plan
 

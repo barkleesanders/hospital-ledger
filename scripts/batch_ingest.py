@@ -474,16 +474,34 @@ def ingest_candidate(ccn, candidate):
     return False, n, fmt, detail
 
 
-def ingest_ccn(ccn, timeout_seconds=0):
-    conn = sqlite3.connect(DB)
-    candidates = ranked_mrf_candidates(conn, ccn)
-    conn.close()
-    fallback = parsed_source_candidate(ccn)
-    if fallback:
-        fallback_url = normalize_source_url(fallback['url'])
-        seen_urls = {normalize_source_url(candidate.get('url') or '') for candidate in candidates}
-        if fallback_url and fallback_url not in seen_urls:
-            candidates.append(fallback)
+def ingest_ccn(ccn, timeout_seconds=0, selected_candidate=None):
+    """Ingest a CCN from either an authoritative plan or legacy ranking.
+
+    When ``selected_candidate`` is supplied, its URL is the complete candidate
+    list. The weekly planner already probed and selected that exact URL, so
+    re-ranking here would make change detection and ingestion refer to different
+    source files. Calls that omit it retain the historical fallback behavior.
+    """
+    if selected_candidate is not None:
+        url = selected_candidate.get('url') if isinstance(selected_candidate, dict) else None
+        if not isinstance(url, str) or not url.strip():
+            clear_parsed_record(ccn)
+            return ccn, False, 0, '', 'planned_url_missing'
+        candidate = dict(selected_candidate)
+        candidate['url'] = url
+        candidate.setdefault('name', ccn)
+        candidate.setdefault('source', 'refresh-plan')
+        candidates = [candidate]
+    else:
+        conn = sqlite3.connect(DB)
+        candidates = ranked_mrf_candidates(conn, ccn)
+        conn.close()
+        fallback = parsed_source_candidate(ccn)
+        if fallback:
+            fallback_url = normalize_source_url(fallback['url'])
+            seen_urls = {normalize_source_url(candidate.get('url') or '') for candidate in candidates}
+            if fallback_url and fallback_url not in seen_urls:
+                candidates.append(fallback)
     if not candidates:
         clear_parsed_record(ccn)
         return ccn, False, 0, '', 'no_live_mrf'
@@ -560,6 +578,57 @@ def load_ccns_file(path):
     return ccns
 
 
+def load_worklist(path):
+    """Load a planner-generated CCN-to-candidate map.
+
+    A direct ``{ccn: url}`` map is also accepted for small ad hoc runs. Invalid
+    or absent URLs remain represented so ingestion reports a deterministic
+    ``planned_url_missing`` failure instead of silently choosing another URL.
+    """
+    with open(path) as handle:
+        payload = json.load(handle)
+    entries = payload.get('hospitals') if isinstance(payload, dict) else None
+    if entries is None and isinstance(payload, dict):
+        entries = payload
+    if not isinstance(entries, dict):
+        raise ValueError('worklist must contain a hospitals object')
+
+    worklist = {}
+    for raw_ccn, raw_entry in entries.items():
+        ccn = str(raw_ccn).strip()
+        if not ccn:
+            raise ValueError('worklist contains an empty CCN')
+        if isinstance(raw_entry, str):
+            entry = {'url': raw_entry}
+        elif isinstance(raw_entry, dict):
+            entry = dict(raw_entry)
+        else:
+            raise ValueError(f'worklist entry for {ccn} must be an object or URL string')
+        worklist[ccn] = entry
+    return worklist
+
+
+def hospital_name(conn, ccn):
+    row = conn.execute('SELECT name FROM hospitals WHERE ccn = ?', (ccn,)).fetchone()
+    return str(row[0]) if row and row[0] else ccn
+
+
+def select_worklist_candidates(conn, ccns, worklist):
+    missing = [ccn for ccn in ccns if ccn not in worklist]
+    if missing:
+        preview = ', '.join(missing[:10])
+        suffix = '' if len(missing) <= 10 else f' (+{len(missing) - 10} more)'
+        raise ValueError(f'worklist is missing {len(missing)} requested CCN(s): {preview}{suffix}')
+
+    selected = {}
+    for ccn in ccns:
+        candidate = dict(worklist[ccn])
+        candidate.setdefault('name', hospital_name(conn, ccn))
+        candidate.setdefault('source', 'refresh-plan')
+        selected[ccn] = candidate
+    return selected
+
+
 def write_status(path, payload):
     tmp = path + '.tmp'
     with open(tmp, 'w') as f:
@@ -597,6 +666,10 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('--ccns', nargs='+', help='Explicit CCN list')
     p.add_argument('--ccns-file', help='Path to newline-delimited CCN list')
+    p.add_argument(
+        '--worklist',
+        help='Planner JSON mapping each requested CCN to its authoritative selected URL',
+    )
     p.add_argument('--state', help='Process all live-MRF hospitals in a state')
     p.add_argument('--limit', type=int, default=10)
     p.add_argument('--all', action='store_true', help='Ignore --limit and target every live-MRF hospital')
@@ -631,6 +704,17 @@ def main():
     else:
         limit = None if args.all else args.limit
         ccns = get_target_ccns(conn, state=args.state, limit=limit, offset=args.offset)
+    selected_candidates = None
+    if args.worklist:
+        try:
+            selected_candidates = select_worklist_candidates(
+                conn,
+                ccns,
+                load_worklist(args.worklist),
+            )
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            conn.close()
+            p.error(f'invalid --worklist: {exc}')
     conn.close()
 
     eligible = len(ccns)
@@ -673,7 +757,15 @@ def main():
         return
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as ex:
-        futs = {ex.submit(ingest_ccn, c, args.item_timeout_seconds): c for c in ccns}
+        futs = {
+            ex.submit(
+                ingest_ccn,
+                c,
+                args.item_timeout_seconds,
+                selected_candidates[c] if selected_candidates is not None else None,
+            ): c
+            for c in ccns
+        }
         for fut in concurrent.futures.as_completed(futs):
             ccn, ok, n, fmt, msg = fut.result()
             done += 1

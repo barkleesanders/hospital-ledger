@@ -268,6 +268,7 @@ fi
 run_planner
 
 CHANGED_FILE="$ROOT/data/cloud_refresh_changed_ccns.txt"
+WORKLIST_FILE="$ROOT/data/cloud_refresh_worklist.json"
 PARSE_SUCCESS_FILE="$RUN_DIR/parse-success.txt"
 SUCCESS_FILE="$RUN_DIR/publish-success.txt"
 FAILURES_FILE="$ROOT/data/refresh_logs/ingest-$RUN_ID.failures.jsonl"
@@ -312,6 +313,7 @@ for shard in "$SHARD_DIR"/shard-*; do
 
   bash scripts/mem_guard.sh "$PYTHON" scripts/batch_ingest.py \
     --ccns-file "$shard" \
+    --worklist "$WORKLIST_FILE" \
     --workers "$INGEST_WORKERS" \
     --item-timeout-seconds 1800 \
     --status-file "$shard_status" \

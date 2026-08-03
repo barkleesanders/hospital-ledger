@@ -35,6 +35,7 @@ jobs:
           python -m unittest discover -s tests -v
           python -m py_compile \
             scripts/prepare_incremental_refresh.py \
+            scripts/batch_ingest.py \
             scripts/r2_store.py \
             scripts/refresh_artifacts.py \
             scripts/validate_refresh_output.py

@@ -27,7 +27,7 @@ CLOUDFLARE_API_TOKEN
 2. Hydrate the validator state, SQLite database, public indexes, and gzipped parsed corpus from R2.
 3. Probe every preferred hospital MRF URL concurrently.
 4. Compare URL, ETag, Last-Modified, content length, and a bounded content sample. Schedule a deterministic forced refresh when a server exposes weak validators.
-5. Parse only the explicit changed-hospital worklist in bounded shards. Each shard is slimmed and gzipped immediately, so the first rebuild never accumulates the roughly 107 GB uncompressed corpus. A failed parse restores the prior raw record so global indexes retain last-known-good data.
+5. Parse only the explicit changed-hospital worklist in bounded shards. The planner records the exact selected URL for every CCN, and each ingest shard consumes that map without independently re-ranking candidates. Each shard is slimmed and gzipped immediately, so the first rebuild never accumulates the roughly 107 GB uncompressed corpus. A failed parse restores the prior raw record so global indexes retain last-known-good data.
 6. Rebuild and audit all public aggregates.
 7. Snapshot every R2 key that will change and record the active Worker version.
 8. Upload changed hospital objects and the CPT index, deploy the Worker, and run the live audit.

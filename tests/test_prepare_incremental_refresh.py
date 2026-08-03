@@ -24,6 +24,7 @@ class PlannerTests(unittest.TestCase):
         MODULE.STAGED = root / "data" / "cloud_refresh_probe.json"
         MODULE.PLAN = root / "data" / "cloud_refresh_plan.json"
         MODULE.CHANGED = root / "data" / "cloud_refresh_changed_ccns.txt"
+        MODULE.WORKLIST = root / "data" / "cloud_refresh_worklist.json"
         MODULE.PARSED = root / "data" / "parsed"
         connection = sqlite3.connect(MODULE.DB)
         connection.executescript(
@@ -78,7 +79,35 @@ class PlannerTests(unittest.TestCase):
         plan = MODULE.plan_refresh(workers=1)
         self.assertEqual(plan["changed"], ["123456"])
         self.assertEqual(MODULE.CHANGED.read_text(), "123456\n")
+        worklist = json.loads(MODULE.WORKLIST.read_text())
+        self.assertEqual(
+            worklist["hospitals"]["123456"]["url"],
+            "https://example.test/mrf.json",
+        )
         self.assertTrue(cached.exists())
+
+    def test_worklist_records_the_exact_reachable_fallback_selected_by_probe(self):
+        first = "https://example.test/first"
+        selected = "https://example.test/selected"
+        MODULE.candidates = lambda: {"123456": [first, selected]}
+        MODULE.probe = lambda item: (
+            item[0],
+            {
+                "url": selected,
+                "checked_at": "2026-08-03T00:00:00Z",
+                "status": 200,
+                "final_url": "https://cdn.example.test/signed",
+                "etag": '"v1"',
+                "last_modified": "Sun, 02 Aug 2026 00:00:00 GMT",
+                "content_length": "100",
+            },
+        )
+
+        MODULE.plan_refresh(workers=1)
+
+        worklist = json.loads(MODULE.WORKLIST.read_text())
+        self.assertEqual(worklist["hospitals"]["123456"]["url"], selected)
+        self.assertNotEqual(worklist["hospitals"]["123456"]["url"], first)
 
     def test_checkpoint_advances_only_for_processed_hospitals(self):
         MODULE.plan_refresh(workers=1)
