@@ -174,6 +174,7 @@ def audit_source() -> list[tuple[Claim, str, str, int]]:
     for claim in CLAIMS:
         path = ROOT / claim.where
         if not path.exists():
+            stale.append((claim, "(file missing)", claim.truth(), -1))
             continue
         text = path.read_text()
         m = re.search(claim.pattern, text)
