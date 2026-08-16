@@ -251,6 +251,14 @@ run "Step 9: audit:copy:live (must pass)" npm run audit:copy:live || {
   exit 3
 }
 
+# Large generated assets are only needed through deployment and the live audit.
+# Keep them when debugging is requested; otherwise remove them after success so
+# a healthy weekly run cannot leave the Mac mini's internal disk full.
+if [ "$DRY_RUN" != 1 ] && [ "${HOSPITAL_LEDGER_KEEP_GENERATED:-0}" != 1 ]; then
+  run "Step 10: remove generated local deployment output" \
+    bash scripts/cleanup_generated_artifacts.sh "$ROOT"
+fi
+
 echo ""
 echo "✅ hl-refresh complete $TS"
 echo "   priced: $(python3 -c "import json; print(json.load(open('public/data/summary.json'))['standardized_price_hospitals'])")"
