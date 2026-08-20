@@ -1,31 +1,32 @@
 {
-  "name": "hospital-ledger",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "wrangler dev",
-    "build": "vite build",
-    "preview": "wrangler dev",
-    "audit:copy": "python3 scripts/predeploy_audit.py",
-    "audit:copy:live": "python3 scripts/predeploy_audit.py --check-live",
-    "refresh": "bash scripts/refresh.sh",
-    "refresh:dry": "bash scripts/refresh.sh --dry-run",
-    "refresh:quick": "bash scripts/refresh.sh --quick",
-    "predeploy": "python3 scripts/predeploy_audit.py && python3 scripts/csp_audit.py",
-    "deploy": "bash scripts/deploy.sh",
-    "typecheck": "tsc --noEmit",
-    "audit:csp": "python3 scripts/csp_audit.py"
-  },
-  "dependencies": {
-    "hono": "^4.6.14"
-  },
-  "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250109.0",
-    "@hono/vite-build": "^1.2.0",
-    "@hono/vite-dev-server": "^0.18.0",
-    "typescript": "^5.7.2",
-    "vite": "^6.0.7",
-    "wrangler": "^4.107.0"
-  }
+	"name": "hospital-ledger",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "wrangler dev",
+		"build": "vite build",
+		"preview": "wrangler dev",
+		"audit:copy": "python3 scripts/predeploy_audit.py",
+		"audit:copy:live": "python3 scripts/predeploy_audit.py --check-live",
+		"refresh": "bash scripts/refresh.sh",
+		"refresh:dry": "bash scripts/refresh.sh --dry-run",
+		"refresh:quick": "bash scripts/refresh.sh --quick",
+		"predeploy": "python3 scripts/predeploy_audit.py && python3 scripts/csp_audit.py",
+		"deploy": "bash scripts/deploy.sh",
+		"typecheck": "tsc --noEmit",
+		"audit:csp": "python3 scripts/csp_audit.py"
+	},
+	"dependencies": {
+		"hono": "^4.13.3"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^5.20260820.1",
+		"@hono/vite-build": "^1.2.0",
+		"@hono/vite-dev-server": "^0.18.0",
+		"jsdom": "^30.0.1",
+		"typescript": "^5.7.2",
+		"vite": "^6.0.7",
+		"wrangler": "^4.124.0"
+	}
 }

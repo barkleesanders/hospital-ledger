@@ -1,35 +1,35 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "hospital-ledger",
-  "main": "dist/index.js",
-  "compatibility_date": "2025-11-01",
-  "cache": { "enabled": true },
-  "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": false,
-  "preview_urls": false,
-  "routes": [
-    { "pattern": "hospitalledger.com", "custom_domain": true },
-    { "pattern": "www.hospitalledger.com", "custom_domain": true }
-  ],
-  "vars": {
-    "SITE_NAME": "Hospital Ledger"
-  },
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS",
-    "not_found_handling": "none"
-  },
-  "r2_buckets": [
-    {
-      "binding": "HL_MRF_RAW",
-      "bucket_name": "hl-mrf-raw"
-    },
-    {
-      "binding": "HL_MRF_PARSED",
-      "bucket_name": "hl-mrf-parsed"
-    }
-  ],
-  "observability": {
-    "enabled": true
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "hospital-ledger",
+	"main": "dist/index.js",
+	"compatibility_date": "2025-11-01",
+	"cache": { "enabled": true },
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": false,
+	"preview_urls": false,
+	"routes": [
+		{ "pattern": "hospitalledger.com", "custom_domain": true },
+		{ "pattern": "www.hospitalledger.com", "custom_domain": true }
+	],
+	"vars": {
+		"SITE_NAME": "Hospital Ledger"
+	},
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS",
+		"not_found_handling": "none"
+	},
+	"r2_buckets": [
+		{
+			"binding": "HL_MRF_RAW",
+			"bucket_name": "hl-mrf-raw"
+		},
+		{
+			"binding": "HL_MRF_PARSED",
+			"bucket_name": "hl-mrf-parsed"
+		}
+	],
+	"observability": {
+		"enabled": true
+	}
 }

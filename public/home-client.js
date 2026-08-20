@@ -5,107 +5,137 @@
 // site/index.html, with one cleanup: modal close uses [data-close-modal]
 // instead of an inline onclick handler (CSP-friendlier).
 (() => {
-  const $ = (id) => document.getElementById(id);
-  let hospitals = [];
-  let summary = null;
-  let pricesIndex = null;
-  let cptIndex = null;
-  let cptIndexLoading = false;
-  let cptIndexPromise = null;
+	const $ = (id) => document.getElementById(id);
+	let hospitals = [];
+	let summary = null;
+	let pricesIndex = null;
+	let cptIndex = null;
+	let cptIndexLoading = false;
+	let cptIndexPromise = null;
 
-  async function load() {
-    try {
-      summary = await (await fetch("/data/summary.json")).json();
-      renderSummary();
-    } catch (e) {
-      console.error("summary load", e);
-    }
-    try {
-      hospitals = await (await fetch("/data/hospitals.json")).json();
-      initSearch();
-      renderWorst();
-      renderStates();
-      renderTypes();
-      await loadPriceIndexes();
-      initCptSearch();
-      if (location.hash.startsWith("#h/")) openCCN(decodeURIComponent(location.hash.slice(3)));
-    } catch (e) {
-      console.error("hospitals load", e);
-    }
-  }
+	async function load() {
+		try {
+			summary = await (await fetch("/data/summary.json")).json();
+			renderSummary();
+		} catch (e) {
+			console.error("summary load", e);
+		}
+		try {
+			hospitals = await (await fetch("/data/hospitals.json")).json();
+			initSearch();
+			renderWorst();
+			renderStates();
+			renderTypes();
+			await loadPriceIndexes();
+			initCptSearch();
+			if (location.hash.startsWith("#h/"))
+				openCCN(decodeURIComponent(location.hash.slice(3)));
+		} catch (e) {
+			console.error("hospitals load", e);
+		}
+	}
 
-  async function fetchOptionalJson(url) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) return null;
-      return await res.json();
-    } catch (e) {
-      console.warn("optional data load failed", url, e);
-      return null;
-    }
-  }
+	async function fetchOptionalJson(url) {
+		try {
+			const res = await fetch(url);
+			if (!res.ok) return null;
+			return await res.json();
+		} catch (e) {
+			console.warn("optional data load failed", url, e);
+			return null;
+		}
+	}
 
-  async function loadPriceIndexes() {
-    const priceData = await fetchOptionalJson("/api/prices-index");
-    pricesIndex = priceData || null;
-    renderPriceCoverage();
-  }
+	async function loadPriceIndexes() {
+		const priceData = await fetchOptionalJson("/api/prices-index");
+		pricesIndex = priceData || null;
+		renderPriceCoverage();
+	}
 
-  function renderSummary() {
-    if (!summary) return;
-    if ($("hero-required")) $("hero-required").textContent = summary.cms_required_total.toLocaleString();
-    if ($("hero-required-visible")) $("hero-required-visible").textContent = summary.cms_required_total.toLocaleString();
-    if ($("hero-live-mrf-count")) $("hero-live-mrf-count").textContent = summary.compliant.toLocaleString();
-    if ($("methodology-live-mrf-count")) $("methodology-live-mrf-count").textContent = summary.compliant.toLocaleString();
-    const standardizedHospitals =
-      summary.standardized_price_hospitals || summary.standardized_price_index_hospitals || null;
-    if (standardizedHospitals) {
-      const text = standardizedHospitals.toLocaleString();
-      if ($("hero-hospital-count")) $("hero-hospital-count").textContent = text;
-      if ($("kpi-patient-hospitals")) $("kpi-patient-hospitals").textContent = text;
-      if ($("methodology-price-count")) $("methodology-price-count").textContent = text;
-      if ($("price-hospital-count")) $("price-hospital-count").textContent = text;
-    }
-    if (summary.standardized_price_rows && $("price-row-count")) {
-      $("price-row-count").textContent = summary.standardized_price_rows.toLocaleString();
-    }
-    if ($("kpi-compliance")) $("kpi-compliance").textContent = summary.compliance_pct + "%";
-    if ($("kpi-missing")) $("kpi-missing").textContent = summary.missing.toLocaleString();
-    if ($("kpi-enforcement")) $("kpi-enforcement").textContent = summary.under_enforcement.toLocaleString();
-    if ($("kpi-actions")) $("kpi-actions").textContent = summary.enforcement_actions_total.toLocaleString();
-    const tb = $("worst-tbody");
-    if (tb && summary.worst_offenders) {
-      summary.worst_offenders.forEach((h) => {
-        const tr = document.createElement("tr");
-        tr.className = "hover:bg-zinc-900/70 cursor-pointer";
-        tr.addEventListener("click", () => openCCN(h.ccn));
-        tr.innerHTML = `
+	function renderSummary() {
+		if (!summary) return;
+		if ($("hero-required"))
+			$("hero-required").textContent =
+				summary.cms_required_total.toLocaleString();
+		if ($("hero-required-visible"))
+			$("hero-required-visible").textContent =
+				summary.cms_required_total.toLocaleString();
+		if ($("hero-live-mrf-count"))
+			$("hero-live-mrf-count").textContent = summary.compliant.toLocaleString();
+		if ($("methodology-live-mrf-count"))
+			$("methodology-live-mrf-count").textContent =
+				summary.compliant.toLocaleString();
+		const standardizedHospitals =
+			summary.standardized_price_hospitals ||
+			summary.standardized_price_index_hospitals ||
+			null;
+		if (standardizedHospitals) {
+			const text = standardizedHospitals.toLocaleString();
+			if ($("hero-hospital-count")) $("hero-hospital-count").textContent = text;
+			if ($("kpi-patient-hospitals"))
+				$("kpi-patient-hospitals").textContent = text;
+			if ($("methodology-price-count"))
+				$("methodology-price-count").textContent = text;
+			if ($("price-hospital-count"))
+				$("price-hospital-count").textContent = text;
+		}
+		if (summary.standardized_price_rows && $("price-row-count")) {
+			$("price-row-count").textContent =
+				summary.standardized_price_rows.toLocaleString();
+		}
+		if ($("kpi-compliance"))
+			$("kpi-compliance").textContent = `${summary.compliance_pct}%`;
+		if ($("kpi-missing"))
+			$("kpi-missing").textContent = summary.missing.toLocaleString();
+		if ($("kpi-enforcement"))
+			$("kpi-enforcement").textContent =
+				summary.under_enforcement.toLocaleString();
+		if ($("kpi-actions"))
+			$("kpi-actions").textContent =
+				summary.enforcement_actions_total.toLocaleString();
+		const tb = $("worst-tbody");
+		if (tb && summary.worst_offenders) {
+			summary.worst_offenders.forEach((h) => {
+				const tr = document.createElement("tr");
+				tr.className = "hover:bg-zinc-900/70 cursor-pointer";
+				tr.addEventListener("click", () => openCCN(h.ccn));
+				tr.innerHTML = `
           <td class="px-4 py-2 mono text-xs text-zinc-500">${h.ccn}</td>
           <td class="px-4 py-2">${escapeHtml(h.name)}</td>
           <td class="px-4 py-2 text-zinc-400">${escapeHtml(h.city)}, ${h.state}</td>
           <td class="px-4 py-2 text-right tab-num text-rose-400">${h.enforcement_count}</td>`;
-        tb.appendChild(tr);
-      });
-    }
-    const ws = (summary.states || []).slice(0, 12);
-    const stb = $("state-bottom-tbody");
-    if (stb) {
-      ws.forEach((s) => {
-        const tr = document.createElement("tr");
-        const cls = s.pct < 70 ? "text-rose-400" : s.pct < 85 ? "text-amber-400" : "text-emerald-400";
-        tr.innerHTML = `
+				tb.appendChild(tr);
+			});
+		}
+		const ws = (summary.states || []).slice(0, 12);
+		const stb = $("state-bottom-tbody");
+		if (stb) {
+			ws.forEach((s) => {
+				const tr = document.createElement("tr");
+				const cls =
+					s.pct < 70
+						? "text-rose-400"
+						: s.pct < 85
+							? "text-amber-400"
+							: "text-emerald-400";
+				tr.innerHTML = `
           <td class="px-4 py-2 mono">${s.state}</td>
           <td class="px-4 py-2 text-right tab-num">${s.total}</td>
           <td class="px-4 py-2 text-right tab-num">${s.live}</td>
           <td class="px-4 py-2 text-right tab-num ${cls}">${s.pct}%</td>`;
-        stb.appendChild(tr);
-      });
-    }
-    const tb2 = $("type-bars");
-    if (tb2 && summary.types) {
-      summary.types.forEach((t) => {
-        const color = t.pct < 70 ? "bg-rose-500" : t.pct < 85 ? "bg-amber-500" : "bg-emerald-500";
-        tb2.innerHTML += `
+				stb.appendChild(tr);
+			});
+		}
+		const tb2 = $("type-bars");
+		if (tb2 && summary.types) {
+			summary.types.forEach((t) => {
+				const color =
+					t.pct < 70
+						? "bg-rose-500"
+						: t.pct < 85
+							? "bg-amber-500"
+							: "bg-emerald-500";
+				tb2.innerHTML += `
           <div>
             <div class="flex justify-between text-sm">
               <span>${escapeHtml(t.type)}</span>
@@ -115,163 +145,191 @@
               <div class="h-full ${color}" style="width:${t.pct}%"></div>
             </div>
           </div>`;
-      });
-    }
-  }
+			});
+		}
+	}
 
-  function initSearch() {
-    if ($("hosp-count")) $("hosp-count").textContent = hospitals.length.toLocaleString();
-    const states = [...new Set(hospitals.map((h) => h.state))].sort();
-    const sel = $("state");
-    if (sel) {
-      sel.innerHTML =
-        '<option value="">All states</option>' + states.map((s) => `<option value="${s}">${s}</option>`).join("");
-    }
-    if ($("q")) $("q").addEventListener("input", debounce(render, 80));
-    if ($("state")) $("state").addEventListener("change", render);
-    if ($("status")) $("status").addEventListener("change", render);
-    render();
-  }
+	function initSearch() {
+		if ($("hosp-count"))
+			$("hosp-count").textContent = hospitals.length.toLocaleString();
+		const states = [...new Set(hospitals.map((h) => h.state))].sort();
+		const sel = $("state");
+		if (sel) {
+			sel.innerHTML =
+				'<option value="">All states</option>' +
+				states.map((s) => `<option value="${s}">${s}</option>`).join("");
+		}
+		if ($("q")) $("q").addEventListener("input", debounce(render, 80));
+		if ($("state")) $("state").addEventListener("change", render);
+		if ($("status")) $("status").addEventListener("change", render);
+		render();
+	}
 
-  function initCptSearch() {
-    const q = $("cpt-q");
-    const sort = $("cpt-sort");
-    if (!q || !sort) return;
-    q.addEventListener("focus", () => {
-      if (!cptIndex && !cptIndexLoading) ensureCptIndex();
-    });
-    q.addEventListener(
-      "input",
-      debounce(() => {
-        if (q.value.trim() && !cptIndex && !cptIndexLoading) ensureCptIndex();
-        renderCptSearch();
-      }, 120),
-    );
-    sort.addEventListener("change", () => {
-      if (!cptIndex && !cptIndexLoading) ensureCptIndex();
-      renderCptSearch();
-    });
-    renderCptSearch();
-  }
+	function initCptSearch() {
+		const q = $("cpt-q");
+		const sort = $("cpt-sort");
+		if (!q || !sort) return;
+		q.addEventListener("focus", () => {
+			if (!cptIndex && !cptIndexLoading) ensureCptIndex();
+		});
+		q.addEventListener(
+			"input",
+			debounce(() => {
+				if (q.value.trim() && !cptIndex && !cptIndexLoading) ensureCptIndex();
+				renderCptSearch();
+			}, 120),
+		);
+		sort.addEventListener("change", () => {
+			if (!cptIndex && !cptIndexLoading) ensureCptIndex();
+			renderCptSearch();
+		});
+		renderCptSearch();
+	}
 
-  function getPriceIndexHospitals() {
-    if (!pricesIndex) return [];
-    if (Array.isArray(pricesIndex)) return pricesIndex;
-    if (Array.isArray(pricesIndex.hospitals)) return pricesIndex.hospitals;
-    return [];
-  }
+	function getPriceIndexHospitals() {
+		if (!pricesIndex) return [];
+		if (Array.isArray(pricesIndex)) return pricesIndex;
+		if (Array.isArray(pricesIndex.hospitals)) return pricesIndex.hospitals;
+		return [];
+	}
 
-  function getPreviewHospitals() {
-    return getPriceIndexHospitals().filter((h) => Number(h.n || h.count || h.items || 0) > 0);
-  }
+	function getPreviewHospitals() {
+		return getPriceIndexHospitals().filter(
+			(h) => Number(h.n || h.count || h.items || 0) > 0,
+		);
+	}
 
-  function renderPriceCoverage() {
-    const previewHospitals = getPreviewHospitals();
-    const rows = previewHospitals.reduce((sum, h) => sum + Number(h.n || h.count || h.items || 0), 0);
-    const codeCount = cptIndex ? Object.keys(cptIndex).length : null;
-    const hospitalText = previewHospitals.length ? previewHospitals.length.toLocaleString() : "—";
-    const rowText = rows ? rows.toLocaleString() : "—";
-    const codeText = codeCount === null ? "Load on search" : codeCount.toLocaleString();
-    if ($("price-hospital-count")) $("price-hospital-count").textContent = hospitalText;
-    if ($("methodology-price-count")) $("methodology-price-count").textContent = hospitalText;
-    if ($("price-row-count")) $("price-row-count").textContent = rowText;
-    if ($("price-code-count")) $("price-code-count").textContent = codeText;
-    if ($("kpi-patient-hospitals")) $("kpi-patient-hospitals").textContent = hospitalText;
-    if ($("hero-hospital-count")) $("hero-hospital-count").textContent = hospitalText;
-  }
+	function renderPriceCoverage() {
+		const previewHospitals = getPreviewHospitals();
+		const rows = previewHospitals.reduce(
+			(sum, h) => sum + Number(h.n || h.count || h.items || 0),
+			0,
+		);
+		const codeCount = cptIndex ? Object.keys(cptIndex).length : null;
+		const hospitalText = previewHospitals.length
+			? previewHospitals.length.toLocaleString()
+			: "—";
+		const rowText = rows ? rows.toLocaleString() : "—";
+		const codeText =
+			codeCount === null ? "Load on search" : codeCount.toLocaleString();
+		if ($("price-hospital-count"))
+			$("price-hospital-count").textContent = hospitalText;
+		if ($("methodology-price-count"))
+			$("methodology-price-count").textContent = hospitalText;
+		if ($("price-row-count")) $("price-row-count").textContent = rowText;
+		if ($("price-code-count")) $("price-code-count").textContent = codeText;
+		if ($("kpi-patient-hospitals"))
+			$("kpi-patient-hospitals").textContent = hospitalText;
+		if ($("hero-hospital-count"))
+			$("hero-hospital-count").textContent = hospitalText;
+	}
 
-  async function ensureCptIndex() {
-    if (cptIndex || cptIndexLoading) return cptIndexPromise;
-    cptIndexLoading = true;
-    renderCptSearch();
-    cptIndexPromise = fetchOptionalJson("/api/cpt-index")
-      .then((data) => {
-        cptIndex = data || null;
-        cptIndexLoading = false;
-        renderPriceCoverage();
-        renderCptSearch();
-        return cptIndex;
-      })
-      .catch((e) => {
-        cptIndexLoading = false;
-        console.warn("cpt index load failed", e);
-        renderCptSearch();
-        return null;
-      });
-    return cptIndexPromise;
-  }
+	async function ensureCptIndex() {
+		if (cptIndex || cptIndexLoading) return cptIndexPromise;
+		cptIndexLoading = true;
+		renderCptSearch();
+		cptIndexPromise = fetchOptionalJson("/api/cpt-index")
+			.then((data) => {
+				cptIndex = data || null;
+				cptIndexLoading = false;
+				renderPriceCoverage();
+				renderCptSearch();
+				return cptIndex;
+			})
+			.catch((e) => {
+				cptIndexLoading = false;
+				console.warn("cpt index load failed", e);
+				renderCptSearch();
+				return null;
+			});
+		return cptIndexPromise;
+	}
 
-  function getHospital(ccn) {
-    return hospitals.find((h) => String(h.ccn) === String(ccn));
-  }
+	function getHospital(ccn) {
+		return hospitals.find((h) => String(h.ccn) === String(ccn));
+	}
 
-  function isCodeQuery(q) {
-    return /^[A-Z]?\d[A-Z0-9]{1,6}$/.test(q);
-  }
+	function isCodeQuery(q) {
+		return /^[A-Z]?\d[A-Z0-9]{1,6}$/.test(q);
+	}
 
-  function renderCptSearch() {
-    const qEl = $("cpt-q");
-    const status = $("cpt-status");
-    const results = $("cpt-results");
-    if (!qEl || !status || !results) return;
-    const q = qEl.value.trim().toUpperCase();
-    const sort = $("cpt-sort").value;
-    const indexedHospitals = getPreviewHospitals();
-    const codeCount = cptIndex ? Object.keys(cptIndex).length : 0;
-    const hospitalCount = indexedHospitals.length;
+	function renderCptSearch() {
+		const qEl = $("cpt-q");
+		const status = $("cpt-status");
+		const results = $("cpt-results");
+		if (!qEl || !status || !results) return;
+		const q = qEl.value.trim().toUpperCase();
+		const sort = $("cpt-sort").value;
+		const indexedHospitals = getPreviewHospitals();
+		const codeCount = cptIndex ? Object.keys(cptIndex).length : 0;
+		const hospitalCount = indexedHospitals.length;
 
-    if (!cptIndex) {
-      status.textContent = cptIndexLoading
-        ? `${hospitalCount.toLocaleString()} hospitals have standardized price previews. Loading the cross-hospital CPT/HCPCS comparison index…`
-        : `${hospitalCount.toLocaleString()} hospitals have standardized price previews. Enter a CPT/HCPCS code to load cross-hospital comparisons.`;
-      results.innerHTML = "";
-      return;
-    }
-    if (!q) {
-      status.textContent = `${codeCount.toLocaleString()} CPT/HCPCS codes indexed across ${hospitalCount.toLocaleString()} hospital${hospitalCount === 1 ? "" : "s"}. Enter a code such as 99213, J9271, or A9543.`;
-      results.innerHTML = renderTopCptCodes(sort);
-      return;
-    }
-    if (!isCodeQuery(q)) {
-      status.textContent =
-        "This compact CPT index currently supports exact or prefix CPT/HCPCS code searches. Try a code like 99213, J9271, or A9543.";
-      results.innerHTML = "";
-      return;
-    }
-    const matches = Object.keys(cptIndex).filter((code) => code.startsWith(q));
-    if (sort === "coverage") {
-      matches.sort((a, b) => (cptIndex[b] || []).length - (cptIndex[a] || []).length || a.localeCompare(b));
-    } else {
-      matches.sort((a, b) => a.localeCompare(b));
-    }
-    if (!matches.length) {
-      status.textContent = `No standardized price rows found for code prefix ${q}.`;
-      results.innerHTML = "";
-      return;
-    }
-    status.textContent = `${matches.length.toLocaleString()} matching code${matches.length === 1 ? "" : "s"} for ${q}. Showing hospital price rows from the standardized index.`;
-    results.innerHTML = matches.slice(0, 20).map((code) => renderCptCodeResult(code, cptIndex[code])).join("");
-  }
+		if (!cptIndex) {
+			status.textContent = cptIndexLoading
+				? `${hospitalCount.toLocaleString()} hospitals have standardized price previews. Loading the cross-hospital CPT/HCPCS comparison index…`
+				: `${hospitalCount.toLocaleString()} hospitals have standardized price previews. Enter a CPT/HCPCS code to load cross-hospital comparisons.`;
+			results.innerHTML = "";
+			return;
+		}
+		if (!q) {
+			status.textContent = `${codeCount.toLocaleString()} CPT/HCPCS codes indexed across ${hospitalCount.toLocaleString()} hospital${hospitalCount === 1 ? "" : "s"}. Enter a code such as 99213, J9271, or A9543.`;
+			results.innerHTML = renderTopCptCodes(sort);
+			return;
+		}
+		if (!isCodeQuery(q)) {
+			status.textContent =
+				"This compact CPT index currently supports exact or prefix CPT/HCPCS code searches. Try a code like 99213, J9271, or A9543.";
+			results.innerHTML = "";
+			return;
+		}
+		const matches = Object.keys(cptIndex).filter((code) => code.startsWith(q));
+		if (sort === "coverage") {
+			matches.sort(
+				(a, b) =>
+					(cptIndex[b] || []).length - (cptIndex[a] || []).length ||
+					a.localeCompare(b),
+			);
+		} else {
+			matches.sort((a, b) => a.localeCompare(b));
+		}
+		if (!matches.length) {
+			status.textContent = `No standardized price rows found for code prefix ${q}.`;
+			results.innerHTML = "";
+			return;
+		}
+		status.textContent = `${matches.length.toLocaleString()} matching code${matches.length === 1 ? "" : "s"} for ${q}. Showing hospital price rows from the standardized index.`;
+		results.innerHTML = matches
+			.slice(0, 20)
+			.map((code) => renderCptCodeResult(code, cptIndex[code]))
+			.join("");
+	}
 
-  function renderTopCptCodes(sort) {
-    const codes = Object.keys(cptIndex || {});
-    if (sort === "coverage") {
-      codes.sort((a, b) => (cptIndex[b] || []).length - (cptIndex[a] || []).length || a.localeCompare(b));
-    } else {
-      codes.sort((a, b) => a.localeCompare(b));
-    }
-    return codes.slice(0, 10).map((code) => renderCptCodeResult(code, cptIndex[code], true)).join("");
-  }
+	function renderTopCptCodes(sort) {
+		const codes = Object.keys(cptIndex || {});
+		if (sort === "coverage") {
+			codes.sort(
+				(a, b) =>
+					(cptIndex[b] || []).length - (cptIndex[a] || []).length ||
+					a.localeCompare(b),
+			);
+		} else {
+			codes.sort((a, b) => a.localeCompare(b));
+		}
+		return codes
+			.slice(0, 10)
+			.map((code) => renderCptCodeResult(code, cptIndex[code], true))
+			.join("");
+	}
 
-  function renderCptCodeResult(code, rows, compact = false) {
-    const safeCode = escapeHtml(code);
-    const shown = (rows || []).slice(0, compact ? 5 : 25);
-    const body = shown
-      .map((row) => {
-        const h = getHospital(row.ccn) || {};
-        const name = h.name || row.name || `CCN ${row.ccn}`;
-        const place = [h.city, h.state].filter(Boolean).join(", ");
-        return `
+	function renderCptCodeResult(code, rows, compact = false) {
+		const safeCode = escapeHtml(code);
+		const shown = (rows || []).slice(0, compact ? 5 : 25);
+		const body = shown
+			.map((row) => {
+				const h = getHospital(row.ccn) || {};
+				const name = h.name || row.name || `CCN ${row.ccn}`;
+				const place = [h.city, h.state].filter(Boolean).join(", ");
+				return `
         <tr class="border-t border-zinc-800 hover:bg-zinc-900/70 cursor-pointer" data-open-ccn="${escapeHtml(row.ccn)}">
           <td class="px-3 py-2 mono text-xs text-zinc-500">${escapeHtml(row.ccn)}</td>
           <td class="px-3 py-2">
@@ -287,13 +345,13 @@
             ${Number(row.pc || row.payer_count || 0) ? `<div class="text-xs text-zinc-600">${Number(row.pc || row.payer_count).toLocaleString()} rates</div>` : ""}
           </td>
         </tr>`;
-      })
-      .join("");
-    const more =
-      (rows || []).length > shown.length
-        ? `<div class="px-3 py-2 text-xs text-zinc-500">+ ${((rows || []).length - shown.length).toLocaleString()} more hospital${(rows || []).length - shown.length === 1 ? "" : "s"} for this code.</div>`
-        : "";
-    return `
+			})
+			.join("");
+		const more =
+			(rows || []).length > shown.length
+				? `<div class="px-3 py-2 text-xs text-zinc-500">+ ${((rows || []).length - shown.length).toLocaleString()} more hospital${(rows || []).length - shown.length === 1 ? "" : "s"} for this code.</div>`
+				: "";
+		return `
       <div class="rounded-md border border-zinc-800 bg-zinc-950/40 overflow-hidden mb-3">
         <div class="px-3 py-2 flex items-center justify-between gap-3 bg-zinc-900/80">
           <div>
@@ -311,46 +369,56 @@
         </div>
         ${more}
       </div>`;
-  }
+	}
 
-  function render() {
-    const q = ($("q")?.value || "").toLowerCase().trim();
-    const st = $("state")?.value || "";
-    const status = $("status")?.value || "";
-    let out = hospitals;
-    if (q) {
-      out = out.filter((h) =>
-        h.name.toLowerCase().includes(q) || h.city.toLowerCase().includes(q) || h.ccn.includes(q),
-      );
-    }
-    if (st) out = out.filter((h) => h.state === st);
-    if (status === "compliant") out = out.filter((h) => h.has_live_mrf);
-    else if (status === "missing") out = out.filter((h) => !h.has_live_mrf && h.required);
-    else if (status === "enforcement") out = out.filter((h) => (h.enforcement_count || 0) > 0);
-    else if (status === "missing-enforcement")
-      out = out.filter((h) => !h.has_live_mrf && (h.enforcement_count || 0) > 0);
+	function render() {
+		const q = ($("q")?.value || "").toLowerCase().trim();
+		const st = $("state")?.value || "";
+		const status = $("status")?.value || "";
+		let out = hospitals;
+		if (q) {
+			out = out.filter(
+				(h) =>
+					h.name.toLowerCase().includes(q) ||
+					h.city.toLowerCase().includes(q) ||
+					h.ccn.includes(q),
+			);
+		}
+		if (st) out = out.filter((h) => h.state === st);
+		if (status === "compliant") out = out.filter((h) => h.has_live_mrf);
+		else if (status === "missing")
+			out = out.filter((h) => !h.has_live_mrf && h.required);
+		else if (status === "enforcement")
+			out = out.filter((h) => (h.enforcement_count || 0) > 0);
+		else if (status === "missing-enforcement")
+			out = out.filter(
+				(h) => !h.has_live_mrf && (h.enforcement_count || 0) > 0,
+			);
 
-    if ($("results-count")) {
-      $("results-count").textContent = `${out.length.toLocaleString()} hospital${out.length === 1 ? "" : "s"}`;
-    }
-    const container = $("results");
-    if (!container) return;
-    container.innerHTML = "";
-    out.slice(0, 200).forEach((h) => container.appendChild(card(h)));
-    if (out.length > 200) {
-      const more = document.createElement("div");
-      more.className = "text-center text-sm text-zinc-500 py-3";
-      more.textContent = `+ ${(out.length - 200).toLocaleString()} more — refine your search`;
-      container.appendChild(more);
-    }
-  }
+		if ($("results-count")) {
+			$("results-count").textContent =
+				`${out.length.toLocaleString()} hospital${out.length === 1 ? "" : "s"}`;
+		}
+		const container = $("results");
+		if (!container) return;
+		container.innerHTML = "";
+		for (const h of out.slice(0, 200)) {
+			container.appendChild(card(h));
+		}
+		if (out.length > 200) {
+			const more = document.createElement("div");
+			more.className = "text-center text-sm text-zinc-500 py-3";
+			more.textContent = `+ ${(out.length - 200).toLocaleString()} more — refine your search`;
+			container.appendChild(more);
+		}
+	}
 
-  function card(h) {
-    const div = document.createElement("div");
-    div.className =
-      "rounded-md border border-zinc-800 bg-zinc-900/50 p-3 flex items-center gap-3 hover:border-zinc-700 cursor-pointer fade-in";
-    div.addEventListener("click", () => openCCN(h.ccn));
-    div.innerHTML = `
+	function card(h) {
+		const div = document.createElement("div");
+		div.className =
+			"rounded-md border border-zinc-800 bg-zinc-900/50 p-3 flex items-center gap-3 hover:border-zinc-700 cursor-pointer fade-in";
+		div.addEventListener("click", () => openCCN(h.ccn));
+		div.innerHTML = `
       <div class="flex-1 min-w-0">
         <div class="font-medium text-zinc-100 truncate">${escapeHtml(h.name)}</div>
         <div class="text-xs text-zinc-500 mt-0.5">
@@ -358,55 +426,55 @@
         </div>
       </div>
       <div class="flex flex-col items-end gap-1 shrink-0">${badge(h)}</div>`;
-    return div;
-  }
+		return div;
+	}
 
-  function badge(h) {
-    const parts = [];
-    if (h.has_live_mrf) {
-      parts.push(
-        `<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">✓ Live MRF</span>`,
-      );
-    } else if (h.required) {
-      parts.push(
-        `<span class="text-xs px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">✗ Missing</span>`,
-      );
-    }
-    if ((h.enforcement_count || 0) > 0) {
-      parts.push(
-        `<span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">${h.enforcement_count} CMS action${h.enforcement_count === 1 ? "" : "s"}</span>`,
-      );
-    }
-    return parts.join(" ");
-  }
+	function badge(h) {
+		const parts = [];
+		if (h.has_live_mrf) {
+			parts.push(
+				`<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">✓ Live MRF</span>`,
+			);
+		} else if (h.required) {
+			parts.push(
+				`<span class="text-xs px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">✗ Missing</span>`,
+			);
+		}
+		if ((h.enforcement_count || 0) > 0) {
+			parts.push(
+				`<span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">${h.enforcement_count} CMS action${h.enforcement_count === 1 ? "" : "s"}</span>`,
+			);
+		}
+		return parts.join(" ");
+	}
 
-  function renderWorst() {}
-  function renderStates() {}
-  function renderTypes() {}
+	function renderWorst() {}
+	function renderStates() {}
+	function renderTypes() {}
 
-  function openCCN(ccn) {
-    const h = hospitals.find((x) => x.ccn === ccn);
-    if (!h) return;
-    history.replaceState(null, "", "#h/" + ccn);
-    const enfHtml = (h.enforcement_actions || [])
-      .map(
-        (a) => `<li class="py-1 border-l-2 border-amber-500/40 pl-3 text-sm">
+	function openCCN(ccn) {
+		const h = hospitals.find((x) => x.ccn === ccn);
+		if (!h) return;
+		history.replaceState(null, "", `#h/${ccn}`);
+		const enfHtml = (h.enforcement_actions || [])
+			.map(
+				(a) => `<li class="py-1 border-l-2 border-amber-500/40 pl-3 text-sm">
        <span class="text-zinc-400 mono text-xs">${a.date}</span>
        <span class="ml-2">${escapeHtml(a.action)}</span>
      </li>`,
-      )
-      .join("");
-    const mrfHtml = h.has_live_mrf
-      ? `
+			)
+			.join("");
+		const mrfHtml = h.has_live_mrf
+			? `
       <div class="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 mt-4">
         <div class="text-xs uppercase tracking-wider text-emerald-400">Live machine-readable file</div>
         <a href="${escapeHtml(h.mrf_url)}" target="_blank" rel="noopener" class="mono text-sm text-emerald-300 hover:underline break-all block mt-1">${escapeHtml(h.mrf_url)}</a>
         <div class="text-xs text-zinc-500 mt-2">
           Source: ${escapeHtml(h.mrf_source || "unknown")} · Last verified ${(h.mrf_verified || "").slice(0, 10) || "—"}
-          ${h.mrf_bytes ? " · " + formatBytes(h.mrf_bytes) : ""}
+          ${h.mrf_bytes ? ` · ${formatBytes(h.mrf_bytes)}` : ""}
         </div>
       </div>`
-      : `
+			: `
       <div class="rounded-md border border-rose-500/30 bg-rose-500/5 p-4 mt-4">
         <div class="text-xs uppercase tracking-wider text-rose-400">No live MRF found</div>
         <p class="text-sm text-zinc-300 mt-1">
@@ -414,8 +482,8 @@
           After exhaustive automated probing (CMS-HPT marker files, page parsing, Exa search, Claude agents, Wayback Machine), no live file was found.
         </p>
       </div>`;
-    if ($("modal-content")) {
-      $("modal-content").innerHTML = `
+		if ($("modal-content")) {
+			$("modal-content").innerHTML = `
         <div class="text-xs uppercase tracking-widest text-zinc-500">CCN <span class="mono">${escapeHtml(h.ccn)}</span></div>
         <h3 class="text-2xl font-semibold tracking-tight mt-1">${escapeHtml(h.name)}</h3>
         <div class="text-zinc-400 mt-1">${escapeHtml(h.city)}, ${escapeHtml(h.state)} · ${escapeHtml(h.type)} · ${escapeHtml(h.ownership || "")}</div>
@@ -434,62 +502,89 @@
           <a href="https://data.cms.gov/provider-data/dataset/xubh-q36u" target="_blank" class="underline hover:text-zinc-300">CMS Hospital Compare</a> ·
           <a href="https://data.cms.gov/provider-characteristics/hospitals-and-other-facilities/hospital-price-transparency-enforcement-activities-and-outcomes" target="_blank" class="underline hover:text-zinc-300">CMS Enforcement record</a>
         </div>`;
-    }
-    $("modal")?.classList.remove("hidden");
-    renderHospitalPricePreview(ccn);
-  }
+		}
+		$("modal")?.classList.remove("hidden");
+		renderHospitalPricePreview(ccn);
+	}
 
-  function closeModal() {
-    $("modal")?.classList.add("hidden");
-    history.replaceState(null, "", location.pathname);
-  }
+	function closeModal() {
+		$("modal")?.classList.add("hidden");
+		history.replaceState(null, "", location.pathname);
+	}
 
-  document.addEventListener("keydown", (e) => e.key === "Escape" && closeModal());
+	document.addEventListener(
+		"keydown",
+		(e) => e.key === "Escape" && closeModal(),
+	);
 
-  // Modal close button + outside-click
-  document.addEventListener("click", (e) => {
-    const t = e.target;
-    if (t && t.matches && t.matches("[data-close-modal]")) closeModal();
-    if (t === $("modal")) closeModal();
-    // Delegated open-CCN from CPT search rows
-    const tr = t && t.closest && t.closest("[data-open-ccn]");
-    if (tr) openCCN(tr.getAttribute("data-open-ccn"));
-  });
+	// Modal close button + outside-click
+	document.addEventListener("click", (e) => {
+		const t = e.target;
+		if (t?.matches?.("[data-close-modal]")) closeModal();
+		if (t === $("modal")) closeModal();
+		// Delegated open-CCN from CPT search rows
+		const tr = t?.closest?.("[data-open-ccn]");
+		if (tr) openCCN(tr.getAttribute("data-open-ccn"));
+	});
 
-  function escapeHtml(s) {
-    return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  }
-  function formatBytes(b) {
-    if (b < 1024) return b + " B";
-    if (b < 1024 * 1024) return (b / 1024).toFixed(1) + " KB";
-    return (b / 1024 / 1024).toFixed(1) + " MB";
-  }
-  function formatMoney(v) {
-    const n = Number(v);
-    if (!Number.isFinite(n)) return "—";
-    return "$" + n.toLocaleString(undefined, { maximumFractionDigits: n < 100 ? 2 : 0 });
-  }
-  function firstValue(...values) {
-    return values.find((v) => v !== undefined && v !== null);
-  }
+	function escapeHtml(s) {
+		return String(s || "").replace(
+			/[&<>"']/g,
+			(c) =>
+				({
+					"&": "&amp;",
+					"<": "&lt;",
+					">": "&gt;",
+					'"': "&quot;",
+					"'": "&#39;",
+				})[c],
+		);
+	}
+	function formatBytes(b) {
+		if (b < 1024) return `${b} B`;
+		if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+		return `${(b / 1024 / 1024).toFixed(1)} MB`;
+	}
+	function formatMoney(v) {
+		const n = Number(v);
+		if (!Number.isFinite(n)) return "—";
+		return (
+			"$" +
+			n.toLocaleString(undefined, { maximumFractionDigits: n < 100 ? 2 : 0 })
+		);
+	}
+	function firstValue(...values) {
+		return values.find((v) => v !== undefined && v !== null);
+	}
 
-  async function renderHospitalPricePreview(ccn) {
-    const el = $("price-preview");
-    if (!el) return;
-    const data = await fetchOptionalJson(`/api/prices/${encodeURIComponent(ccn)}`);
-    if (!el || location.hash !== "#h/" + ccn) return;
-    if (!el || !data || !Array.isArray(data.items) || !data.items.length) {
-      el.innerHTML = `
+	async function renderHospitalPricePreview(ccn) {
+		const el = $("price-preview");
+		if (!el) return;
+		const data = await fetchOptionalJson(
+			`/api/prices/${encodeURIComponent(ccn)}`,
+		);
+		if (!el || location.hash !== `#h/${ccn}`) return;
+		if (!el || !data || !Array.isArray(data.items) || !data.items.length) {
+			el.innerHTML = `
         <div class="text-xs uppercase tracking-wider text-zinc-500">Standardized price preview</div>
         <p class="text-sm text-zinc-400 mt-1">No standardized price rows have been generated for this hospital yet.</p>`;
-      return;
-    }
-    const rows = data.items.slice(0, 25).map((item) => {
-      const payers = Array.isArray(item.payers) ? item.payers.slice(0, 3) : [];
-      const payerHtml = payers.length
-        ? payers.map((p) => `<div class="truncate">${escapeHtml(p.p || p.payer || "Payer")} <span class="text-zinc-500">${formatMoney(firstValue(p.r, p.rate, p.rate_dollar))}</span></div>`).join("")
-        : '<span class="text-zinc-600">—</span>';
-      return `
+			return;
+		}
+		const rows = data.items
+			.slice(0, 25)
+			.map((item) => {
+				const payers = Array.isArray(item.payers)
+					? item.payers.slice(0, 3)
+					: [];
+				const payerHtml = payers.length
+					? payers
+							.map(
+								(p) =>
+									`<div class="truncate">${escapeHtml(p.p || p.payer || "Payer")} <span class="text-zinc-500">${formatMoney(firstValue(p.r, p.rate, p.rate_dollar))}</span></div>`,
+							)
+							.join("")
+					: '<span class="text-zinc-600">—</span>';
+				return `
         <tr class="border-t border-zinc-800 align-top">
           <td class="px-3 py-2 mono text-xs text-emerald-300">${escapeHtml(item.code)}</td>
           <td class="px-3 py-2 text-xs text-zinc-500">${escapeHtml(item.type || item.code_type || "")}</td>
@@ -500,8 +595,9 @@
           <td class="px-3 py-2 text-right tab-num">${formatMoney(firstValue(item.max, item.max_negotiated))}</td>
           <td class="px-3 py-2 text-xs text-zinc-400 max-w-56">${payerHtml}</td>
         </tr>`;
-    }).join("");
-    el.innerHTML = `
+			})
+			.join("");
+		el.innerHTML = `
       <div class="flex items-start justify-between gap-3">
         <div>
           <div class="text-xs uppercase tracking-wider text-emerald-400">Standardized price preview</div>
@@ -517,181 +613,207 @@
           <tbody>${rows}</tbody>
         </table>
       </div>`;
-  }
+	}
 
-  function debounce(fn, ms) {
-    let t;
-    return (...args) => {
-      clearTimeout(t);
-      t = setTimeout(() => fn(...args), ms);
-    };
-  }
+	function debounce(fn, ms) {
+		let t;
+		return (...args) => {
+			clearTimeout(t);
+			t = setTimeout(() => fn(...args), ms);
+		};
+	}
 
-  // Patient-facing entry-point handlers
-  const COMMON_PROCEDURES = window.CPT_NAMES || {};
+	// Patient-facing entry-point handlers
+	const COMMON_PROCEDURES = window.CPT_NAMES || {};
 
-  let datalistBuilt = false;
-  const buildDatalist = (filter) => {
-    const dl = document.getElementById("proc-suggestions");
-    if (!dl) return;
-    dl.innerHTML = "";
-    const f = (filter || "").trim().toLowerCase();
-    let entries = Object.entries(COMMON_PROCEDURES);
-    if (f.length >= 2) {
-      entries = entries.filter(([code, desc]) => code.toLowerCase().includes(f) || desc.toLowerCase().includes(f));
-    }
-    entries.slice(0, 25).forEach(([code, desc]) => {
-      const opt = document.createElement("option");
-      opt.value = code;
-      opt.label = `${code} — ${desc}`;
-      opt.textContent = `${code} — ${desc}`;
-      dl.appendChild(opt);
-    });
-  };
+	let datalistBuilt = false;
+	const buildDatalist = (filter) => {
+		const dl = document.getElementById("proc-suggestions");
+		if (!dl) return;
+		dl.innerHTML = "";
+		const f = (filter || "").trim().toLowerCase();
+		let entries = Object.entries(COMMON_PROCEDURES);
+		if (f.length >= 2) {
+			entries = entries.filter(
+				([code, desc]) =>
+					code.toLowerCase().includes(f) || desc.toLowerCase().includes(f),
+			);
+		}
+		entries.slice(0, 25).forEach(([code, desc]) => {
+			const opt = document.createElement("option");
+			opt.value = code;
+			opt.label = `${code} — ${desc}`;
+			opt.textContent = `${code} — ${desc}`;
+			dl.appendChild(opt);
+		});
+	};
 
-  const resolveQuery = (raw) => {
-    const q = (raw || "").trim();
-    if (!q) return { code: null, msg: "", matches: [] };
-    const upper = q.toUpperCase();
-    // If it looks like a code (alphanumeric, 4-7 chars), treat it as one directly
-    if (/^[A-Z0-9]{4,7}$/.test(upper)) {
-      return { code: upper, msg: "", matches: [] };
-    }
-    // Otherwise it's a procedure name search - use COMMON_PROCEDURES (CPT_NAMES)
-    const lower = q.toLowerCase();
-    const matches = Object.entries(COMMON_PROCEDURES).filter(([, desc]) => desc.toLowerCase().includes(lower));
-    
-    if (matches.length === 0) {
-      return { code: null, msg: `No match for "${q}". Try a CPT/HCPCS code (e.g. 45378) or a common name (e.g. "colonoscopy").`, matches: [] };
-    }
-    if (matches.length === 1) {
-      return { code: matches[0][0], msg: `Matched: ${matches[0][1]}`, matches: [] };
-    }
-    // Multiple matches - show picker
-    return {
-      code: null,
-      msg: `Found ${matches.length} matching procedures. Please select one:`,
-      matches: matches.map(([code, desc]) => ({ code, desc })).slice(0, 10), // Limit to top 10
-    };
-  };
+	const resolveQuery = (raw) => {
+		const q = (raw || "").trim();
+		if (!q) return { code: null, msg: "", matches: [] };
+		const upper = q.toUpperCase();
+		// If it looks like a code (alphanumeric, 4-7 chars), treat it as one directly
+		if (/^[A-Z0-9]{4,7}$/.test(upper)) {
+			return { code: upper, msg: "", matches: [] };
+		}
+		// Otherwise it's a procedure name search - use COMMON_PROCEDURES (CPT_NAMES)
+		const lower = q.toLowerCase();
+		const matches = Object.entries(COMMON_PROCEDURES).filter(([, desc]) =>
+			desc.toLowerCase().includes(lower),
+		);
 
-  const procForm = document.getElementById("by-proc-form");
-  const procInput = document.getElementById("by-proc-input");
-  const procMsg = document.getElementById("by-proc-msg");
+		if (matches.length === 0) {
+			return {
+				code: null,
+				msg: `No match for "${q}". Try a CPT/HCPCS code (e.g. 45378) or a common name (e.g. "colonoscopy").`,
+				matches: [],
+			};
+		}
+		if (matches.length === 1) {
+			return {
+				code: matches[0][0],
+				msg: `Matched: ${matches[0][1]}`,
+				matches: [],
+			};
+		}
+		// Multiple matches - show picker
+		return {
+			code: null,
+			msg: `Found ${matches.length} matching procedures. Please select one:`,
+			matches: matches.map(([code, desc]) => ({ code, desc })).slice(0, 10), // Limit to top 10
+		};
+	};
 
-  if (procInput) {
-    procInput.addEventListener("focus", () => {
-      if (!datalistBuilt) {
-        buildDatalist("");
-        datalistBuilt = true;
-      }
-    });
-    procInput.addEventListener("input", () => {
-      buildDatalist(procInput.value);
-      if (procMsg) procMsg.textContent = "";
-    });
-  }
+	const procForm = document.getElementById("by-proc-form");
+	const procInput = document.getElementById("by-proc-input");
+	const procMsg = document.getElementById("by-proc-msg");
 
-  if (procForm) {
-    procForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const raw = procInput.value;
-      const { code, msg, matches } = resolveQuery(raw);
-      
-      if (matches && matches.length > 0) {
-        // Show picker UI for multiple matches
-        if (procMsg) {
-          const pickerHtml = `
+	if (procInput) {
+		procInput.addEventListener("focus", () => {
+			if (!datalistBuilt) {
+				buildDatalist("");
+				datalistBuilt = true;
+			}
+		});
+		procInput.addEventListener("input", () => {
+			buildDatalist(procInput.value);
+			if (procMsg) procMsg.textContent = "";
+		});
+	}
+
+	if (procForm) {
+		procForm.addEventListener("submit", async (e) => {
+			e.preventDefault();
+			const raw = procInput.value;
+			const { code, msg, matches } = resolveQuery(raw);
+
+			if (matches && matches.length > 0) {
+				// Show picker UI for multiple matches
+				if (procMsg) {
+					const pickerHtml = `
             <div class="mt-2">
               <div class="text-emerald-300 mb-2">${escapeHtml(msg)}</div>
               <div class="space-y-1 max-h-64 overflow-y-auto">
-                ${matches.map(m => `
+                ${matches
+									.map(
+										(m) => `
                   <button type="button" data-select-code="${escapeHtml(m.code)}" 
                     class="block w-full text-left px-3 py-2 rounded border border-zinc-700 hover:border-emerald-500 hover:bg-zinc-800 transition text-sm">
                     <span class="mono text-emerald-300">${escapeHtml(m.code)}</span> — <span class="text-zinc-300">${escapeHtml(m.desc)}</span>
                   </button>
-                `).join('')}
+                `,
+									)
+									.join("")}
               </div>
             </div>
           `;
-          procMsg.innerHTML = pickerHtml;
-          
-          // Wire up picker buttons
-          procMsg.querySelectorAll('[data-select-code]').forEach(btn => {
-            btn.addEventListener('click', () => {
-              const selectedCode = btn.getAttribute('data-select-code');
-              procInput.value = selectedCode;
-              procMsg.textContent = `Going to ${selectedCode}…`;
-              location.href = "/procedure/" + encodeURIComponent(selectedCode);
-            });
-          });
-        }
-        return;
-      }
-      
-      if (!code) {
-        if (procMsg) procMsg.textContent = msg;
-        return;
-      }
-      if (procMsg) procMsg.textContent = `Checking ${code}…`;
-      try {
-        const r = await fetch("/api/procedure/" + encodeURIComponent(code), { cache: "no-store" });
-        if (r.status === 404) {
-          procMsg.textContent = `Code ${code} isn't in our top 5,000 indexed procedures yet. Try a more common procedure or browse hospital prices directly.`;
-          return;
-        }
-        if (!r.ok) {
-          procMsg.textContent = `Couldn't load ${code} (HTTP ${r.status}). Try again.`;
-          return;
-        }
-      } catch {
-        // network error — destination page handles 404 itself
-      }
-      location.href = "/procedure/" + encodeURIComponent(code);
-    });
-  }
+					procMsg.innerHTML = pickerHtml;
 
-  const hospForm = document.getElementById("by-hosp-form");
-  if (hospForm) {
-    hospForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const v = document.getElementById("by-hosp-input").value.trim();
-      if (/^\d{6}$/.test(v)) {
-        location.href = "/hospital/" + v;
-      } else if (v) {
-        const q = document.getElementById("q");
-        if (q) {
-          q.value = v;
-          q.dispatchEvent(new Event("input"));
-          document.getElementById("search").scrollIntoView({ behavior: "smooth" });
-        }
-      }
-    });
-  }
+					// Wire up picker buttons
+					procMsg.querySelectorAll("[data-select-code]").forEach((btn) => {
+						btn.addEventListener("click", () => {
+							const selectedCode = btn.getAttribute("data-select-code");
+							procInput.value = selectedCode;
+							procMsg.textContent = `Going to ${selectedCode}…`;
+							location.href = `/procedure/${encodeURIComponent(selectedCode)}`;
+						});
+					});
+				}
+				return;
+			}
 
-  const payerForm = document.getElementById("by-payer-form");
-  const payerSel = document.getElementById("by-payer-select");
-  if (payerForm && payerSel) {
-    fetch("/api/payers-index")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data || !data.featured) {
-          payerSel.innerHTML = '<option value="">No payer index yet</option>';
-          return;
-        }
-        payerSel.innerHTML =
-          '<option value="">Choose your insurance…</option>' +
-          data.featured.map((p) => `<option value="${p.slug}">${p.display} (${p.hospital_count.toLocaleString()} hospitals)</option>`).join("");
-      })
-      .catch(() => {
-        payerSel.innerHTML = '<option value="">Failed to load</option>';
-      });
-    payerForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const slug = payerSel.value;
-      if (slug) location.href = "/payer/" + encodeURIComponent(slug);
-    });
-  }
+			if (!code) {
+				if (procMsg) procMsg.textContent = msg;
+				return;
+			}
+			if (procMsg) procMsg.textContent = `Checking ${code}…`;
+			try {
+				const r = await fetch(`/api/procedure/${encodeURIComponent(code)}`, {
+					cache: "no-store",
+				});
+				if (r.status === 404) {
+					procMsg.textContent = `Code ${code} isn't in our top 5,000 indexed procedures yet. Try a more common procedure or browse hospital prices directly.`;
+					return;
+				}
+				if (!r.ok) {
+					procMsg.textContent = `Couldn't load ${code} (HTTP ${r.status}). Try again.`;
+					return;
+				}
+			} catch {
+				// network error — destination page handles 404 itself
+			}
+			location.href = `/procedure/${encodeURIComponent(code)}`;
+		});
+	}
 
-  load();
+	const hospForm = document.getElementById("by-hosp-form");
+	if (hospForm) {
+		hospForm.addEventListener("submit", (e) => {
+			e.preventDefault();
+			const v = document.getElementById("by-hosp-input").value.trim();
+			if (/^\d{6}$/.test(v)) {
+				location.href = `/hospital/${v}`;
+			} else if (v) {
+				const q = document.getElementById("q");
+				if (q) {
+					q.value = v;
+					q.dispatchEvent(new Event("input"));
+					document
+						.getElementById("search")
+						.scrollIntoView({ behavior: "smooth" });
+				}
+			}
+		});
+	}
+
+	const payerForm = document.getElementById("by-payer-form");
+	const payerSel = document.getElementById("by-payer-select");
+	if (payerForm && payerSel) {
+		fetch("/api/payers-index")
+			.then((r) => (r.ok ? r.json() : null))
+			.then((data) => {
+				if (!data?.featured) {
+					payerSel.innerHTML = '<option value="">No payer index yet</option>';
+					return;
+				}
+				payerSel.innerHTML =
+					'<option value="">Choose your insurance…</option>' +
+					data.featured
+						.map(
+							(p) =>
+								`<option value="${p.slug}">${p.display} (${p.hospital_count.toLocaleString()} hospitals)</option>`,
+						)
+						.join("");
+			})
+			.catch(() => {
+				payerSel.innerHTML = '<option value="">Failed to load</option>';
+			});
+		payerForm.addEventListener("submit", (e) => {
+			e.preventDefault();
+			const slug = payerSel.value;
+			if (slug) location.href = `/payer/${encodeURIComponent(slug)}`;
+		});
+	}
+
+	load();
 })();
