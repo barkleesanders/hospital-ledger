@@ -102,6 +102,7 @@ function hospitalCards(data: ProcedureData) {
       <a
         href={`/hospital/${h.ccn}`}
         class={`block rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 hover:border-emerald-700/50 transition ${isLow || isHigh ? "opacity-70" : ""}`}
+        data-payers={JSON.stringify(h.payers ?? [])}
       >
         <div class="flex items-baseline justify-between gap-2 mb-2 min-w-0">
           <div class="font-medium text-emerald-300 truncate text-sm">{h.name}</div>
@@ -156,7 +157,7 @@ function hospitalRows(data: ProcedureData) {
       </span>
     ) : null;
     return (
-      <tr class={`hover:bg-zinc-900/50 ${isLow || isHigh ? "opacity-70" : ""}`}>
+      <tr class={`hover:bg-zinc-900/50 ${isLow || isHigh ? "opacity-70" : ""}`} data-payers={JSON.stringify(h.payers ?? [])}>
         <td class="px-3 py-2">
           <a href={`/hospital/${h.ccn}`} class="text-emerald-300 hover:underline">
             {h.name}
@@ -210,6 +211,7 @@ function procedurePage(data: ProcedureData, url: string){
       description={seoDesc}
       ogTitle={`${name} (${data.code}) — Hospital Ledger`}
       url={url}
+      scriptSrc="/procedure-client.js"
     >
       <PageHeader eyebrow="Procedure" />
       <main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
@@ -264,6 +266,7 @@ function procedurePage(data: ProcedureData, url: string){
           class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 mb-4"
           data-states={JSON.stringify([...states].sort())}
           data-payers={JSON.stringify([...payers.entries()].sort((a, b) => a[1].localeCompare(b[1])))}
+          data-cash-median={data.stats.cash_p50}
         >
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>

@@ -549,23 +549,79 @@
     });
   };
 
-  const resolveQuery = (raw) => {
+  const resolveQuery = async (raw) => {
     const q = (raw || "").trim();
-    if (!q) return { code: null, msg: "" };
+    if (!q) return { code: null, msg: "", matches: [] };
     const upper = q.toUpperCase();
+    // If it looks like a code (alphanumeric, 4-7 chars), treat it as one directly
     if (/^[A-Z0-9]{4,7}$/.test(upper)) {
-      return { code: upper, msg: "" };
+      return { code: upper, msg: "", matches: [] };
     }
+    // Otherwise it's a procedure name search - use full CPT index
+    await ensureCptIndex();
+    if (!cptIndex) {
+      // Fallback to COMMON_PROCEDURES if index not available
+      const lower = q.toLowerCase();
+      const matches = Object.entries(COMMON_PROCEDURES).filter(([, desc]) => desc.toLowerCase().includes(lower));
+      if (matches.length === 1) return { code: matches[0][0], msg: `Matched: ${matches[0][1]}`, matches: [] };
+      if (matches.length > 1)
+        return {
+          code: null,
+          msg: `${matches.length} matches — pick one from the dropdown (or type the exact 5-digit CPT code).`,
+          matches: matches.map(([code, desc]) => ({ code, desc })),
+        };
+      return { code: null, msg: `No match for "${q}". Try a CPT/HCPCS code (e.g. 45378) or a common name (e.g. "colonoscopy").`, matches: [] };
+    }
+    
+    // Search through full CPT index by procedure name
     const lower = q.toLowerCase();
-    const matches = Object.entries(COMMON_PROCEDURES).filter(([, desc]) => desc.toLowerCase().includes(lower));
-    if (matches.length === 1) return { code: matches[0][0], msg: `Matched: ${matches[0][1]}` };
-    if (matches.length > 1)
-      return {
-        code: null,
-        msg: `${matches.length} matches — pick one from the dropdown (or type the exact 5-digit CPT code).`,
-      };
-    return { code: null, msg: `No match for "${q}". Try a CPT/HCPCS code (e.g. 45378) or a common name (e.g. "colonoscopy").` };
+    const allCodes = Object.keys(cptIndex);
+    const codeMatches = [];
+    
+    // First try exact name match in COMMON_PROCEDURES for better UX
+    for (const [code, desc] of Object.entries(COMMON_PROCEDURES)) {
+      if (desc.toLowerCase().includes(lower)) {
+        codeMatches.push({ code, desc, priority: 1 });
+      }
+    }
+    
+    // Then search through all codes in the index
+    for (const code of allCodes) {
+      const desc = COMMON_PROCEDURES[code] || lookupCptDescription(code);
+      if (desc && desc.toLowerCase().includes(lower) && !codeMatches.find(m => m.code === code)) {
+        codeMatches.push({ code, desc, priority: 2 });
+      }
+    }
+    
+    // Sort by priority (common procedures first), then by code
+    codeMatches.sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return a.code.localeCompare(b.code);
+    });
+    
+    if (codeMatches.length === 0) {
+      return { code: null, msg: `No matching procedures found for "${q}". Try a different term or a CPT/HCPCS code (e.g. 45378).`, matches: [] };
+    }
+    if (codeMatches.length === 1) {
+      return { code: codeMatches[0].code, msg: `Matched: ${codeMatches[0].desc}`, matches: [] };
+    }
+    // Multiple matches - show picker
+    return {
+      code: null,
+      msg: `Found ${codeMatches.length} matching procedures. Please select one:`,
+      matches: codeMatches.slice(0, 10), // Limit to top 10 matches
+    };
   };
+  
+  // Helper to lookup description from index data
+  function lookupCptDescription(code) {
+    // Try to get a description from the first hospital entry in the index
+    const rows = cptIndex[code];
+    if (rows && rows.length > 0 && rows[0].desc) {
+      return rows[0].desc;
+    }
+    return code; // Fallback to just the code
+  }
 
   const procForm = document.getElementById("by-proc-form");
   const procInput = document.getElementById("by-proc-input");
@@ -588,7 +644,40 @@
     procForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const raw = procInput.value;
-      const { code, msg } = resolveQuery(raw);
+      const result = await resolveQuery(raw);
+      const { code, msg, matches } = result;
+      
+      if (matches && matches.length > 0) {
+        // Show picker UI for multiple matches
+        if (procMsg) {
+          const pickerHtml = `
+            <div class="mt-2">
+              <div class="text-emerald-300 mb-2">${escapeHtml(msg)}</div>
+              <div class="space-y-1 max-h-64 overflow-y-auto">
+                ${matches.map(m => `
+                  <button type="button" data-select-code="${escapeHtml(m.code)}" 
+                    class="block w-full text-left px-3 py-2 rounded border border-zinc-700 hover:border-emerald-500 hover:bg-zinc-800 transition text-sm">
+                    <span class="mono text-emerald-300">${escapeHtml(m.code)}</span> — <span class="text-zinc-300">${escapeHtml(m.desc)}</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          `;
+          procMsg.innerHTML = pickerHtml;
+          
+          // Wire up picker buttons
+          procMsg.querySelectorAll('[data-select-code]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const selectedCode = btn.getAttribute('data-select-code');
+              procInput.value = selectedCode;
+              procMsg.textContent = `Going to ${selectedCode}…`;
+              location.href = "/procedure/" + encodeURIComponent(selectedCode);
+            });
+          });
+        }
+        return;
+      }
+      
       if (!code) {
         if (procMsg) procMsg.textContent = msg;
         return;

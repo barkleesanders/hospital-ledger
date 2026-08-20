@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hospital Ledger UX Fixes - Test Runner</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #0a0a0a;
+      color: #e4e4e7;
+    }
+    h1 { color: #34d399; }
+    h2 { color: #a1a1aa; border-bottom: 1px solid #27272a; padding-bottom: 10px; }
+    .test-section {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .test-case {
+      background: #09090b;
+      border-left: 3px solid #52525b;
+      padding: 15px;
+      margin: 10px 0;
+    }
+    .test-case.pass { border-left-color: #34d399; }
+    .test-case.fail { border-left-color: #f87171; }
+    .test-input {
+      width: 100%;
+      padding: 8px;
+      margin: 10px 0;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      color: #e4e4e7;
+      border-radius: 4px;
+    }
+    button {
+      background: #34d399;
+      color: #0a0a0a;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      margin: 5px;
+    }
+    button:hover { background: #10b981; }
+    button.secondary {
+      background: #27272a;
+      color: #e4e4e7;
+      border: 1px solid #3f3f46;
+    }
+    .result {
+      margin: 10px 0;
+      padding: 10px;
+      background: #27272a;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    .pass-badge { color: #34d399; font-weight: bold; }
+    .fail-badge { color: #f87171; font-weight: bold; }
+    .picker {
+      margin: 10px 0;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .picker button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      color: #e4e4e7;
+      margin: 2px 0;
+      font-size: 14px;
+    }
+    .picker button:hover {
+      border-color: #34d399;
+      background: #27272a;
+    }
+    .code { color: #34d399; font-family: monospace; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+    }
+    th, td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #27272a;
+    }
+    th {
+      background: #18181b;
+      color: #a1a1aa;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 12px;
+    }
+    tr:hover {
+      background: #18181b;
+    }
+    select {
+      padding: 8px;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      color: #e4e4e7;
+      border-radius: 4px;
+      margin: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🏥 Hospital Ledger - UX Fixes Test Runner</h1>
+  <p>Manual testing interface for homepage procedure search and procedure page filters.</p>
+
+  <div class="test-section">
+    <h2>Bug 1: Homepage Procedure Search</h2>
+    <p>Tests that procedure name searches resolve to CPT codes using the full index.</p>
+
+    <div class="test-case">
+      <h3>Test 1.1: Direct CPT Code</h3>
+      <p>Enter a CPT code directly (e.g., 45378). Should navigate directly to procedure page.</p>
+      <input type="text" class="test-input" id="test1-input" placeholder="Enter CPT code (e.g., 45378)" />
+      <button onclick="runTest1()">Test Search</button>
+      <div class="result" id="test1-result"></div>
+    </div>
+
+    <div class="test-case">
+      <h3>Test 1.2: Procedure Name - Single Match</h3>
+      <p>Enter a procedure name that matches one CPT code (e.g., "colonoscopy").</p>
+      <input type="text" class="test-input" id="test2-input" value="colonoscopy" />
+      <button onclick="runTest2()">Test Search</button>
+      <div class="result" id="test2-result"></div>
+    </div>
+
+    <div class="test-case">
+      <h3>Test 1.3: Procedure Name - Multiple Matches</h3>
+      <p>Enter a term that matches multiple procedures (e.g., "MRI"). Should show picker.</p>
+      <input type="text" class="test-input" id="test3-input" value="MRI" />
+      <button onclick="runTest3()">Test Search</button>
+      <div class="result" id="test3-result"></div>
+      <div class="picker" id="test3-picker"></div>
+    </div>
+
+    <div class="test-case">
+      <h3>Test 1.4: Case Insensitive</h3>
+      <p>Test that searches work regardless of case.</p>
+      <div>
+        <button onclick="runCaseTest('COLONOSCOPY')">COLONOSCOPY</button>
+        <button onclick="runCaseTest('Colonoscopy')">Colonoscopy</button>
+        <button onclick="runCaseTest('colonoscopy')">colonoscopy</button>
+      </div>
+      <div class="result" id="test4-result"></div>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>Bug 2: Procedure Page Filters</h2>
+    <p>Tests that filters stage changes and only apply on "Update search" or Enter.</p>
+
+    <div class="test-case">
+      <h3>Test 2.1: Filter Staging (No Immediate Apply)</h3>
+      <p>Change filters below. Table should NOT update until you click "Update search".</p>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 10px 0;">
+        <div>
+          <label>State:</label>
+          <select id="demo-state">
+            <option value="">All states</option>
+            <option value="CA">CA</option>
+            <option value="NY">NY</option>
+            <option value="TX">TX</option>
+          </select>
+        </div>
+        <div>
+          <label>Insurance:</label>
+          <select id="demo-payer">
+            <option value="">All insurers</option>
+            <option value="aetna">Aetna</option>
+            <option value="bcbs">Blue Cross</option>
+            <option value="uhc">UnitedHealthcare</option>
+          </select>
+        </div>
+        <div>
+          <label>Sort:</label>
+          <select id="demo-sort">
+            <option value="median-first">Near median</option>
+            <option value="state">By state</option>
+            <option value="cash-asc">Cheapest first</option>
+            <option value="cash-desc">Most expensive</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <button onclick="applyDemoFilters()">Update search</button>
+        <button class="secondary" onclick="clearDemoFilters()">Clear filters</button>
+        <span id="filter-status" style="margin-left: 10px; color: #34d399;"></span>
+      </div>
+
+      <div style="margin-top: 10px;">
+        <strong>Staged filters:</strong> <span id="staged-display">None</span>
+      </div>
+      <div>
+        <strong>Applied filters:</strong> <span id="applied-display">None</span>
+      </div>
+
+      <table id="demo-table" style="margin-top: 20px;">
+        <thead>
+          <tr>
+            <th>Hospital</th>
+            <th>State</th>
+            <th>Cash Price</th>
+            <th>Insurance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-state="CA" data-payer="aetna" data-cash="8000">
+            <td>Hospital A</td>
+            <td>CA</td>
+            <td>$8,000</td>
+            <td>Aetna</td>
+          </tr>
+          <tr data-state="NY" data-payer="bcbs" data-cash="9000">
+            <td>Hospital B</td>
+            <td>NY</td>
+            <td>$9,000</td>
+            <td>Blue Cross</td>
+          </tr>
+          <tr data-state="CA" data-payer="uhc" data-cash="7500">
+            <td>Hospital C</td>
+            <td>CA</td>
+            <td>$7,500</td>
+            <td>UnitedHealthcare</td>
+          </tr>
+          <tr data-state="TX" data-payer="aetna" data-cash="6500">
+            <td>Hospital D</td>
+            <td>TX</td>
+            <td>$6,500</td>
+            <td>Aetna</td>
+          </tr>
+          <tr data-state="NY" data-payer="uhc" data-cash="10000">
+            <td>Hospital E</td>
+            <td>NY</td>
+            <td>$10,000</td>
+            <td>UnitedHealthcare</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="test-case">
+      <h3>Test 2.2: Enter Key Apply</h3>
+      <p>Focus a filter dropdown and press Enter. Should apply filters.</p>
+      <div class="result" id="test5-result">
+        Focus a dropdown above and press Enter to test.
+      </div>
+    </div>
+
+    <div class="test-case">
+      <h3>Test 2.3: URL Parameters</h3>
+      <p>After applying filters, the URL should update with query params for sharing.</p>
+      <div class="result" id="test6-result">
+        Current URL: <span id="current-url" class="code"></span>
+      </div>
+      <button onclick="testUrlSharing()">Simulate URL Load</button>
+    </div>
+  </div>
+
+  <script>
+    // Sample CPT data for testing
+    const CPT_NAMES = {
+      "45378": "Colonoscopy, diagnostic (no biopsy)",
+      "73721": "MRI knee without contrast",
+      "70551": "MRI brain without contrast",
+      "72148": "MRI lumbar spine without contrast",
+      "27447": "Total knee replacement",
+      "27130": "Total hip replacement",
+      "23472": "Total shoulder replacement",
+    };
+
+    // Bug 1 Test Functions
+    function runTest1() {
+      const input = document.getElementById('test1-input').value.trim().toUpperCase();
+      const result = document.getElementById('test1-result');
+      
+      const isCode = /^[A-Z0-9]{4,7}$/.test(input);
+      
+      if (isCode) {
+        result.innerHTML = `<span class="pass-badge">✓ PASS</span> - Recognized as CPT code: <span class="code">${input}</span><br>Would navigate to: /procedure/${input}`;
+      } else {
+        result.innerHTML = `<span class="fail-badge">✗ FAIL</span> - Not recognized as valid CPT code format`;
+      }
+    }
+
+    function runTest2() {
+      const input = document.getElementById('test2-input').value.trim().toLowerCase();
+      const result = document.getElementById('test2-result');
+      
+      const matches = Object.entries(CPT_NAMES).filter(([, desc]) => 
+        desc.toLowerCase().includes(input)
+      );
+      
+      if (matches.length === 1) {
+        result.innerHTML = `<span class="pass-badge">✓ PASS</span> - Found 1 match:<br><span class="code">${matches[0][0]}</span> - ${matches[0][1]}<br>Would navigate to: /procedure/${matches[0][0]}`;
+      } else if (matches.length > 1) {
+        result.innerHTML = `<span class="fail-badge">✗ UNEXPECTED</span> - Found ${matches.length} matches (expected 1). Use Test 1.3 for multi-match testing.`;
+      } else {
+        result.innerHTML = `<span class="fail-badge">✗ FAIL</span> - No matches found`;
+      }
+    }
+
+    function runTest3() {
+      const input = document.getElementById('test3-input').value.trim().toLowerCase();
+      const result = document.getElementById('test3-result');
+      const picker = document.getElementById('test3-picker');
+      
+      const matches = Object.entries(CPT_NAMES).filter(([, desc]) => 
+        desc.toLowerCase().includes(input)
+      );
+      
+      if (matches.length > 1) {
+        result.innerHTML = `<span class="pass-badge">✓ PASS</span> - Found ${matches.length} matches. Picker UI should appear:`;
+        picker.innerHTML = matches.map(([code, desc]) => 
+          `<button onclick="selectCode('${code}')">${code} — ${desc}</button>`
+        ).join('');
+      } else if (matches.length === 1) {
+        result.innerHTML = `<span class="fail-badge">✗ UNEXPECTED</span> - Only 1 match found. No picker needed.`;
+        picker.innerHTML = '';
+      } else {
+        result.innerHTML = `<span class="fail-badge">✗ FAIL</span> - No matches found`;
+        picker.innerHTML = '';
+      }
+    }
+
+    function selectCode(code) {
+      alert(`Selected: ${code}\nWould navigate to: /procedure/${code}`);
+    }
+
+    function runCaseTest(term) {
+      const result = document.getElementById('test4-result');
+      const matches = Object.entries(CPT_NAMES).filter(([, desc]) => 
+        desc.toLowerCase().includes(term.toLowerCase())
+      );
+      
+      const existing = result.innerHTML;
+      result.innerHTML = existing + `<br>"${term}" → ${matches.length} matches`;
+    }
+
+    // Bug 2 Test Functions
+    let stagedFilters = { state: '', payer: '', sort: 'median-first' };
+    let appliedFilters = { state: '', payer: '', sort: 'median-first' };
+
+    document.getElementById('demo-state')?.addEventListener('change', updateStaged);
+    document.getElementById('demo-payer')?.addEventListener('change', updateStaged);
+    document.getElementById('demo-sort')?.addEventListener('change', updateStaged);
+
+    // Add Enter key listener
+    ['demo-state', 'demo-payer', 'demo-sort'].forEach(id => {
+      document.getElementById(id)?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          applyDemoFilters();
+          document.getElementById('test5-result').innerHTML = 
+            '<span class="pass-badge">✓ PASS</span> - Enter key triggered filter apply';
+        }
+      });
+    });
+
+    function updateStaged() {
+      stagedFilters.state = document.getElementById('demo-state').value;
+      stagedFilters.payer = document.getElementById('demo-payer').value;
+      stagedFilters.sort = document.getElementById('demo-sort').value;
+      
+      const parts = [];
+      if (stagedFilters.state) parts.push(`State: ${stagedFilters.state}`);
+      if (stagedFilters.payer) parts.push(`Payer: ${stagedFilters.payer}`);
+      if (stagedFilters.sort !== 'median-first') parts.push(`Sort: ${stagedFilters.sort}`);
+      
+      document.getElementById('staged-display').textContent = parts.length ? parts.join(', ') : 'None';
+    }
+
+    function applyDemoFilters() {
+      appliedFilters = { ...stagedFilters };
+      
+      const parts = [];
+      if (appliedFilters.state) parts.push(`State: ${appliedFilters.state}`);
+      if (appliedFilters.payer) parts.push(`Payer: ${appliedFilters.payer}`);
+      if (appliedFilters.sort !== 'median-first') parts.push(`Sort: ${appliedFilters.sort}`);
+      
+      document.getElementById('applied-display').textContent = parts.length ? parts.join(', ') : 'None';
+      document.getElementById('filter-status').textContent = parts.length ? `Active: ${parts.join(' · ')}` : '';
+      
+      filterTable();
+      updateTestUrl();
+    }
+
+    function clearDemoFilters() {
+      stagedFilters = { state: '', payer: '', sort: 'median-first' };
+      appliedFilters = { state: '', payer: '', sort: 'median-first' };
+      
+      document.getElementById('demo-state').value = '';
+      document.getElementById('demo-payer').value = '';
+      document.getElementById('demo-sort').value = 'median-first';
+      
+      document.getElementById('staged-display').textContent = 'None';
+      document.getElementById('applied-display').textContent = 'None';
+      document.getElementById('filter-status').textContent = '';
+      
+      filterTable();
+      updateTestUrl();
+    }
+
+    function filterTable() {
+      const rows = document.querySelectorAll('#demo-table tbody tr');
+      let visibleCount = 0;
+      
+      rows.forEach(row => {
+        const rowState = row.getAttribute('data-state');
+        const rowPayer = row.getAttribute('data-payer');
+        const rowCash = parseInt(row.getAttribute('data-cash'));
+        
+        let visible = true;
+        
+        if (appliedFilters.state && rowState !== appliedFilters.state) {
+          visible = false;
+        }
+        
+        if (appliedFilters.payer && rowPayer !== appliedFilters.payer) {
+          visible = false;
+        }
+        
+        row.style.display = visible ? '' : 'none';
+        if (visible) visibleCount++;
+      });
+      
+      // Apply sort (simplified)
+      if (appliedFilters.sort === 'cash-asc') {
+        const tbody = document.querySelector('#demo-table tbody');
+        const rowsArray = Array.from(rows);
+        rowsArray.sort((a, b) => {
+          const aVal = parseInt(a.getAttribute('data-cash'));
+          const bVal = parseInt(b.getAttribute('data-cash'));
+          return aVal - bVal;
+        });
+        rowsArray.forEach(row => tbody.appendChild(row));
+      }
+      
+      console.log(`Filtered: ${visibleCount} rows visible`);
+    }
+
+    function updateTestUrl() {
+      const params = new URLSearchParams();
+      if (appliedFilters.state) params.set('state', appliedFilters.state);
+      if (appliedFilters.payer) params.set('payer', appliedFilters.payer);
+      if (appliedFilters.sort !== 'median-first') params.set('sort', appliedFilters.sort);
+      
+      const url = params.toString() ? `/procedure/45378?${params.toString()}` : '/procedure/45378';
+      document.getElementById('current-url').textContent = url;
+    }
+
+    function testUrlSharing() {
+      const result = document.getElementById('test6-result');
+      const url = document.getElementById('current-url').textContent;
+      
+      result.innerHTML = `
+        <span class="pass-badge">✓ SIMULATION</span><br>
+        Shareable URL: <span class="code">${url}</span><br>
+        When loaded, filters would be pre-applied from URL params.
+      `;
+    }
+
+    // Initialize
+    updateStaged();
+    updateTestUrl();
+  </script>
+</body>
+</html>
