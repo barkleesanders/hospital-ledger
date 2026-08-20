@@ -551,20 +551,28 @@
 
   const resolveQuery = (raw) => {
     const q = (raw || "").trim();
-    if (!q) return { code: null, msg: "" };
+    if (!q) return { code: null, msg: "", matches: [] };
     const upper = q.toUpperCase();
+    // If it looks like a code (alphanumeric, 4-7 chars), treat it as one directly
     if (/^[A-Z0-9]{4,7}$/.test(upper)) {
-      return { code: upper, msg: "" };
+      return { code: upper, msg: "", matches: [] };
     }
+    // Otherwise it's a procedure name search - use COMMON_PROCEDURES (CPT_NAMES)
     const lower = q.toLowerCase();
     const matches = Object.entries(COMMON_PROCEDURES).filter(([, desc]) => desc.toLowerCase().includes(lower));
-    if (matches.length === 1) return { code: matches[0][0], msg: `Matched: ${matches[0][1]}` };
-    if (matches.length > 1)
-      return {
-        code: null,
-        msg: `${matches.length} matches — pick one from the dropdown (or type the exact 5-digit CPT code).`,
-      };
-    return { code: null, msg: `No match for "${q}". Try a CPT/HCPCS code (e.g. 45378) or a common name (e.g. "colonoscopy").` };
+    
+    if (matches.length === 0) {
+      return { code: null, msg: `No match for "${q}". Try a CPT/HCPCS code (e.g. 45378) or a common name (e.g. "colonoscopy").`, matches: [] };
+    }
+    if (matches.length === 1) {
+      return { code: matches[0][0], msg: `Matched: ${matches[0][1]}`, matches: [] };
+    }
+    // Multiple matches - show picker
+    return {
+      code: null,
+      msg: `Found ${matches.length} matching procedures. Please select one:`,
+      matches: matches.map(([code, desc]) => ({ code, desc })).slice(0, 10), // Limit to top 10
+    };
   };
 
   const procForm = document.getElementById("by-proc-form");
@@ -588,7 +596,39 @@
     procForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const raw = procInput.value;
-      const { code, msg } = resolveQuery(raw);
+      const { code, msg, matches } = resolveQuery(raw);
+      
+      if (matches && matches.length > 0) {
+        // Show picker UI for multiple matches
+        if (procMsg) {
+          const pickerHtml = `
+            <div class="mt-2">
+              <div class="text-emerald-300 mb-2">${escapeHtml(msg)}</div>
+              <div class="space-y-1 max-h-64 overflow-y-auto">
+                ${matches.map(m => `
+                  <button type="button" data-select-code="${escapeHtml(m.code)}" 
+                    class="block w-full text-left px-3 py-2 rounded border border-zinc-700 hover:border-emerald-500 hover:bg-zinc-800 transition text-sm">
+                    <span class="mono text-emerald-300">${escapeHtml(m.code)}</span> — <span class="text-zinc-300">${escapeHtml(m.desc)}</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          `;
+          procMsg.innerHTML = pickerHtml;
+          
+          // Wire up picker buttons
+          procMsg.querySelectorAll('[data-select-code]').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const selectedCode = btn.getAttribute('data-select-code');
+              procInput.value = selectedCode;
+              procMsg.textContent = `Going to ${selectedCode}…`;
+              location.href = "/procedure/" + encodeURIComponent(selectedCode);
+            });
+          });
+        }
+        return;
+      }
+      
       if (!code) {
         if (procMsg) procMsg.textContent = msg;
         return;
