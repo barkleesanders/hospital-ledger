@@ -67,7 +67,7 @@ app.use("*", async (c, next) => {
 	if (!h.has("Content-Security-Policy")) {
 		h.set(
 			"Content-Security-Policy",
-			"default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://analytics-collect.hospitalledger.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://analytics-collect.hospitalledger.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+			"default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://analytics-collect.hospitalledger.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://analytics-collect.hospitalledger.com https://cloudflareinsights.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
 		);
 	}
 });
