@@ -112,6 +112,9 @@ export const Layout: FC<LayoutProps> = ({
         `,
 					}}
 				/>
+
+				{/* Traks Analytics (self-hosted, cookieless) */}
+				<script defer src="https://traks-collect.barkleesanders.workers.dev/t.js" data-site="pb_live_yx6qihmu9eceff3n9wcubpmr" />
 			</head>
 			<body class={bodyClass ?? "min-h-screen"}>
 				{children}
