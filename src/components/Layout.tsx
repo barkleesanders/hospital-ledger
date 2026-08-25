@@ -8,6 +8,32 @@
 
 import { raw } from "hono/html";
 import type { FC, PropsWithChildren } from "hono/jsx";
+import summaryJson from "../../public/data/summary.json";
+
+/**
+ * The same generated summary the home page renders its headline stats from.
+ * The Dataset node below derives every figure from this object rather than
+ * repeating a literal, so a data refresh cannot leave the schema asserting a
+ * number the page no longer shows.
+ */
+const DATA = summaryJson;
+
+const n = (v: number) => v.toLocaleString("en-US");
+
+/**
+ * Dataset description. Google requires 50–5000 characters and requires the
+ * markup to match the visible page, which is why this is assembled from DATA
+ * rather than written out.
+ */
+const DATASET_DESCRIPTION =
+	`Compliance status for ${n(DATA.total_facilities)} U.S. hospitals under the federal hospital ` +
+	`price transparency rule (45 CFR Part 180), of which ${n(DATA.cms_required_total)} are required ` +
+	`to publish a machine-readable file; ${n(DATA.compliant)} have a verified live file ` +
+	`(${DATA.compliance_pct}%). Each record pairs CMS Hospital General Information with live ` +
+	`verification of the hospital's machine-readable file URL, plus CMS enforcement history ` +
+	`(${n(DATA.enforcement_actions_total)} actions). Includes ${n(DATA.standardized_price_rows)} ` +
+	`standardized price rows across ${n(DATA.standardized_price_hospitals)} hospitals and ` +
+	`${n(DATA.cpt_indexed_rows)} CPT-indexed rows. Public domain, no signup, no tracking.`;
 
 export type LayoutProps = PropsWithChildren<{
 	title: string;
@@ -94,30 +120,127 @@ export const Layout: FC<LayoutProps> = ({
 							// safety instead of becoming an injection point.
 							JSON.stringify({
 								"@context": "https://schema.org",
-								"@type": "WebSite",
-								name: "Hospital Ledger",
-								url: "https://hospitalledger.com/",
-								description,
-								license: "https://www.gnu.org/licenses/agpl-3.0.html",
-								// NO sameAs — and that is the honest state, not an oversight.
-								// The obvious anchor is the source repo the page advertises:
-								//   "Built in the open at github.com/barkleesanders/hospital-ledger"
-								// It was shipped here, and the /ship entity gate immediately
-								// flagged it DEAD (404). `gh api` confirms why: the repository
-								// is PRIVATE (verified 2026-08-24).
-								//
-								// A sameAs pointing at a 404 is worse than none — it tells a
-								// crawler this site's identity lives at a URL that does not
-								// exist. So it is removed rather than left to rot.
-								//
-								// Two ways to close this, both the owner's call, not tooling's:
-								//  * make the repo public -> restore the sameAs AND make the
-								//    page's "built in the open" claim true at the same time
-								//  * keep it private -> the body copy should stop saying the
-								//    project is built in the open at a link nobody can open
-								// Until one of those happens the gate reports BAD for this
-								// site, which is correct: there is no verifiable public
-								// identity to anchor to.
+								"@graph": [
+									{
+										"@type": "WebSite",
+										"@id": "https://hospitalledger.com/#website",
+										name: "Hospital Ledger",
+										url: "https://hospitalledger.com/",
+										description,
+										// CC0, NOT AGPL. An earlier revision of this node carried
+										// the AGPL URL — that was wrong and is corrected here: a
+										// WebSite's `license` describes the CONTENT, and the page
+										// says so in its own footer, "Data CC0 1.0 Universal ·
+										// Code AGPLv3". The code license belongs to the repo, not
+										// to the site's data.
+										license:
+											"http://creativecommons.org/publicdomain/zero/1.0/",
+										mainEntity: {
+											"@id": "https://hospitalledger.com/#dataset",
+										},
+										// NO sameAs — and that is the honest state, not an oversight.
+										// The obvious anchor is the source repo the page advertises:
+										//   "Built in the open at github.com/barkleesanders/hospital-ledger"
+										// It was shipped here, and the /ship entity gate immediately
+										// flagged it DEAD (404). `gh api` confirms why: the repository
+										// is PRIVATE (verified 2026-08-24).
+										//
+										// A sameAs pointing at a 404 is worse than none — it tells a
+										// crawler this site's identity lives at a URL that does not
+										// exist. So it is removed rather than left to rot.
+										//
+										// Two ways to close this, both the owner's call, not tooling's:
+										//  * make the repo public -> restore the sameAs AND make the
+										//    page's "built in the open" claim true at the same time
+										//  * keep it private -> the body copy should stop saying the
+										//    project is built in the open at a link nobody can open
+										// Until one of those happens the gate reports BAD for this
+										// site, which is correct: there is no verifiable public
+										// identity to anchor to.
+									},
+									{
+										// Dataset — the node that earns this site a discovery
+										// surface it is currently absent from.
+										//
+										// This site IS a dataset: per-hospital compliance records
+										// derived from CMS sources. Google indexes Dataset markup
+										// into Google Dataset Search, a SEPARATE index from web
+										// search with far less competition than "hospital prices".
+										// Unlike most schema, this is not a rich-result garnish on
+										// a page that would rank anyway — it is the entry ticket
+										// to a surface that otherwise cannot see us.
+										//
+										// EVERY NUMBER BELOW IS DERIVED, NEVER TYPED. They read
+										// from the same public/data/summary.json the home page
+										// renders, so a stat cannot drift from the visible text —
+										// which is both Google's requirement ("structured data
+										// matches the visible text") and this repo's own
+										// Copy-Truth Gate (scripts/predeploy_audit.py). Hardcoding
+										// 5,426 here would pass tsc, pass lint, render fine, and
+										// silently become a lie on the next data refresh.
+										"@type": "Dataset",
+										"@id": "https://hospitalledger.com/#dataset",
+										name: "U.S. Hospital Price Transparency Compliance Ledger",
+										description: DATASET_DESCRIPTION,
+										url: "https://hospitalledger.com/",
+										license:
+											"http://creativecommons.org/publicdomain/zero/1.0/",
+										isAccessibleForFree: true,
+										dateModified: DATA.generated_at,
+										spatialCoverage: {
+											"@type": "Place",
+											name: "United States",
+										},
+										keywords: [
+											"hospital price transparency",
+											"machine-readable file",
+											"CMS compliance",
+											"healthcare prices",
+											"chargemaster",
+											"45 CFR Part 180",
+										],
+										// The upstream sources the page already cites and links.
+										// Naming them lets an aggregator place this derived work
+										// relative to its origins.
+										isBasedOn: [
+											"https://data.cms.gov/provider-data/dataset/xubh-q36u",
+											"https://data.cms.gov/provider-characteristics/hospitals-and-other-facilities/hospital-price-transparency-enforcement-activities-and-outcomes",
+										],
+										// Real, live, public JSON — both verified 200
+										// application/json before being written here. A
+										// distribution URL that 404s is the same failure as a dead
+										// sameAs: it points an aggregator at data that isn't there.
+										distribution: [
+											{
+												"@type": "DataDownload",
+												name: "Nationwide compliance summary",
+												encodingFormat: "application/json",
+												contentUrl:
+													"https://hospitalledger.com/data/summary.json",
+											},
+											{
+												"@type": "DataDownload",
+												name: "Per-hospital records",
+												encodingFormat: "application/json",
+												contentUrl:
+													"https://hospitalledger.com/data/hospitals.json",
+											},
+										],
+										// NO `creator`. Google lists it as recommended and it is
+										// tempting to fill — but this site names no person or
+										// organization as author anywhere in its own text, and
+										// inventing one to satisfy a schema field is the exact
+										// fabrication the sibling sites' entity work avoided.
+										// sourceOrganization is CMS because that is true and the
+										// page says it; authorship stays unstated because the page
+										// leaves it unstated.
+										sourceOrganization: {
+											"@type": "GovernmentOrganization",
+											name: "Centers for Medicare & Medicaid Services",
+											url: "https://www.cms.gov/",
+										},
+									},
+								],
 							}).replace(/</g, "\\u003c"),
 						)}
 					</script>
