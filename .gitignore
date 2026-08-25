@@ -59,3 +59,7 @@ dist/
 .wrangler/
 .dev.vars
 .prices_build_stash/
+
+# Beads / Dolt files (added by bd init)
+.beads/proxieddb/
+*.gate.lock*
