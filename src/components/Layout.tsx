@@ -6,6 +6,7 @@
  * pipeline is intentionally out of scope this round.
  */
 
+import { raw } from "hono/html";
 import type { FC, PropsWithChildren } from "hono/jsx";
 
 export type LayoutProps = PropsWithChildren<{
@@ -50,6 +51,59 @@ export const Layout: FC<LayoutProps> = ({
 				<title>{title}</title>
 				<meta name="description" content={description} />
 				{url ? <link rel="canonical" href={url} /> : null}
+
+				{/*
+				  Entity anchor — HOME PAGE ONLY, and deliberately NOT an Organization.
+
+				  `sameAs` ties this site to another page about the same thing, so a
+				  crawler can reconcile them. Google lists it under Organization's
+				  RECOMMENDED properties (docs re-read 2026-08-24); it is a hint for
+				  entity understanding, not a ranking factor.
+
+				  ⛔ WHY THERE IS NO Organization NODE HERE.
+				  The three sibling sites (aivaclaims.com, improvebayarea.com,
+				  esbe.tech) each declare an organization. This one does not, because
+				  this site does not claim one: it says "wasn't cost-effective for one
+				  person", it is AGPLv3, and it names no company anywhere.
+
+				  Attaching ESBE Incorporated (the 501(c)(3) behind the other sites)
+				  would be inventing an affiliation — a false public statement about a
+				  real nonprofit's programs, made in machine-readable form that
+				  aggregators would then repeat. An empty slot is honest; a plausible
+				  claim is not. If this project ever IS put under an organization,
+				  that is a decision for its owner to state, not for tooling to infer.
+
+				  So the anchor is the one true external identity the site ALREADY
+				  publishes in its own body text: the public source repository. The
+				  node is a WebSite, which is what this is.
+
+				  The /ship gate requires an Organization by default; this page is
+				  cleared explicitly, so "no org" stays a stated decision rather than a
+				  silent omission:
+				    entity-sameas-check.sh https://hospitalledger.com \\
+				      --allow-types WebSite \\
+				      --forbid 'propublica|candid|every\\.org|aivaclaims'
+				*/}
+				{url === "https://hospitalledger.com/" ? (
+					<script type="application/ld+json">
+						{raw(
+							// raw() instead of dangerouslySetInnerHTML so biome's
+							// noDangerouslySetInnerHtml is satisfied by construction, not by a
+							// suppression comment. The `<` escape is standard JSON-LD hardening:
+							// nothing here is dynamic today, but a future field inherits the
+							// safety instead of becoming an injection point.
+							JSON.stringify({
+								"@context": "https://schema.org",
+								"@type": "WebSite",
+								name: "Hospital Ledger",
+								url: "https://hospitalledger.com/",
+								description,
+								license: "https://www.gnu.org/licenses/agpl-3.0.html",
+								sameAs: ["https://github.com/barkleesanders/hospital-ledger"],
+							}).replace(/</g, "\\u003c"),
+						)}
+					</script>
+				) : null}
 
 				{/* Open Graph */}
 				<meta property="og:title" content={resolvedOgTitle} />
