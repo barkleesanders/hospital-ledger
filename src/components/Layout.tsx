@@ -99,7 +99,25 @@ export const Layout: FC<LayoutProps> = ({
 								url: "https://hospitalledger.com/",
 								description,
 								license: "https://www.gnu.org/licenses/agpl-3.0.html",
-								sameAs: ["https://github.com/barkleesanders/hospital-ledger"],
+								// NO sameAs — and that is the honest state, not an oversight.
+								// The obvious anchor is the source repo the page advertises:
+								//   "Built in the open at github.com/barkleesanders/hospital-ledger"
+								// It was shipped here, and the /ship entity gate immediately
+								// flagged it DEAD (404). `gh api` confirms why: the repository
+								// is PRIVATE (verified 2026-08-24).
+								//
+								// A sameAs pointing at a 404 is worse than none — it tells a
+								// crawler this site's identity lives at a URL that does not
+								// exist. So it is removed rather than left to rot.
+								//
+								// Two ways to close this, both the owner's call, not tooling's:
+								//  * make the repo public -> restore the sameAs AND make the
+								//    page's "built in the open" claim true at the same time
+								//  * keep it private -> the body copy should stop saying the
+								//    project is built in the open at a link nobody can open
+								// Until one of those happens the gate reports BAD for this
+								// site, which is correct: there is no verifiable public
+								// identity to anchor to.
 							}).replace(/</g, "\\u003c"),
 						)}
 					</script>
