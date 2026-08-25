@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import summaryJson from "../public/data/summary.json";
 import { CPT_NAMES } from "./lib/cpt-names";
 import { readR2Json } from "./lib/r2";
 import { aboutNumbersPageHandler } from "./routes/about-the-numbers";
@@ -36,6 +37,25 @@ app.use("*", async (c, next) => {
 		h.set("Referrer-Policy", "strict-origin-when-cross-origin");
 	if (!h.has("Permissions-Policy"))
 		h.set("Permissions-Policy", "interest-cohort=()");
+	// COOP/CORP — the two /ship Phase 4.05 baseline headers this site was missing.
+	//
+	// COOP severs the window.opener relationship, so a page this site opens (or
+	// that opens this site) cannot reach back into its window. CORP is the more
+	// consequential one here: this site's whole purpose is to serve public JSON
+	// (/data/summary.json, /data/hospitals.json, and the per-hospital price
+	// files), and `same-site` would break exactly that. `cross-origin` is the
+	// correct value for a CC0 public dataset — it keeps the data embeddable by
+	// anyone, which is the point, while still opting the responses out of being
+	// silently pulled into another origin's process by Spectre-class attacks.
+	//
+	// Deliberately NOT setting COEP: it would require every cross-origin
+	// subresource to opt in via CORP/CORS, and this page loads Tailwind's Play
+	// CDN and Google Fonts, which do not. COEP's payoff is cross-origin isolation
+	// (SharedArrayBuffer, precise timers) that a static data site has no use for.
+	if (!h.has("Cross-Origin-Opener-Policy"))
+		h.set("Cross-Origin-Opener-Policy", "same-origin");
+	if (!h.has("Cross-Origin-Resource-Policy"))
+		h.set("Cross-Origin-Resource-Policy", "cross-origin");
 	if (!h.has("Strict-Transport-Security")) {
 		h.set(
 			"Strict-Transport-Security",
@@ -108,7 +128,25 @@ app.get("/api/summary.json", (c) => c.redirect("/data/summary.json", 301));
 // XML sitemap — top procedures, top payers, top hospitals, plus the home page.
 app.get("/sitemap.xml", async (c) => {
 	const SITE = "https://hospitalledger.com";
-	const lastmod = new Date().toISOString().slice(0, 10);
+	// lastmod is the DATA's generation date, not `new Date()`.
+	//
+	// It used to be `new Date().toISOString().slice(0,10)`, which told crawlers
+	// that every URL in the sitemap had changed today — every day, forever. That
+	// is not a stale-date bug, it is the opposite one, and it costs more: Google
+	// documents that it "uses the <lastmod> value if it's consistently and
+	// verifiably (for example by comparing to the last modification of the page)
+	// accurate" (developers.google.com/search/docs/crawling-indexing/sitemaps/
+	// build-sitemap, checked 2026-08-24). An always-today value fails that
+	// comparison on every page, so the signal is discarded wholesale — including
+	// for the pages that genuinely did change.
+	//
+	// This site's pages are renderings of one dataset, so the honest answer to
+	// "when did this page last significantly change?" is "when the data was
+	// regenerated" — the same timestamp the home page's Dataset node already
+	// publishes as `dateModified`. It is stable between refreshes (so Google can
+	// verify it), it advances on its own the next time `npm run refresh` runs,
+	// and it cannot drift from the page, because it IS the page's source.
+	const lastmod = summaryJson.generated_at.slice(0, 10);
 
 	// Hospitals: try R2 prices/index.json first; fall back to static
 	// /data/hospitals.json filtered to has_live_mrf=true.
