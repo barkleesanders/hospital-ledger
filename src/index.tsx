@@ -237,5 +237,6 @@ app.get("/", homePageHandler);
 // SSR methodology page explaining the gap between CMS-required, live MRF,
 // and standardized-price counts. Linked from the home-page hero + Section 03.
 app.get("/about-the-numbers", aboutNumbersPageHandler);
+app.get("/security.txt", (c) => c.redirect("/.well-known/security.txt", 301));
 
 export default app;
