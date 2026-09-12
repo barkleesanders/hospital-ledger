@@ -317,6 +317,31 @@ export const Layout: FC<LayoutProps> = ({
 			</head>
 			<body class={bodyClass ?? "min-h-screen"}>
 				{children}
+				<aside
+					aria-label="Veteran resource"
+					class="mx-auto max-w-6xl px-4 sm:px-6 mt-10"
+				>
+					<div class="rounded-xl border border-zinc-700 bg-zinc-900 p-5 sm:p-6">
+						<p class="text-base font-semibold text-zinc-100">
+							Preparing a VA disability claim?
+						</p>
+						<p class="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-300">
+							AIVA Claims helps veterans organize medical records and prepare
+							claim documents. You review the documents and submit your own
+							claim to the VA.
+						</p>
+						<a
+							href="https://aivaclaims.com/?utm_source=hospitalledger&utm_medium=referral&utm_campaign=veteran_resources"
+							class="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-300 underline underline-offset-4 hover:text-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4"
+						>
+							Explore AIVA Claims
+						</a>
+						<p class="mt-2 text-xs leading-relaxed text-zinc-400">
+							AIVA is a document-preparation tool, not a medical provider or a
+							VA-accredited claims agent.
+						</p>
+					</div>
+				</aside>
 				<footer class="border-t border-zinc-800 mt-10 sm:mt-12 py-6 text-center text-xs text-zinc-500">
 					<a href="/" class="hover:text-zinc-300">
 						Hospital Ledger
