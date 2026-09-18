@@ -59,6 +59,10 @@ const MODEL_FRAMES = [
 	'data: {"response":"","choices":[{"delta":{"content":""}}]}',
 	'data: {"response":"Only hospitals ","choices":[{"delta":{"content":"Only hospitals "}}]}',
 	'data: {"choices":[{"delta":{"reasoning":"SCRATCHPAD-MUST-NOT-LEAK","content":null}}]}',
+	// A digit-only token arrives as a bare JSON number (measured 2026-09-18; see ChunkSchema).
+	'data: {"response":4,"choices":[{"delta":{"content":"4"}}]}',
+	'data: {"response":",625 ","choices":[{"delta":{"content":",625 "}}]}',
+	'data: {"response":0}',
 	'data: {"response":"with rows.","choices":[{"delta":{"content":"with rows."}}]}',
 	'data: {"response":"","usage":{"completion_tokens":7,"total_tokens":300}}',
 	"data: [DONE]",
@@ -238,7 +242,13 @@ describe("POST /api/faq/ask — wire shape", () => {
 			.filter((e) => e.type === "text-delta")
 			.map((e) => e.delta);
 
-		expect(deltas).toEqual(["Only hospitals ", "with rows."]);
+		expect(deltas).toEqual([
+			"Only hospitals ",
+			"4",
+			",625 ",
+			"0",
+			"with rows.",
+		]);
 		expect(events.at(-2)).toBe(JSON.stringify({ type: "finish" }));
 		expect(events.at(-1)).toBe("[DONE]");
 	});
@@ -301,7 +311,7 @@ describe("POST /api/faq/ask — wire shape", () => {
 		expect(res.headers.get("content-type")).toContain("text/plain");
 		expect(res.headers.get("cache-control")).toBe("private, no-store");
 		expect(res.headers.get("cdn-cache-control")).toBe("no-store");
-		expect(await res.text()).toBe("Only hospitals with rows.");
+		expect(await res.text()).toBe("Only hospitals 4,625 0with rows.");
 	});
 
 	it("reads a form POST's context from the hidden field", async () => {

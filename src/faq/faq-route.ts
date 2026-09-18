@@ -305,13 +305,22 @@ ${corpus}`;
  * Text carried by one SSE chunk, whatever the model's shape. `||` not `??`: llama's stream
  * sends response:"" alongside real content on early frames (16bedlimit, measured 2026-08-26).
  */
+/**
+ * A token that is only digits arrives as a bare JSON NUMBER — {"response":4,...,"delta":
+ * {"content":"4"}} — measured 3/3 on wrangler dev with the real binding (2026-09-18, the
+ * model reporting itself as @cf/meta/llama-3.3-70b-instruct-sd): "there are 4,625" streamed
+ * as "there are ,625" because a string-only schema refused the whole frame. Accept numbers
+ * on both fields and stringify them.
+ */
+const TokenText = z.union([z.string(), z.number()]);
+
 const ChunkSchema = z.object({
-	response: z.string().optional(),
+	response: TokenText.optional(),
 	choices: z
 		.array(
 			z.object({
 				delta: z
-					.object({ content: z.string().nullable().optional() })
+					.object({ content: TokenText.nullable().optional() })
 					.optional(),
 			}),
 		)
@@ -326,8 +335,17 @@ const ChunkSchema = z.object({
 
 type Chunk = z.infer<typeof ChunkSchema>;
 
+/** A numeric token is text too: 4 → "4", 0 → "0" (never dropped as falsy). */
+function tokenText(v: string | number | null | undefined): string {
+	return typeof v === "number" ? String(v) : (v ?? "");
+}
+
 function pieceOf(chunk: Chunk): string {
-	return chunk.response || chunk.choices?.[0]?.delta?.content || "";
+	return (
+		tokenText(chunk.response) ||
+		tokenText(chunk.choices?.[0]?.delta?.content) ||
+		""
+	);
 }
 
 type StreamStats = { deltas: number; chars: number; tokens: number | null };

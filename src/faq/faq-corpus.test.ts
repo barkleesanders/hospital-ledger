@@ -164,6 +164,7 @@ describe("buildSiteCorpus / budget", () => {
 			`${SITE_ORIGIN}/`,
 			`${SITE_ORIGIN}/about-the-numbers`,
 			`${SITE_ORIGIN}/procedure/27130`,
+			`${SITE_ORIGIN}/`,
 		]);
 		// Copy that only the rendered pages carry (not the loader), so a stub would fail here.
 		expect(site[0].text).toContain("What does your hospital actually charge?");
@@ -173,6 +174,12 @@ describe("buildSiteCorpus / budget", () => {
 		);
 		expect(site[1].text).toContain("About the numbers");
 		expect(site[2].text).toContain("Professional fee only");
+		// The grade explainer carries the six elements and the three score bands.
+		expect(site[3].text).toContain("- Min / max negotiated charges");
+		expect(site[3].text).toContain(
+			"Score 80 or above: This hospital published most of what § 180 requires.",
+		);
+		expect(site[3].text).toContain("not the quality of care");
 		// Layout chrome is not content.
 		expect(site[0].text).not.toContain("Preparing a VA disability claim?");
 		expect(site[0].text).not.toContain("© 2026");

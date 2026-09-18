@@ -94,13 +94,38 @@ const PUBLIC_PAGES: PublicPage[] = [
 	},
 ];
 
+/**
+ * How a hospital page's compliance grade is scored — the card every /hospital/:ccn page
+ * opens with (src/routes/hospital.tsx ELEMENT_LABELS + complianceExplainer + the page's
+ * closing note). Built from the same exports the page renders from, so it cannot drift.
+ * Measured live before this doc existed: "What does the compliance grade measure?" was
+ * answered "not explicitly defined in the reference material" (2026-09-18).
+ */
+function gradesDoc(): FaqCorpusDoc {
+	return {
+		title:
+			"How a hospital's compliance grade is scored (shown on every hospital page)",
+		url: `${SITE_ORIGIN}/`,
+		text: [
+			'Every hospital page opens with a "45 CFR § 180 compliance" card: a letter grade (A, B, C, D or F) and a score out of 100, with a dot for each of the six data elements the federal hospital price transparency rule (45 CFR Part 180) requires a hospital to publish:',
+			...Object.values(ELEMENT_LABELS).map((label) => `- ${label}`),
+			`Score 80 or above: ${complianceExplainer(80)} Score 60 to 79: ${complianceExplainer(60)} Score below 60: ${complianceExplainer(0)}`,
+			"The compliance grade reflects how completely the hospital published the six required data elements, not the quality of care. Data comes straight from the hospital's federally-mandated machine-readable file.",
+			"Each hospital page also shows how many procedures it lists, how many insurances it has negotiated rates with, how many CPT / HCPCS codes it covers, a link to the hospital's source file, and its most expensive procedures by gross charge with cash, minimum and maximum negotiated prices.",
+		].join("\n"),
+	};
+}
+
 /** Build the site corpus from scratch (exported for tests; the loader caches it). */
 export function buildSiteCorpus(): FaqCorpusDoc[] {
-	return PUBLIC_PAGES.map((p) => ({
-		title: p.title,
-		url: `${SITE_ORIGIN}${p.path}`,
-		text: pageText(p.render()),
-	}));
+	return [
+		...PUBLIC_PAGES.map((p) => ({
+			title: p.title,
+			url: `${SITE_ORIGIN}${p.path}`,
+			text: pageText(p.render()),
+		})),
+		gradesDoc(),
+	];
 }
 
 let siteCached: FaqCorpusDoc[] | null = null;
