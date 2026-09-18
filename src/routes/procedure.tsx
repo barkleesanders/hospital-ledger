@@ -10,9 +10,11 @@
  */
 
 import type { Context } from "hono";
+import type { FC } from "hono/jsx";
 import { EditorialHero } from "../components/EditorialHero";
 import { Layout, PageHeader } from "../components/Layout";
 import { PriceHistogram } from "../components/PriceHistogram";
+import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
 import { lookupCptName } from "../lib/cpt-names";
 import { loadProcedure, type ProcedureData } from "../lib/data";
@@ -66,7 +68,8 @@ function notFoundPage(code: string, url: string) {
 	);
 }
 
-function procedureName(data: ProcedureData): string {
+/** Display name of a procedure; shared with the "Ask anything" corpus (src/faq/faq-corpus.ts). */
+export function procedureName(data: ProcedureData): string {
 	const desc = (data.desc || lookupCptName(data.code) || "")
 		.replace(/\s+/g, " ")
 		.trim();
@@ -218,13 +221,66 @@ function hospitalRows(data: ProcedureData) {
 	});
 }
 
+/** The note under "Cheapest published"; shared with the "Ask anything" corpus. */
+export function cashMinNote(flaggedLow: number): string {
+	return flaggedLow > 0
+		? `${flaggedLow} entries below $50 already filtered. Remaining low values usually reflect partial-cost line items (professional fee only), not full bills.`
+		: "Lowest published price across all reporting hospitals.";
+}
+
+/**
+ * "Why some prices look unrealistically low or high" — rendered on every procedure
+ * page, and rendered again into the "Ask anything" corpus so the model reads the
+ * same explanation the visitor does.
+ */
+export const PriceCaveats: FC = () => (
+	<details class="mb-4 rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-sm text-zinc-400">
+		<summary class="cursor-pointer text-zinc-300 hover:text-emerald-300">
+			Why some prices look unrealistically low or high
+		</summary>
+		<div class="mt-3 space-y-2 leading-relaxed">
+			<p>
+				Hospitals publish their machine-readable files (MRFs) the way they
+				choose. A single procedure code can appear with very different prices
+				depending on what's being charged:
+			</p>
+			<ul class="list-disc pl-5 space-y-1">
+				<li>
+					<strong class="text-zinc-300">Global price</strong> — facility +
+					implant + anesthesia + surgeon. This is what you'd actually be billed.
+				</li>
+				<li>
+					<strong class="text-zinc-300">Professional fee only</strong> —
+					surgeon's portion. Often $500–$2,500 for a major procedure that costs
+					$20K+ globally.
+				</li>
+				<li>
+					<strong class="text-zinc-300">Facility fee only</strong> — operating
+					room and recovery, no implant or surgeon.
+				</li>
+				<li>
+					<strong class="text-zinc-300">Per-unit / per-minute charges</strong> —
+					e.g. anesthesia time billed at $0.68/min appearing under a CPT code.
+				</li>
+				<li>
+					<strong class="text-zinc-300">Rate multipliers</strong> — values like
+					0.85 meaning "85% of Medicare" rather than dollars.
+				</li>
+			</ul>
+			<p>
+				We filter the most obvious artifacts (under $50, or 25× above the
+				median), but rows in the $500–$2K range for a major procedure are
+				typically professional-only and we can't always tell. Use the median and
+				high-end as the realistic range; treat very low rows as{" "}
+				<em>partial-cost line items</em>, not full bills.
+			</p>
+		</div>
+	</details>
+);
+
 function procedurePage(data: ProcedureData, url: string) {
 	const name = procedureName(data);
-	const flaggedLow = data.stats.flagged_low ?? 0;
-	const cashMinNote =
-		flaggedLow > 0
-			? `${flaggedLow} entries below $50 already filtered. Remaining low values usually reflect partial-cost line items (professional fee only), not full bills.`
-			: "Lowest published price across all reporting hospitals.";
+	const minNote = cashMinNote(data.stats.flagged_low ?? 0);
 
 	// SEO meta: keep description under ~160 chars and include hospital count + code.
 	const seoDesc = `Compare ${name} (${data.code}) prices across ${data.stats.hospital_count} U.S. hospitals — gross, cash, negotiated rates by insurance.`;
@@ -251,6 +307,8 @@ function procedurePage(data: ProcedureData, url: string) {
 			ogTitle={`${name} (${data.code}) — Hospital Ledger`}
 			url={url}
 			scriptSrc="/procedure-client.js"
+			stylesheets={["/faq.css"]}
+			moduleScripts={["/faq-island.js"]}
 		>
 			<PageHeader eyebrow="Procedure" />
 			<main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
@@ -264,9 +322,7 @@ function procedurePage(data: ProcedureData, url: string) {
 						<div class="mt-2 serif text-3xl sm:text-4xl md:text-5xl text-amber-300">
 							{fmtMoney(data.stats.cash_min)}
 						</div>
-						<div class="mt-2 text-sm text-zinc-400 leading-snug">
-							{cashMinNote}
-						</div>
+						<div class="mt-2 text-sm text-zinc-400 leading-snug">{minNote}</div>
 					</div>
 					<div>
 						<div class="label-eyebrow">
@@ -295,6 +351,13 @@ function procedurePage(data: ProcedureData, url: string) {
 						</div>
 					</div>
 				</section>
+
+				<div class="mb-8 md:mb-12">
+					<FaqAskRow
+						variant="procedure"
+						context={{ kind: "procedure", id: data.code }}
+					/>
+				</div>
 
 				<section class="mb-8 md:mb-12">
 					<div class="flex items-baseline justify-between mb-4 gap-2">
@@ -399,52 +462,7 @@ function procedurePage(data: ProcedureData, url: string) {
 					</div>
 				</section>
 
-				<details class="mb-4 rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-sm text-zinc-400">
-					<summary class="cursor-pointer text-zinc-300 hover:text-emerald-300">
-						Why some prices look unrealistically low or high
-					</summary>
-					<div class="mt-3 space-y-2 leading-relaxed">
-						<p>
-							Hospitals publish their machine-readable files (MRFs) the way they
-							choose. A single procedure code can appear with very different
-							prices depending on what's being charged:
-						</p>
-						<ul class="list-disc pl-5 space-y-1">
-							<li>
-								<strong class="text-zinc-300">Global price</strong> — facility +
-								implant + anesthesia + surgeon. This is what you'd actually be
-								billed.
-							</li>
-							<li>
-								<strong class="text-zinc-300">Professional fee only</strong> —
-								surgeon's portion. Often $500–$2,500 for a major procedure that
-								costs $20K+ globally.
-							</li>
-							<li>
-								<strong class="text-zinc-300">Facility fee only</strong> —
-								operating room and recovery, no implant or surgeon.
-							</li>
-							<li>
-								<strong class="text-zinc-300">
-									Per-unit / per-minute charges
-								</strong>{" "}
-								— e.g. anesthesia time billed at $0.68/min appearing under a CPT
-								code.
-							</li>
-							<li>
-								<strong class="text-zinc-300">Rate multipliers</strong> — values
-								like 0.85 meaning "85% of Medicare" rather than dollars.
-							</li>
-						</ul>
-						<p>
-							We filter the most obvious artifacts (under $50, or 25× above the
-							median), but rows in the $500–$2K range for a major procedure are
-							typically professional-only and we can't always tell. Use the
-							median and high-end as the realistic range; treat very low rows as{" "}
-							<em>partial-cost line items</em>, not full bills.
-						</p>
-					</div>
-				</details>
+				<PriceCaveats />
 
 				<section>
 					<div id="status" class="text-sm text-zinc-400 mb-2">

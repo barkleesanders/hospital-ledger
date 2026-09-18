@@ -1,5 +1,16 @@
 import { Hono } from "hono";
 import summaryJson from "../public/data/summary.json";
+import {
+	loadFaqCorpus,
+	recordContextDoc,
+	SITE_NAME,
+	SITE_ORIGIN,
+} from "./faq/faq-corpus";
+import {
+	type FaqAi,
+	type FaqRateLimiter,
+	mountInfiniteFaq,
+} from "./faq/faq-route";
 import { CPT_NAMES } from "./lib/cpt-names";
 import { readR2Json } from "./lib/r2";
 import { aboutNumbersPageHandler } from "./routes/about-the-numbers";
@@ -21,6 +32,10 @@ export type Env = {
 		HL_MRF_RAW: R2Bucket;
 		ASSETS: Fetcher;
 		SITE_NAME: string;
+		/** Workers AI (wrangler.jsonc `ai`) — the "Ask anything" row's model. */
+		AI: FaqAi;
+		/** Cloudflare Rate Limiting (wrangler.jsonc `ratelimits`) for /api/faq/ask. */
+		FAQ_RATE_LIMITER?: FaqRateLimiter;
 	};
 };
 
@@ -110,6 +125,25 @@ app.use("*", async (c, next) => {
 		return c.redirect(lowered + url.search, 301);
 	}
 	return next();
+});
+
+// "Ask anything" — POST /api/faq/ask streams a Workers AI answer grounded in the
+// site's own pages (src/faq/faq-corpus.ts) and, on a detail page, in the record on
+// screen. Registered with the API routes, above every SSR handler. The rules below
+// are the site's anti-fabrication contract: this is a price database, so a number the
+// model "completes" is worse than no answer.
+mountInfiniteFaq(app, {
+	siteName: SITE_NAME,
+	fallbackUrl: `${SITE_ORIGIN}/about-the-numbers`,
+	corpus: loadFaqCorpus,
+	contextDoc: recordContextDoc,
+	rateLimiter: (env) => env.FAQ_RATE_LIMITER,
+	extraRules: [
+		"Prices, counts, grades, dates and dollar amounts must be copied whole and exactly as the reference material states them, or reported as not listed — never rounded, completed or estimated.",
+		"Prices are what each hospital published in its own machine-readable file: they are not a quote, and what a patient pays depends on their insurance, deductible and the services provided; say so when a visitor asks what something will cost them.",
+		"The site has no phone numbers, email addresses, street addresses, charity-care or financial-assistance data: when asked for one, say the site does not list it and point the visitor to the hospital directly.",
+		"Never speak for CMS, HHS or a hospital, and never say whether a hospital is breaking the law; describe only what it published and the compliance grade the site gave it.",
+	],
 });
 
 // API routes (preserve byte-similar shapes with the legacy Pages Functions).

@@ -4,7 +4,10 @@
 	"main": "dist/index.js",
 	"compatibility_date": "2025-11-01",
 	"cache": { "enabled": true },
-	"compatibility_flags": ["nodejs_compat"],
+	// enable_request_signal: a Stop click (client disconnect) reaches the /api/faq/ask
+	// handler as request.signal so the model stream is cancelled instead of running to
+	// its end (developers.cloudflare.com/workers/runtime-apis/request/, read 2026-09-18).
+	"compatibility_flags": ["nodejs_compat", "enable_request_signal"],
 	"workers_dev": false,
 	"preview_urls": false,
 	"routes": [
@@ -31,5 +34,18 @@
 	],
 	"observability": {
 		"enabled": true
-	}
+	},
+	// Workers AI for the "Ask anything" row (src/faq/faq-route.ts). `remote: true`
+	// makes `wrangler dev` call the real model instead of a local stub.
+	"ai": { "binding": "AI", "remote": true },
+	// 20 questions per minute per client IP on /api/faq/ask. namespace_id is
+	// account-unique: aivaclaims 2026091801, improvebayarea 2026091802,
+	// improvecortland 2026091803, this worker 2026091804.
+	"ratelimits": [
+		{
+			"name": "FAQ_RATE_LIMITER",
+			"namespace_id": "2026091804",
+			"simple": { "limit": 20, "period": 60 }
+		}
+	]
 }

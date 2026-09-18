@@ -5,13 +5,15 @@
 
 import type { Context } from "hono";
 import { Layout, PageHeader } from "../components/Layout";
+import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
 import { type HospitalData, loadHospital } from "../lib/data";
 import { fmtMoney } from "../lib/format";
 
 const VALID_CCN = /^\d{6}$/;
 
-const ELEMENT_LABELS: Record<string, string> = {
+/** The six data elements 45 CFR § 180 requires; shared with the "Ask anything" corpus. */
+export const ELEMENT_LABELS: Record<string, string> = {
 	mrf: "Machine-readable file published",
 	gross: "Gross / standard charges",
 	cash: "Discounted cash price",
@@ -46,6 +48,15 @@ function notFoundPage(ccn: string, url: string) {
 	);
 }
 
+/** One sentence on the score band; shared with the "Ask anything" corpus (src/faq/faq-corpus.ts). */
+export function complianceExplainer(score: number): string {
+	return score >= 80
+		? "This hospital published most of what § 180 requires."
+		: score >= 60
+			? "This hospital published part of what § 180 requires."
+			: "This hospital published little of what § 180 requires.";
+}
+
 function hospitalPage(ccn: string, data: HospitalData, url: string) {
 	const name = data.hospital_name || `Hospital ${ccn}`;
 	const compliance = data.compliance ?? {};
@@ -64,18 +75,15 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 		}
 	}
 	const top = items.slice(0, 50);
-	const explainer =
-		score >= 80
-			? "This hospital published most of what § 180 requires."
-			: score >= 60
-				? "This hospital published part of what § 180 requires."
-				: "This hospital published little of what § 180 requires.";
+	const explainer = complianceExplainer(score);
 
 	return (
 		<Layout
 			title={`${name} — Hospital Ledger`}
 			description={`Prices and compliance for ${name}.`}
 			url={url}
+			stylesheets={["/faq.css"]}
+			moduleScripts={["/faq-island.js"]}
 		>
 			<header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
 				<div class="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8">
@@ -125,6 +133,13 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 						</div>
 					</div>
 				</section>
+
+				<div class="mb-6">
+					<FaqAskRow
+						variant="hospital"
+						context={{ kind: "hospital", id: ccn }}
+					/>
+				</div>
 
 				<section class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
 					<div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">

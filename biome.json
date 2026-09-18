@@ -20,7 +20,8 @@
 			"!!**/public/data",
 			"!!**/.prices_build_stash",
 			"!!**/.beads",
-			"!!**/_cpt_detail_raw.jsonl"
+			"!!**/_cpt_detail_raw.jsonl",
+			"!!**/public/faq-island.js"
 		]
 	},
 	"formatter": {

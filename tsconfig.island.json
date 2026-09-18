@@ -1,0 +1,18 @@
+{
+	"// why": "src/faq/faq-island.tsx is BROWSER code (hono/jsx/dom, document, fetch): the Worker tsconfig has no DOM lib and the wrong jsxImportSource, so the island is excluded there and typechecked here. `npm run typecheck` runs both.",
+	"compilerOptions": {
+		"target": "ES2022",
+		"lib": ["ES2022", "DOM", "DOM.Iterable"],
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"types": [],
+		"strict": true,
+		"noEmit": true,
+		"skipLibCheck": true,
+		"isolatedModules": true,
+		"verbatimModuleSyntax": true,
+		"jsx": "react-jsx",
+		"jsxImportSource": "hono/jsx/dom"
+	},
+	"include": ["src/faq/faq-island.tsx", "src/faq/faq-links.ts"]
+}

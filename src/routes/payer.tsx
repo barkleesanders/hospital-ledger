@@ -6,6 +6,7 @@
 import type { Context } from "hono";
 import { GradeBadge } from "../components/ComplianceBar";
 import { Layout, PageHeader } from "../components/Layout";
+import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
 import { loadPayer, type PayerData } from "../lib/data";
 import { fmtMoney } from "../lib/format";
@@ -48,6 +49,8 @@ function payerPage(slug: string, data: PayerData, url: string) {
 			title={`${display} prices — Hospital Ledger`}
 			description={`Hospitals that have negotiated rates with ${display}.`}
 			url={url}
+			stylesheets={["/faq.css"]}
+			moduleScripts={["/faq-island.js"]}
 		>
 			<header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
 				<div class="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8">
@@ -103,6 +106,10 @@ function payerPage(slug: string, data: PayerData, url: string) {
 						</div>
 					</div>
 				</section>
+
+				<div class="mb-6">
+					<FaqAskRow variant="payer" context={{ kind: "payer", id: slug }} />
+				</div>
 
 				<section class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 mb-4">
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-3">

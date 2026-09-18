@@ -38,7 +38,8 @@ const totalGap = compliant - standardized;
 const updated = S.generated_at.slice(0, 10);
 const fmt = (n: number) => n.toLocaleString("en-US");
 
-function aboutPage(url: string) {
+/** Exported so the "Ask anything" corpus (src/faq/faq-corpus.ts) renders the served copy. */
+export function aboutPage(url: string) {
 	return (
 		<Layout
 			title="About the numbers — Hospital Ledger"
