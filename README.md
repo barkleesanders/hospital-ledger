@@ -67,6 +67,20 @@ remaining (out of 3,986 CMS-required+live targets); 163 terminal exceptions
 documented in `data/coverage_terminal_exceptions.json`; full failure cluster
 breakdown in `data/coverage_closeout_status.json`.
 
+## Ask anything (site FAQ)
+
+Every page except the methodology page carries an "Ask anything" row: the home
+page directly under the hero's lead paragraph, and each hospital, procedure and
+insurance page under its headline card. It POSTs to `/api/faq/ask` (a real form
+with JavaScript off; a streaming island with it) and answers from the site's own
+rendered pages — the home page, `/about-the-numbers`, the procedure-page price
+caveats and the hospital-page grade key — plus, on a detail page, the record on
+screen re-read from R2 by id. Workers AI (`AI` binding, llama-3.3-70b), 20
+questions per minute per IP (`FAQ_RATE_LIMITER`), 8 KB body cap. The model is
+told to copy numbers whole or say they are not listed, and that prices are as
+published, never a quote. Code: `src/faq/`; tests: `npm run test:faq`; island
+bundle: `npm run build:faq-island` (committed to `public/faq-island.js`).
+
 ## Files
 
 | Path | Contents | Source |
