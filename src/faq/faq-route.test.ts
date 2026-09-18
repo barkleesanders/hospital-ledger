@@ -5,6 +5,7 @@ import {
 	type FaqAi,
 	type FaqCorpusDoc,
 	type FaqRateLimiter,
+	MAX_BODY_BYTES,
 	MAX_CORPUS_CHARS,
 	MAX_QUESTION_CHARS,
 	mountInfiniteFaq,
@@ -139,6 +140,7 @@ function build(options: {
 		});
 
 	return {
+		app,
 		ask,
 		post,
 		calls,
@@ -196,6 +198,38 @@ describe("POST /api/faq/ask — validation", () => {
 		});
 
 		expect(res.status).toBe(400);
+	});
+
+	it(`refuses a body over ${MAX_BODY_BYTES} bytes with 413 before parsing it — declared, and chunked with no Content-Length`, async () => {
+		const { post, calls, app, env, ip } = build({});
+		const big = JSON.stringify({ question: "x".repeat(MAX_BODY_BYTES) });
+
+		const declared = await post(big, {
+			"content-type": "application/json",
+			"content-length": String(big.length),
+		});
+		expect(declared.status).toBe(413);
+
+		const chunked = new ReadableStream<Uint8Array>({
+			start(controller) {
+				const enc = new TextEncoder();
+				for (let i = 0; i < big.length; i += 1024)
+					controller.enqueue(enc.encode(big.slice(i, i + 1024)));
+				controller.close();
+			},
+		});
+		// A streamed body has no Content-Length; node's fetch needs duplex:"half" to send one.
+		const streamed = await app.fetch(
+			new Request("http://x/api/faq/ask", {
+				method: "POST",
+				body: chunked,
+				headers: { "content-type": "application/json", "cf-connecting-ip": ip },
+				duplex: "half",
+			} as RequestInit),
+			env,
+		);
+		expect(streamed.status).toBe(413);
+		expect(calls).toHaveLength(0);
 	});
 
 	it("rejects a malformed context with 400 naming the page reference, and never reads the store", async () => {

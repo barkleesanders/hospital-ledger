@@ -484,27 +484,86 @@ function invalidBody(c: Context, contextBad: boolean): Response {
 	);
 }
 
+/**
+ * ceiling: Cloudflare accepts request bodies up to 100 MB on Free/Pro
+ *   (https://developers.cloudflare.com/workers/platform/limits/, read 2026-09-18), and
+ *   c.req.json()/formData() would materialise all of it before zod ever saw the 600-char
+ *   cap — ~2x the body in V8 against the 128 MB isolate cap, taking every other visitor's
+ *   stream on that isolate down with it.
+ * corpus: the largest legitimate body is {"question": 600 chars, "context": {kind, id up to
+ *   80 chars}} — under 2.6 KB even if every char is 4-byte UTF-8, ~2 KB as a URL-encoded
+ *   form. 8 KB refuses nothing real.
+ */
+export const MAX_BODY_BYTES = 8192;
+
+/**
+ * The request body as text, read chunk by chunk and abandoned the moment it passes
+ * MAX_BODY_BYTES — Content-Length is a hint (checked first, cheaply) but a chunked body
+ * carries none, so the reader is the actual bound. Returns null when too large.
+ */
+async function readBoundedBody(c: Context): Promise<string | null> {
+	const declared = Number(c.req.header("content-length") ?? 0);
+
+	if (declared > MAX_BODY_BYTES) return null;
+	const body = c.req.raw.body;
+
+	if (!body) return "";
+	const reader = body.getReader();
+	const chunks: Uint8Array[] = [];
+	let size = 0;
+
+	try {
+		for (;;) {
+			const { done, value } = await reader.read();
+
+			if (done) break;
+			size += value.byteLength;
+
+			if (size > MAX_BODY_BYTES) return null;
+			chunks.push(value);
+		}
+	} finally {
+		await reader.cancel().catch(() => undefined);
+	}
+
+	const bytes = new Uint8Array(size);
+	let at = 0;
+
+	for (const chunk of chunks) {
+		bytes.set(chunk, at);
+		at += chunk.byteLength;
+	}
+
+	return new TextDecoder().decode(bytes);
+}
+
 async function readQuestion(c: Context): Promise<AskRequest | Response> {
 	const ct = c.req.header("content-type") ?? "";
+	// application/x-www-form-urlencoded is what <form method="post"> sends; multipart is
+	// not accepted (it would need a parser over the bounded text and nothing sends it).
+	const form = ct.includes("application/x-www-form-urlencoded");
+	const text = await readBoundedBody(c);
 
-	const form =
-		ct.includes("application/x-www-form-urlencoded") ||
-		ct.includes("multipart/form-data");
+	if (text === null) {
+		return c.json(
+			{ error: `Ask a question of 1 to ${MAX_QUESTION_CHARS} characters.` },
+			413,
+		);
+	}
 
 	let parsed: z.ZodSafeParseResult<AskBody>;
 
-	try {
-		if (form) {
-			const fd = await c.req.formData();
-			parsed = AskFormBody.safeParse({
-				question: fd.get("question"),
-				context: fd.get("context") || undefined,
-			});
-		} else {
-			parsed = AskJsonBody.safeParse(await c.req.json());
-		}
-	} catch {
-		return c.json({ error: BODY_ERROR }, 400);
+	if (form) {
+		const fields = new URLSearchParams(text);
+		parsed = AskFormBody.safeParse({
+			question: fields.get("question"),
+			context: fields.get("context") || undefined,
+		});
+	} else {
+		const json = JsonText.safeParse(text);
+
+		if (!json.success) return c.json({ error: BODY_ERROR }, 400);
+		parsed = AskJsonBody.safeParse(json.data);
 	}
 
 	if (!parsed.success) {
