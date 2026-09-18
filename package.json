@@ -18,7 +18,7 @@
 		"audit:csp": "python3 scripts/csp_audit.py",
 		"test:faq": "vitest run --config vitest.faq.config.mjs",
 		"build:faq-island": "node tools/build-faq-island.mjs",
-		"probe:constrained": "node tests/probe-constrained.mjs"
+		"probe:constrained": "node tests/probe-constrained.mjs probe"
 	},
 	"dependencies": {
 		"hono": "^4.13.3",

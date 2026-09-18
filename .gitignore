@@ -63,3 +63,8 @@ dist/
 # Beads / Dolt files (added by bd init)
 .beads/proxieddb/
 *.gate.lock*
+
+# Pattern-43 constrained probe (tests/probe-constrained.mjs): playwright symlink + outputs
+tests/node_modules
+tests/probe-*.json
+tests/probe-*.png
