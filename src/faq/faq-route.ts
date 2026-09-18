@@ -147,6 +147,8 @@ export const MAX_QUESTION_CHARS = 600;
  *   the record document goes FIRST so the tail that would be cut if a page outgrows the
  *   budget is the methodology page, and the route logs faq.corpus.truncated naming it.
  */
+// The binding's own cap is 24,000 TOKENS of context (Workers AI error 5021, measured on
+// a sibling site 2026-09-18) — about 90,000 chars; 30,000 chars is ~7,500 tokens.
 export const MAX_CORPUS_CHARS = 30_000;
 
 /**
@@ -340,10 +342,16 @@ function tokenText(v: string | number | null | undefined): string {
 	return typeof v === "number" ? String(v) : (v ?? "");
 }
 
+/**
+ * `choices[0].delta.content` first: when the token is digits the `response` copy is a
+ * number and loses the token's whitespace ({"content":"7 \n"} beside {"response":7},
+ * measured on kingsandersheritage 2026-09-18). `response` is the fallback for a frame
+ * that carries only it.
+ */
 function pieceOf(chunk: Chunk): string {
 	return (
-		tokenText(chunk.response) ||
 		tokenText(chunk.choices?.[0]?.delta?.content) ||
+		tokenText(chunk.response) ||
 		""
 	);
 }

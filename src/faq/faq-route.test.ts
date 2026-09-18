@@ -62,6 +62,7 @@ const MODEL_FRAMES = [
 	// A digit-only token arrives as a bare JSON number (measured 2026-09-18; see ChunkSchema).
 	'data: {"response":4,"choices":[{"delta":{"content":"4"}}]}',
 	'data: {"response":",625 ","choices":[{"delta":{"content":",625 "}}]}',
+	'data: {"choices":[{"delta":{"content":"7 \\n"}}],"response":7}',
 	'data: {"response":0}',
 	'data: {"response":"with rows.","choices":[{"delta":{"content":"with rows."}}]}',
 	'data: {"response":"","usage":{"completion_tokens":7,"total_tokens":300}}',
@@ -246,6 +247,7 @@ describe("POST /api/faq/ask — wire shape", () => {
 			"Only hospitals ",
 			"4",
 			",625 ",
+			"7 \n", // the content copy keeps the token's whitespace; the numeric copy does not
 			"0",
 			"with rows.",
 		]);
@@ -289,6 +291,26 @@ describe("POST /api/faq/ask — wire shape", () => {
 		expect(res.headers.get("cdn-cache-control")).toBe("no-store");
 	});
 
+	it("keeps a chunk whose text is all digits (Workers AI serialises `response` as a JSON number)", async () => {
+		const { ask } = build({
+			frames: [
+				'data: {"choices":[{"delta":{"content":"December 196"}}],"response":"December 196"}',
+				'data: {"choices":[{"delta":{"content":"7 \\n"}}],"response":7}',
+				'data: {"response":"- next"}',
+				"data: [DONE]",
+			],
+		});
+		const body = await (await ask("when?")).text();
+		const deltas = body
+			.split("\n")
+			.filter((l) => l.startsWith("data: {"))
+			.map((l) => StreamEvent.parse(JSON.parse(l.slice(5))))
+			.filter((e) => e.type === "text-delta")
+			.map((e) => e.delta);
+
+		expect(deltas).toEqual(["December 196", "7 \n", "- next"]);
+	});
+
 	it("never forwards the model's reasoning channel", async () => {
 		const { ask } = build({});
 		const body = await (await ask("anything")).text();
@@ -311,7 +333,7 @@ describe("POST /api/faq/ask — wire shape", () => {
 		expect(res.headers.get("content-type")).toContain("text/plain");
 		expect(res.headers.get("cache-control")).toBe("private, no-store");
 		expect(res.headers.get("cdn-cache-control")).toBe("no-store");
-		expect(await res.text()).toBe("Only hospitals 4,625 0with rows.");
+		expect(await res.text()).toBe("Only hospitals 4,625 7 \n0with rows.");
 	});
 
 	it("reads a form POST's context from the hidden field", async () => {
