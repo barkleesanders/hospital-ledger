@@ -15,7 +15,9 @@
 		"predeploy": "python3 scripts/predeploy_audit.py && python3 scripts/csp_audit.py",
 		"deploy": "bash scripts/deploy.sh",
 		"typecheck": "tsc --noEmit",
-		"audit:csp": "python3 scripts/csp_audit.py"
+		"audit:csp": "python3 scripts/csp_audit.py",
+		"test:unit": "esbuild tests/site-data.test.ts --bundle --platform=node --format=esm --packages=external --outfile=.wrangler/tmp/site-data.test.mjs --log-level=warning && node --test .wrangler/tmp/site-data.test.mjs",
+		"test": "npm run test:unit"
 	},
 	"dependencies": {
 		"hono": "^4.13.3"

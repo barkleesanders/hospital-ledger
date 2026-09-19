@@ -12,10 +12,10 @@
  */
 
 import type { Context } from "hono";
-import summaryJson from "../../public/data/summary.json";
 import { Layout } from "../components/Layout";
 import { ProcedureCarousel } from "../components/ProcedureCarousel";
 import type { Env } from "../index";
+import { loadSummary } from "../lib/site-data";
 
 type HomeSummary = {
 	generated_at: string;
@@ -31,21 +31,21 @@ type HomeSummary = {
 	enforcement_actions_total: number;
 };
 
-const SITE_COUNTS = summaryJson as HomeSummary;
-const totalFacilities = SITE_COUNTS.total_facilities ?? 5426;
-const cmsRequiredTotal = SITE_COUNTS.cms_required_total;
-const liveMrfRequired = SITE_COUNTS.compliant;
-const standardizedPriceHospitals =
-	SITE_COUNTS.standardized_price_hospitals ??
-	SITE_COUNTS.standardized_price_index_hospitals ??
-	3654;
-const parsedMrfOutputs = SITE_COUNTS.standardized_price_index_hospitals ?? 3768;
-const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 62577586;
-const cptIndexedRows = SITE_COUNTS.cpt_indexed_rows ?? 14247687;
-const updatedDate = SITE_COUNTS.generated_at.slice(0, 10);
 const fmt = (n: number) => n.toLocaleString("en-US");
 
-function homePage(url: string) {
+function homePage(url: string, SITE_COUNTS: HomeSummary) {
+	const totalFacilities = SITE_COUNTS.total_facilities ?? 5426;
+	const cmsRequiredTotal = SITE_COUNTS.cms_required_total;
+	const liveMrfRequired = SITE_COUNTS.compliant;
+	const standardizedPriceHospitals =
+		SITE_COUNTS.standardized_price_hospitals ??
+		SITE_COUNTS.standardized_price_index_hospitals ??
+		3654;
+	const parsedMrfOutputs =
+		SITE_COUNTS.standardized_price_index_hospitals ?? 3768;
+	const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 62577586;
+	const cptIndexedRows = SITE_COUNTS.cpt_indexed_rows ?? 14247687;
+	const updatedDate = SITE_COUNTS.generated_at.slice(0, 10);
 	return (
 		<Layout
 			title="Hospital Ledger — what the law required, what hospitals delivered"
@@ -1413,8 +1413,10 @@ function homePage(url: string) {
 }
 
 export async function homePageHandler(c: Context<Env>): Promise<Response> {
-	return c.html(homePage("https://hospitalledger.com/"), 200, {
+	const { summary, source } = await loadSummary(c.env);
+	return c.html(homePage("https://hospitalledger.com/", summary), 200, {
 		"cache-control": "public, max-age=300",
 		"x-hl-template": "home-ssr",
+		"x-hl-source": source,
 	});
 }

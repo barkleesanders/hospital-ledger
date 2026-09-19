@@ -5,14 +5,15 @@
  * required 4,625 and 3,986 have a live MRF?" This page answers that with
  * the count definitions, the four-stage pipeline, and the live gap.
  *
- * All numbers are derived from /data/summary.json at build time so they
- * stay in sync with the homepage.
+ * All numbers come from the same summary the homepage renders (R2
+ * meta/summary.json, falling back to the bundled /data/summary.json), so the
+ * two pages cannot drift apart.
  */
 
 import type { Context } from "hono";
-import summaryJson from "../../public/data/summary.json";
 import { Layout } from "../components/Layout";
 import type { Env } from "../index";
+import { loadSummary } from "../lib/site-data";
 
 type Summary = {
 	generated_at: string;
@@ -26,19 +27,18 @@ type Summary = {
 	zero_price_index_entries?: number;
 };
 
-const S = summaryJson as Summary;
-const totalFacilities = S.total_facilities ?? 5426;
-const cmsRequired = S.cms_required_total;
-const compliant = S.compliant;
-const indexEntries = S.standardized_price_index_hospitals ?? 3768;
-const standardized = S.standardized_price_hospitals ?? 3654;
-const zeroEntries = S.zero_price_index_entries ?? indexEntries - standardized;
-const notInIndex = compliant - indexEntries;
-const totalGap = compliant - standardized;
-const updated = S.generated_at.slice(0, 10);
 const fmt = (n: number) => n.toLocaleString("en-US");
 
-function aboutPage(url: string) {
+function aboutPage(url: string, S: Summary) {
+	const totalFacilities = S.total_facilities ?? 5426;
+	const cmsRequired = S.cms_required_total;
+	const compliant = S.compliant;
+	const indexEntries = S.standardized_price_index_hospitals ?? 3768;
+	const standardized = S.standardized_price_hospitals ?? 3654;
+	const zeroEntries = S.zero_price_index_entries ?? indexEntries - standardized;
+	const notInIndex = compliant - indexEntries;
+	const totalGap = compliant - standardized;
+	const updated = S.generated_at.slice(0, 10);
 	return (
 		<Layout
 			title="About the numbers — Hospital Ledger"
@@ -275,12 +275,14 @@ curl -s https://hospitalledger.com/data/prices/index.json | jq '[.hospitals[] | 
 export async function aboutNumbersPageHandler(
 	c: Context<Env>,
 ): Promise<Response> {
+	const { summary, source } = await loadSummary(c.env);
 	return c.html(
-		aboutPage("https://hospitalledger.com/about-the-numbers"),
+		aboutPage("https://hospitalledger.com/about-the-numbers", summary),
 		200,
 		{
 			"cache-control": "public, max-age=300",
 			"x-hl-template": "about-the-numbers-ssr",
+			"x-hl-source": source,
 		},
 	);
 }

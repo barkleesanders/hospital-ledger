@@ -1,7 +1,9 @@
+import type { Context } from "hono";
 import { Hono } from "hono";
-import summaryJson from "../public/data/summary.json";
 import { CPT_NAMES } from "./lib/cpt-names";
-import { readR2Json } from "./lib/r2";
+import { r2Passthrough, readR2Json } from "./lib/r2";
+import { json } from "./lib/responses";
+import { loadManifest, loadSummary } from "./lib/site-data";
 import { aboutNumbersPageHandler } from "./routes/about-the-numbers";
 import { complianceRankingHandler } from "./routes/api/compliance-ranking";
 import { cptIndexHandler } from "./routes/api/cpt-index";
@@ -125,6 +127,49 @@ app.get("/api/procedure/:code", procedureHandler);
 app.get("/api/hospitals.json", (c) => c.redirect("/data/hospitals.json", 301));
 app.get("/api/summary.json", (c) => c.redirect("/data/summary.json", 301));
 
+// Site-level data: R2 `meta/*` first, bundled static asset second.
+//
+// These two paths are listed in wrangler.jsonc `assets.run_worker_first`, so
+// the request reaches this Worker instead of being answered by the static
+// asset. That is what lets the muse.ai refresh task update the live numbers
+// by writing `meta/summary.json` / `meta/hospitals.json` to R2 — the bundled
+// copies under public/data/ are only the fallback (and what `/api/manifest`
+// reports as `bundled` until R2 has a manifest).
+async function metaOrAsset(
+	c: Context<Env>,
+	key: string,
+	assetPath: string,
+): Promise<Response> {
+	const r2 = await r2Passthrough(c.env.HL_MRF_PARSED, key, {
+		cacheControl: "public, max-age=300",
+		source: "r2",
+	});
+	if (r2) return r2;
+	const url = new URL(c.req.url);
+	url.pathname = assetPath;
+	url.search = "";
+	const resp = await c.env.ASSETS.fetch(url.toString());
+	const out = new Response(resp.body, resp);
+	out.headers.set("x-hl-source", "bundled");
+	return out;
+}
+app.get("/data/summary.json", (c) =>
+	metaOrAsset(c, "meta/summary.json", "/data/summary.json"),
+);
+app.get("/data/hospitals.json", (c) =>
+	metaOrAsset(c, "meta/hospitals.json", "/data/hospitals.json"),
+);
+// Data freshness + provenance — the signal an external producer's run is
+// verified against ("did generated_at advance on the live site?").
+app.get("/api/manifest", async (c) => {
+	const manifest = await loadManifest(c.env);
+	const { source } = await loadSummary(c.env);
+	return json(
+		{ ...manifest, summary_source: source },
+		{ cacheControl: "public, max-age=60" },
+	);
+});
+
 // XML sitemap — top procedures, top payers, top hospitals, plus the home page.
 app.get("/sitemap.xml", async (c) => {
 	const SITE = "https://hospitalledger.com";
@@ -146,7 +191,8 @@ app.get("/sitemap.xml", async (c) => {
 	// publishes as `dateModified`. It is stable between refreshes (so Google can
 	// verify it), it advances on its own the next time `npm run refresh` runs,
 	// and it cannot drift from the page, because it IS the page's source.
-	const lastmod = summaryJson.generated_at.slice(0, 10);
+	const { summary } = await loadSummary(c.env);
+	const lastmod = summary.generated_at.slice(0, 10);
 
 	// Hospitals: try R2 prices/index.json first; fall back to static
 	// /data/hospitals.json filtered to has_live_mrf=true.

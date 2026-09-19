@@ -63,3 +63,7 @@ dist/
 # Beads / Dolt files (added by bd init)
 .beads/proxieddb/
 *.gate.lock*
+
+# scratch output of scripts/refresh_counts.sh (contract tree, uploaded to R2)
+data/site-out/
+data/refresh_logs/

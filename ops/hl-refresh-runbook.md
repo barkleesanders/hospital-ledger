@@ -1,7 +1,37 @@
 # hospitalledger.com weekly refresh — runbook
 
-Autonomous Sunday 04:00 refresh on the mac mini via launchd. Catches
-hospital MRF updates, re-attempts the gap, deploys the new numbers.
+> **RETIRED 2026-09-18.** The mac-mini launchd job described below no longer
+> exists and must **not** be reinstalled. The weekly refresh is now a
+> **muse.ai recurring task owned by Nova** — see `ops/muse-refresh-task.md`
+> (counts tier, Sunday 04:00 America/Los_Angeles) and the data contract it
+> produces against, `ops/data-contract.md`. Why the old job stopped working,
+> with dates and log evidence: `ops/pipeline-ground-truth-2026-09-18.md`.
+>
+> Mini state at decommission (measured 2026-09-18 over ssh, with a positive
+> control on `com.barklee.settings-watch`): no `com.hospitalledger.*` plist in
+> `~/Library/LaunchAgents`, service not loaded (`launchctl print` → not found),
+> no `refresh.sh` process, no crontab entry; the stale `=> enabled` override
+> left in the launchd domain was cleared with
+> `launchctl disable gui/501/com.hospitalledger.refresh`, so a `bootstrap` of
+> the old plist will be refused until someone deliberately re-enables it.
+>
+> The site no longer needs a deploy to change its numbers: the Worker reads
+> `meta/summary.json`, `meta/hospitals.json`, `meta/manifest.json` from R2
+> (`src/lib/site-data.ts`), and `/api/manifest` reports which run is live.
+> Verify Nova's run with
+> `curl -s "https://hospitalledger.com/api/manifest?cb=$(date +%s)"`.
+>
+> **What is still manual:** the *full* tier (re-parse changed MRFs, rebuild
+> `prices/`, `indexes/cpt-index.json`, `aggregates/`). `scripts/refresh.sh`
+> steps 2–6 remain the reference for that, run by hand on a machine with the
+> parsed corpus and ≥ 3 GB free disk, then published per `ops/data-contract.md`.
+> Everything below is kept as the historical description of that script.
+
+---
+
+## (historical) Autonomous Sunday 04:00 refresh on the mac mini via launchd
+
+Catches hospital MRF updates, re-attempts the gap, deploys the new numbers.
 
 ## What runs
 

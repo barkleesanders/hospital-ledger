@@ -17,7 +17,11 @@
 	"assets": {
 		"directory": "./public",
 		"binding": "ASSETS",
-		"not_found_handling": "none"
+		"not_found_handling": "none",
+		// These two are R2-first (meta/summary.json, meta/hospitals.json) so the
+		// refresh task can update the live site without a deploy; the bundled
+		// static copies are the fallback the Worker reaches for itself.
+		"run_worker_first": ["/data/summary.json", "/data/hospitals.json"]
 	},
 	"r2_buckets": [
 		{
