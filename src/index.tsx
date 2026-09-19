@@ -34,8 +34,10 @@ export type Env = {
 		SITE_NAME: string;
 		/** Workers AI (wrangler.jsonc `ai`) — the "Ask anything" row's model. */
 		AI: FaqAi;
-		/** Cloudflare Rate Limiting (wrangler.jsonc `ratelimits`) for /api/faq/ask. */
+		/** Cloudflare Rate Limiting (wrangler.jsonc `ratelimits`) for /api/faq/ask: per IP. */
 		FAQ_RATE_LIMITER?: FaqRateLimiter;
+		/** The account-wide budget for /api/faq/ask, one shared key. */
+		FAQ_RATE_LIMITER_GLOBAL?: FaqRateLimiter;
 	};
 };
 
@@ -138,6 +140,7 @@ mountInfiniteFaq(app, {
 	corpus: loadFaqCorpus,
 	contextDoc: recordContextDoc,
 	rateLimiter: (env) => env.FAQ_RATE_LIMITER,
+	globalRateLimiter: (env) => env.FAQ_RATE_LIMITER_GLOBAL,
 	extraRules: [
 		"Prices, counts, grades, dates and dollar amounts must be copied whole and exactly as the reference material states them, or reported as not listed — never rounded, completed or estimated.",
 		"Prices are what each hospital published in its own machine-readable file: they are not a quote, and what a patient pays depends on their insurance, deductible and the services provided; say so when a visitor asks what something will cost them.",

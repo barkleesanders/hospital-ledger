@@ -5,6 +5,9 @@ import {
 	type FaqAi,
 	type FaqCorpusDoc,
 	type FaqRateLimiter,
+	LOCAL_BUCKET_MAX_KEYS,
+	localBucketAllows,
+	localBucketSize,
 	MAX_BODY_BYTES,
 	MAX_CORPUS_CHARS,
 	MAX_QUESTION_CHARS,
@@ -80,6 +83,7 @@ let nextIp = 1;
 function build(options: {
 	frames?: string[];
 	limiter?: FaqRateLimiter;
+	globalLimiter?: FaqRateLimiter;
 	runImpl?: FaqAi["run"];
 }) {
 	const ip = `203.0.113.${nextIp++}`;
@@ -107,6 +111,7 @@ function build(options: {
 			return [SITE_DOC];
 		},
 		rateLimiter: (env) => env.FAQ_RATE_LIMITER,
+		globalRateLimiter: () => options.globalLimiter,
 		// The site re-reads the record by id; only the one CCN "exists".
 		contextDoc: async (_env, ctx, request) => {
 			contextCalls.push({ kind: ctx.kind, id: ctx.id, url: request.url });
@@ -252,6 +257,58 @@ describe("POST /api/faq/ask — validation", () => {
 
 		expect(calls).toHaveLength(0);
 		expect(contextCalls).toHaveLength(0);
+	});
+});
+
+describe("POST /api/faq/ask — cross-site posts", () => {
+	it("refuses a browser's cross-site POST with 403 before the limiter or the model run", async () => {
+		const seen: string[] = [];
+		const limiter: FaqRateLimiter = {
+			limit: async ({ key }) => {
+				seen.push(key);
+
+				return { success: true };
+			},
+		};
+		const { post, calls } = build({ limiter });
+		const form = new URLSearchParams({ question: "hi" }).toString();
+
+		const byFetchMeta = await post(form, {
+			"content-type": "application/x-www-form-urlencoded",
+			"sec-fetch-site": "cross-site",
+			origin: "https://evil.example",
+		});
+		expect(byFetchMeta.status).toBe(403);
+
+		const byOriginOnly = await post(form, {
+			"content-type": "application/x-www-form-urlencoded",
+			origin: "https://evil.example",
+		});
+		expect(byOriginOnly.status).toBe(403);
+
+		const nullOrigin = await post(form, {
+			"content-type": "application/x-www-form-urlencoded",
+			origin: "null",
+			"sec-fetch-site": "cross-site",
+		});
+		expect(nullOrigin.status).toBe(403);
+
+		expect(seen).toHaveLength(0);
+		expect(calls).toHaveLength(0);
+	});
+
+	it("accepts the site's own form (same-origin Origin) and a client that sends no Origin", async () => {
+		const { post, ask, calls } = build({});
+		const form = new URLSearchParams({ question: "hi" }).toString();
+
+		const own = await post(form, {
+			"content-type": "application/x-www-form-urlencoded",
+			origin: "http://localhost",
+			"sec-fetch-site": "same-origin",
+		});
+		expect(own.status).toBe(200);
+		expect((await ask("hi")).status).toBe(200); // no Origin at all (curl)
+		expect(calls).toHaveLength(2);
 	});
 });
 
@@ -580,6 +637,41 @@ describe("POST /api/faq/ask — rate limiting", () => {
 		expect(statuses.slice(0, 10).every((s) => s === 200)).toBe(true);
 		expect(statuses[10]).toBe(429);
 		expect(calls).toHaveLength(10);
+	});
+
+	it("returns 429 when the account-wide limiter refuses, after the per-IP one allowed", async () => {
+		const keys: string[] = [];
+		const limiter: FaqRateLimiter = {
+			limit: async ({ key }) => {
+				keys.push(key);
+
+				return { success: true };
+			},
+		};
+		const globalLimiter: FaqRateLimiter = {
+			limit: async ({ key }) => {
+				keys.push(key);
+
+				return { success: false };
+			},
+		};
+		const { ask, calls, ip } = build({ limiter, globalLimiter });
+
+		expect((await ask("hello")).status).toBe(429);
+		expect(keys).toEqual([`faq:${ip}`, "faq:global"]);
+		expect(calls).toHaveLength(0);
+	});
+
+	it("sweeps expired entries out of the per-isolate bucket once it holds LOCAL_BUCKET_MAX_KEYS", () => {
+		const t0 = 1_000_000;
+		const before = localBucketSize();
+
+		for (let i = 0; i < LOCAL_BUCKET_MAX_KEYS; i++)
+			localBucketAllows(`sweep:${i}`, t0);
+		expect(localBucketSize()).toBe(before + LOCAL_BUCKET_MAX_KEYS);
+		// A minute later every one of those has expired; the next call sweeps them.
+		expect(localBucketAllows("sweep:new", t0 + 60_001)).toBe(true);
+		expect(localBucketSize()).toBeLessThanOrEqual(before + 1);
 	});
 
 	it("lets the question through when the binding allows", async () => {

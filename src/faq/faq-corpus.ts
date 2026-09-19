@@ -142,7 +142,50 @@ export async function loadFaqCorpus(): Promise<FaqCorpusDoc[]> {
  * the page's own loader. Returns null for an unknown id, so a made-up id cannot put
  * anything into the prompt.
  */
+/**
+ * Rendered record documents, per isolate. A hospital file is a multi-MB JSON that
+ * /hospital/:ccn parses once per 300 s thanks to its public cache; this route is
+ * no-store, so without this every question re-read and re-parsed the file to keep
+ * ten rows of it.
+ * ceiling: a doc is ~3 KB, so 64 entries is ~200 KB against a 128 MB isolate.
+ * corpus: the pages themselves are cached 300 s (src/routes/*.tsx), so a doc is
+ *   never staler than the page beside it.
+ */
+export const RECORD_DOC_CACHE_MAX = 64;
+
+export const RECORD_DOC_TTL_MS = 300_000;
+
+const recordDocs = new Map<
+	string,
+	{ doc: FaqCorpusDoc | null; expires: number }
+>();
+
 export async function recordContextDoc(
+	env: Bindings,
+	ctx: RecordContext,
+	request: Request,
+): Promise<FaqCorpusDoc | null> {
+	const key = `${ctx.kind}:${ctx.id}`;
+	const now = Date.now();
+	const hit = recordDocs.get(key);
+
+	if (hit && hit.expires > now) return hit.doc;
+	const doc = await loadRecordDoc(env, ctx, request);
+
+	// Insertion order is the eviction order: the oldest entry goes first.
+	if (recordDocs.size >= RECORD_DOC_CACHE_MAX) {
+		const oldest = recordDocs.keys().next().value;
+
+		if (oldest !== undefined) recordDocs.delete(oldest);
+	}
+
+	recordDocs.delete(key);
+	recordDocs.set(key, { doc, expires: now + RECORD_DOC_TTL_MS });
+
+	return doc;
+}
+
+async function loadRecordDoc(
 	env: Bindings,
 	ctx: RecordContext,
 	request: Request,

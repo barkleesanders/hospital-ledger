@@ -375,6 +375,32 @@ describe("recordContextDoc", () => {
 		).toBe("This insurance");
 	});
 
+	it("re-reads a record from the store once per isolate, then serves the rendered doc from the cache", async () => {
+		let reads = 0;
+		const counting = {
+			HL_MRF_PARSED: {
+				get: async (key: string) => {
+					reads += 1;
+
+					return key === `prices/${CCN}.json`
+						? { text: async () => JSON.stringify(HOSPITAL) }
+						: null;
+				},
+			} as unknown as R2Bucket,
+			ASSETS: undefined as unknown as Fetcher,
+		};
+		// A fresh key (the module cache may already hold CCN from the test above).
+		const other = "010002";
+		expect(
+			await recordContextDoc(counting, { kind: "hospital", id: other }, req),
+		).toBeNull();
+		expect(reads).toBe(1);
+		expect(
+			await recordContextDoc(counting, { kind: "hospital", id: other }, req),
+		).toBeNull();
+		expect(reads).toBe(1); // a miss is cached too: a made-up id costs one read per TTL
+	});
+
 	it("returns null for an id the store does not have, so a made-up id puts nothing in the prompt", async () => {
 		expect(
 			await recordContextDoc(env, { kind: "hospital", id: "999999" }, req),

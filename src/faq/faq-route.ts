@@ -113,6 +113,12 @@ export type InfiniteFaqOptions<E extends FaqEnv> = {
 	 * Returning undefined (binding not configured) falls back to the per-isolate bucket.
 	 */
 	rateLimiter?: (env: E["Bindings"]) => FaqRateLimiter | undefined;
+	/**
+	 * Optional accessor for a SECOND Rate Limiting binding checked with one shared key —
+	 * the account-wide budget. The per-IP limiter cannot see a question routed through
+	 * a thousand victims' browsers (see `crossSite`); this one can.
+	 */
+	globalRateLimiter?: (env: E["Bindings"]) => FaqRateLimiter | undefined;
 	/** Corpus chars placed in the prompt before truncation. See MAX_CORPUS_CHARS. */
 	maxCorpusChars?: number;
 	/**
@@ -426,7 +432,26 @@ async function* textPieces(
 
 const localBuckets = new Map<string, { count: number; resetAt: number }>();
 
-function localBucketAllows(key: string, now: number): boolean {
+/**
+ * ceiling: an isolate's memory is 128 MB; an entry is ~100 B, so this is ~1 MB.
+ * corpus: an isolate sees a few thousand distinct IPs an hour at most.
+ */
+export const LOCAL_BUCKET_MAX_KEYS = 10_000;
+
+/** Exported for the test that pins the sweep; the handler calls it through allowed(). */
+/** Test seam: how many IPs the fallback bucket currently tracks. */
+export function localBucketSize(): number {
+	return localBuckets.size;
+}
+
+export function localBucketAllows(key: string, now: number): boolean {
+	// Expired entries are otherwise replaced only when their own IP returns, so a
+	// scan of distinct IPs would grow the map forever.
+	if (localBuckets.size >= LOCAL_BUCKET_MAX_KEYS) {
+		for (const [k, v] of localBuckets)
+			if (v.resetAt <= now) localBuckets.delete(k);
+	}
+
 	const b = localBuckets.get(key);
 
 	if (!b || b.resetAt <= now) {
@@ -443,11 +468,14 @@ function localBucketAllows(key: string, now: number): boolean {
 async function allowed(
 	limiter: FaqRateLimiter | undefined,
 	ip: string,
+	global: FaqRateLimiter | undefined,
 ): Promise<boolean> {
 	if (!limiter) return localBucketAllows(ip, Date.now());
 
 	try {
-		return (await limiter.limit({ key: `faq:${ip}` })).success;
+		if (!(await limiter.limit({ key: `faq:${ip}` })).success) return false;
+
+		return global ? (await global.limit({ key: "faq:global" })).success : true;
 	} catch (err) {
 		// A limiter outage degrades cost control, not the FAQ. Visible, not silent.
 		log("faq.ratelimit.unavailable", {
@@ -461,6 +489,28 @@ async function allowed(
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
+
+/**
+ * True when a browser says this POST comes from another site: Sec-Fetch-Site
+ * "cross-site", or an Origin whose host is not this Worker's. A request with
+ * neither header (curl, a form on this site in an old browser) passes — it is bounded
+ * by its own IP. The Host comparison uses the request URL, which on Cloudflare is the
+ * routed hostname (hospitalledger.com / www).
+ */
+export function crossSite(c: Context): boolean {
+	const sfs = c.req.header("sec-fetch-site");
+
+	if (sfs === "cross-site") return true;
+	const origin = c.req.header("origin");
+
+	if (!origin || origin === "null") return sfs === "cross-site";
+
+	try {
+		return new URL(origin).host !== new URL(c.req.url).host;
+	} catch {
+		return true;
+	}
+}
 
 function log(
 	event: string,
@@ -792,10 +842,21 @@ export function askFaqHandler<E extends FaqEnv>(opts: InfiniteFaqOptions<E>) {
 	const corpusBudget = opts.maxCorpusChars ?? MAX_CORPUS_CHARS;
 
 	return async (c: Context<E>): Promise<Response> => {
+		// A urlencoded POST is a CORS-simple request: any page on the web can make every
+		// one of its visitors' browsers post a question here, each visitor being a fresh
+		// IP for the limiter and each question a paid model call. The visitor cannot
+		// read the answer, so refusing cross-site posts loses nothing real: the site's
+		// own no-JS form and the island both send a same-origin Origin.
+		if (crossSite(c)) {
+			log("faq.ask.crosssite", { qLen: 0 });
+
+			return c.json({ error: "Ask from hospitalledger.com." }, 403);
+		}
+
 		const ip = c.req.header("cf-connecting-ip") ?? "unknown";
 		const limiter = opts.rateLimiter?.(c.env);
 
-		if (!(await allowed(limiter, ip))) {
+		if (!(await allowed(limiter, ip, opts.globalRateLimiter?.(c.env)))) {
 			log("faq.ask.ratelimited", { limiter: Boolean(limiter) });
 
 			return c.json(
