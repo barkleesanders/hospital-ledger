@@ -44,11 +44,11 @@
 	// 2026-09-18: new connections land on different machines), so treat them as a
 	// ceiling on a browser crowd, not an accounting system. namespace_id
 	// is account-unique: aivaclaims 2026091801, improvebayarea 2026091802,
-	// improvecortland 2026091803, this worker 2026091804 + 2026091805.
+	// improvecortland 2026091803, this worker 2026091807 + 2026091805 (2026091804 was shared with esbe + kingsandersheritage; CF docs: same id = shared counters).
 	"ratelimits": [
 		{
 			"name": "FAQ_RATE_LIMITER",
-			"namespace_id": "2026091804",
+			"namespace_id": "2026091807",
 			"simple": { "limit": 20, "period": 60 }
 		},
 		{
