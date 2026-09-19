@@ -13,8 +13,13 @@
  *   meta/manifest.json   — contract_version + generated_at + per-artifact hashes
  */
 
-import bundledSummary from "../../public/data/summary.json" with { type: "json" };
+import bundledSummary from "../../public/data/summary.json" with {
+	type: "json",
+};
 import { readR2Json } from "./r2";
+
+/** The build-time copy: what the pages render when R2 has no valid meta/summary.json. */
+export const BUNDLED_SUMMARY = bundledSummary as Summary;
 
 export type Summary = {
 	generated_at: string;
@@ -44,7 +49,7 @@ export type Manifest = {
 
 export type SiteDataSource = "r2" | "bundled";
 
-type Bindings = { HL_MRF_PARSED?: R2Bucket };
+export type Bindings = { HL_MRF_PARSED?: R2Bucket };
 
 // Per-isolate memo so a burst of requests doesn't re-read R2 for the same
 // 6 KB object. 60 s is well under the 300 s edge cache on the pages that use
@@ -87,7 +92,7 @@ export async function loadSummary(
 	);
 	const hit = isValidSummary(fromR2)
 		? { summary: fromR2, source: "r2" as const }
-		: { summary: bundledSummary as Summary, source: "bundled" as const };
+		: { summary: BUNDLED_SUMMARY, source: "bundled" as const };
 	summaryMemo = { at: now, ...hit };
 	return hit;
 }
@@ -98,7 +103,7 @@ export async function loadManifest(env: Bindings): Promise<Manifest> {
 	// No manifest in R2 yet: describe what IS being served.
 	return {
 		contract_version: "1",
-		generated_at: (bundledSummary as Summary).generated_at,
+		generated_at: BUNDLED_SUMMARY.generated_at,
 		producer: "bundled (build-time public/data/summary.json)",
 	};
 }

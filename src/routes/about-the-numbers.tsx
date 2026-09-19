@@ -13,7 +13,7 @@
 import type { Context } from "hono";
 import { Layout } from "../components/Layout";
 import type { Env } from "../index";
-import { loadSummary } from "../lib/site-data";
+import { BUNDLED_SUMMARY, loadSummary } from "../lib/site-data";
 
 type Summary = {
 	generated_at: string;
@@ -29,7 +29,8 @@ type Summary = {
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
-function aboutPage(url: string, S: Summary) {
+/** Exported so the "Ask anything" corpus (src/faq/faq-corpus.ts) renders the served copy. */
+export function aboutPage(url: string, S: Summary = BUNDLED_SUMMARY) {
 	const totalFacilities = S.total_facilities ?? 5426;
 	const cmsRequired = S.cms_required_total;
 	const compliant = S.compliant;

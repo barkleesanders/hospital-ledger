@@ -4,7 +4,10 @@
 	"main": "dist/index.js",
 	"compatibility_date": "2025-11-01",
 	"cache": { "enabled": true },
-	"compatibility_flags": ["nodejs_compat"],
+	// enable_request_signal: a Stop click (client disconnect) reaches the /api/faq/ask
+	// handler as request.signal so the model stream is cancelled instead of running to
+	// its end (developers.cloudflare.com/workers/runtime-apis/request/, read 2026-09-18).
+	"compatibility_flags": ["nodejs_compat", "enable_request_signal"],
 	"workers_dev": false,
 	"preview_urls": false,
 	"routes": [
@@ -35,5 +38,27 @@
 	],
 	"observability": {
 		"enabled": true
-	}
+	},
+	// Workers AI for the "Ask anything" row (src/faq/faq-route.ts). `remote: true`
+	// makes `wrangler dev` call the real model instead of a local stub.
+	"ai": { "binding": "AI", "remote": true },
+	// /api/faq/ask: 20 questions per minute per client IP, and 600 per minute across
+	// everyone (the budget a per-IP limit cannot enforce against a crowd). Both are the
+	// platform's per-edge-machine, eventually-consistent counters (measured on aivaclaims
+	// 2026-09-18: new connections land on different machines), so treat them as a
+	// ceiling on a browser crowd, not an accounting system. namespace_id
+	// is account-unique: aivaclaims 2026091801, improvebayarea 2026091802,
+	// improvecortland 2026091803, this worker 2026091807 + 2026091805 (2026091804 was shared with esbe + kingsandersheritage; CF docs: same id = shared counters).
+	"ratelimits": [
+		{
+			"name": "FAQ_RATE_LIMITER",
+			"namespace_id": "2026091807",
+			"simple": { "limit": 20, "period": 60 }
+		},
+		{
+			"name": "FAQ_RATE_LIMITER_GLOBAL",
+			"namespace_id": "2026091805",
+			"simple": { "limit": 600, "period": 60 }
+		}
+	]
 }

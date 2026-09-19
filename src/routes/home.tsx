@@ -14,8 +14,9 @@
 import type { Context } from "hono";
 import { Layout } from "../components/Layout";
 import { ProcedureCarousel } from "../components/ProcedureCarousel";
+import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
-import { loadSummary } from "../lib/site-data";
+import { BUNDLED_SUMMARY, loadSummary } from "../lib/site-data";
 
 type HomeSummary = {
 	generated_at: string;
@@ -33,7 +34,11 @@ type HomeSummary = {
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
-function homePage(url: string, SITE_COUNTS: HomeSummary) {
+/** Exported so the "Ask anything" corpus (src/faq/faq-corpus.ts) renders the served copy. */
+export function homePage(
+	url: string,
+	SITE_COUNTS: HomeSummary = BUNDLED_SUMMARY,
+) {
 	const totalFacilities = SITE_COUNTS.total_facilities ?? 5426;
 	const cmsRequiredTotal = SITE_COUNTS.cms_required_total;
 	const liveMrfRequired = SITE_COUNTS.compliant;
@@ -53,6 +58,8 @@ function homePage(url: string, SITE_COUNTS: HomeSummary) {
 			ogTitle="Hospital Ledger"
 			url={url}
 			scriptSrc={["/cpt-names.js", "/home-client.js", "/procedure-carousel.js"]}
+			stylesheets={["/faq.css"]}
+			moduleScripts={["/faq-island.js"]}
 		>
 			<header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
 				<div class="mx-auto max-w-6xl px-4 sm:px-6 pt-8 pb-10 sm:pt-10 sm:pb-12 md:pt-14 md:pb-16">
@@ -94,6 +101,13 @@ function homePage(url: string, SITE_COUNTS: HomeSummary) {
 						</span>{" "}
 						CMS-required hospitals have a live machine-readable file.
 					</p>
+					{/* "Ask anything" — the first interactive control on the page, in the
+					    same column as the lead paragraph (max-w-2xl). The hero's own CTA
+					    buttons sit under the carousel and the KPI cards, below the fold on
+					    a phone, so the row lives here, where a visitor's eye lands first. */}
+					<div class="mt-5 max-w-2xl">
+						<FaqAskRow variant="hero" />
+					</div>
 					<p class="mt-5 text-sm sm:text-base text-zinc-400 max-w-2xl leading-relaxed">
 						<span class="font-semibold text-zinc-200">How we count:</span> the
 						headline counts only hospitals with{" "}

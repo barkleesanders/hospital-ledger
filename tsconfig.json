@@ -20,5 +20,12 @@
 		"verbatimModuleSyntax": false
 	},
 	"include": ["src/**/*.ts", "src/**/*.tsx"],
-	"exclude": ["node_modules", "dist", ".wrangler", "site"]
+	"exclude": [
+		"node_modules",
+		"dist",
+		".wrangler",
+		"site",
+		"src/faq/faq-island.tsx",
+		"src/faq/*.test.ts"
+	]
 }

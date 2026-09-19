@@ -67,3 +67,12 @@ dist/
 # scratch output of scripts/refresh_counts.sh (contract tree, uploaded to R2)
 data/site-out/
 data/refresh_logs/
+
+# Pattern-43 constrained probe (tests/probe-constrained.mjs): playwright symlink + outputs
+tests/node_modules
+tests/probe-*.json
+tests/probe-*.png
+.ship/
+
+# stale lockfile — npm (package-lock.json) is the active manager; bun.lock dated from the scaffold and confused the wrangler-autoupdate hook (2026-09-18)
+bun.lock

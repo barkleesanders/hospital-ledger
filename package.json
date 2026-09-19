@@ -12,23 +12,30 @@
 		"refresh": "bash scripts/refresh.sh",
 		"refresh:dry": "bash scripts/refresh.sh --dry-run",
 		"refresh:quick": "bash scripts/refresh.sh --quick",
-		"predeploy": "python3 scripts/predeploy_audit.py && python3 scripts/csp_audit.py",
+		"predeploy": "python3 scripts/predeploy_audit.py && python3 scripts/csp_audit.py && npm run typecheck && npm run test:faq && npm run build:faq-island",
 		"deploy": "bash scripts/deploy.sh",
-		"typecheck": "tsc --noEmit",
+		"typecheck": "tsc --noEmit && tsc -p tsconfig.island.json && tsc -p tsconfig.test.json",
 		"audit:csp": "python3 scripts/csp_audit.py",
+		"test:faq": "vitest run --config vitest.faq.config.mjs",
+		"build:faq-island": "node tools/build-faq-island.mjs",
+		"probe:constrained": "node tests/probe-constrained.mjs probe",
 		"test:unit": "esbuild tests/site-data.test.ts --bundle --platform=node --format=esm --packages=external --outfile=.wrangler/tmp/site-data.test.mjs --log-level=warning && node --test .wrangler/tmp/site-data.test.mjs",
-		"test": "npm run test:unit"
+		"test": "npm run test:unit && npm run test:faq"
 	},
 	"dependencies": {
-		"hono": "^4.13.3"
+		"hono": "^4.13.3",
+		"zod": "^4.6.5"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^5.20260820.1",
 		"@hono/vite-build": "^1.2.0",
 		"@hono/vite-dev-server": "^0.18.0",
+		"@types/node": "^24.13.5",
+		"esbuild": "^0.25.12",
 		"jsdom": "^30.0.1",
 		"typescript": "^5.7.2",
 		"vite": "^6.0.7",
+		"vitest": "^4.1.11",
 		"wrangler": "^4.124.0"
 	}
 }

@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",
@@ -10,6 +10,8 @@
 			"src/**",
 			"public/*.js",
 			"tests/**/*.js",
+			"tests/**/*.mjs",
+			"tools/**/*.mjs",
 			"vite.config.ts",
 			"package.json",
 			"wrangler.jsonc",
@@ -20,7 +22,8 @@
 			"!!**/public/data",
 			"!!**/.prices_build_stash",
 			"!!**/.beads",
-			"!!**/_cpt_detail_raw.jsonl"
+			"!!**/_cpt_detail_raw.jsonl",
+			"!!**/public/faq-island.js"
 		]
 	},
 	"formatter": {

@@ -52,6 +52,11 @@ export type LayoutProps = PropsWithChildren<{
 	// when multiple ordered scripts are needed (e.g. cpt-names.js then
 	// home-client.js, where the latter reads window.CPT_NAMES).
 	scriptSrc?: string | string[];
+	// Extra same-origin stylesheets for pages that need them (e.g. /faq.css on the
+	// pages that render the "Ask anything" row).
+	stylesheets?: string[];
+	// Same-origin ES-module scripts, deferred by nature (e.g. /faq-island.js).
+	moduleScripts?: string[];
 }>;
 
 const DEFAULT_OG_IMAGE = "https://hospitalledger.com/og.png";
@@ -65,6 +70,8 @@ export const Layout: FC<LayoutProps> = ({
 	bodyClass,
 	inlineScript,
 	scriptSrc,
+	stylesheets,
+	moduleScripts,
 	children,
 }) => {
 	const resolvedOgImage = ogImage ?? DEFAULT_OG_IMAGE;
@@ -280,6 +287,9 @@ export const Layout: FC<LayoutProps> = ({
 					rel="stylesheet"
 				/>
 				<script src="https://cdn.tailwindcss.com" />
+				{(stylesheets ?? []).map((href) => (
+					<link rel="stylesheet" href={href} />
+				))}
 				<style
 					dangerouslySetInnerHTML={{
 						__html: `
@@ -356,6 +366,9 @@ export const Layout: FC<LayoutProps> = ({
 				{inlineScript ? (
 					<script dangerouslySetInnerHTML={{ __html: inlineScript }} />
 				) : null}
+				{(moduleScripts ?? []).map((src) => (
+					<script type="module" src={src} />
+				))}
 			</body>
 		</html>
 	);
