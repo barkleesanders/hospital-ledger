@@ -2,6 +2,12 @@
 
 ## 2026-09-18 — "Ask anything" row (infinite-faq)
 
+### Security follow-up (a1845fe)
+
+- `/api/faq/ask` refuses cross-site browser posts (`Sec-Fetch-Site: cross-site`, or an `Origin` whose host is not the site's) with 403 before the rate limiter or the model run.
+- A second Rate Limit binding, `FAQ_RATE_LIMITER_GLOBAL` (600 questions/60 s across everyone), caps account-wide spend; both bindings are per-edge-machine and eventually consistent, so they bound a browser crowd, not a scripted one.
+- Record context docs are cached per isolate (LRU 64, 5 min); the per-isolate fallback rate bucket sweeps expired IPs once it holds 10,000.
+
 - Added `POST /api/faq/ask` (`src/faq/faq-route.ts`): zod-validated question
   (1..600 chars) plus an optional `{kind, id}` record context, SSE
   `text-delta` / `finish` / `[DONE]` wire, `text/plain` for a no-JS form POST,
