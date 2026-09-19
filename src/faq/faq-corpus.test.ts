@@ -7,8 +7,10 @@ import {
 	pageText,
 	payerDoc,
 	procedureDoc,
+	RECORD_DOC_CACHE_MAX,
 	RECORD_ROWS,
 	recordContextDoc,
+	recordDocKeys,
 	SITE_ORIGIN,
 } from "./faq-corpus";
 import { MAX_CORPUS_CHARS, renderCorpus } from "./faq-route";
@@ -399,6 +401,65 @@ describe("recordContextDoc", () => {
 			await recordContextDoc(counting, { kind: "hospital", id: other }, req),
 		).toBeNull();
 		expect(reads).toBe(1); // a miss is cached too: a made-up id costs one read per TTL
+	});
+
+	it("keeps a record that is asked about again, and lets made-up ids fill their own cache", async () => {
+		// Every 90xxxx id is a real hospital; everything else is unknown.
+		const bucket = {
+			HL_MRF_PARSED: {
+				get: async (key: string) =>
+					key.startsWith("prices/90")
+						? { text: async () => JSON.stringify(HOSPITAL) }
+						: null,
+			} as unknown as R2Bucket,
+			ASSETS: undefined as unknown as Fetcher,
+		};
+		const real = { kind: "hospital", id: "900001" } as const;
+
+		expect(await recordContextDoc(bucket, real, req)).not.toBeNull();
+		// A rotation of unknown ids, more than the doc cache holds, does not evict it…
+		for (let i = 0; i < RECORD_DOC_CACHE_MAX + 5; i++)
+			expect(
+				await recordContextDoc(
+					bucket,
+					{ kind: "hospital", id: String(100_000 + i) },
+					req,
+				),
+			).toBeNull();
+		expect(recordDocKeys()).toContain("hospital:900001");
+		// …and asking about it again makes it the newest, so it survives the next
+		// eviction while the record that was NOT asked about again goes.
+		for (let i = 0; i < RECORD_DOC_CACHE_MAX - 1; i++)
+			await recordContextDoc(
+				bucket,
+				{ kind: "hospital", id: String(900_002 + i) },
+				req,
+			);
+		expect(recordDocKeys()[0]).toBe("hospital:900001");
+		await recordContextDoc(bucket, real, req);
+		await recordContextDoc(bucket, { kind: "hospital", id: "909999" }, req);
+		expect(recordDocKeys()).toContain("hospital:900001");
+		expect(recordDocKeys()).not.toContain("hospital:900002");
+	});
+
+	it("keys a procedure by its uppercased code, the way the loader reads it", async () => {
+		let reads = 0;
+		const bucket = {
+			HL_MRF_PARSED: {
+				get: async () => {
+					reads += 1;
+
+					return null;
+				},
+			} as unknown as R2Bucket,
+			ASSETS: {
+				fetch: async () => new Response(null, { status: 404 }),
+			} as unknown as Fetcher,
+		};
+
+		await recordContextDoc(bucket, { kind: "procedure", id: "zz9x1" }, req);
+		await recordContextDoc(bucket, { kind: "procedure", id: "ZZ9X1" }, req);
+		expect(reads).toBe(1);
 	});
 
 	it("returns null for an id the store does not have, so a made-up id puts nothing in the prompt", async () => {

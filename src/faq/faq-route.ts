@@ -438,21 +438,29 @@ const localBuckets = new Map<string, { count: number; resetAt: number }>();
  */
 export const LOCAL_BUCKET_MAX_KEYS = 10_000;
 
-/** Exported for the test that pins the sweep; the handler calls it through allowed(). */
 /** Test seam: how many IPs the fallback bucket currently tracks. */
 export function localBucketSize(): number {
 	return localBuckets.size;
 }
 
+/** Exported for the test that pins the sweep; the handler calls it through allowed(). */
 export function localBucketAllows(key: string, now: number): boolean {
+	const b = localBuckets.get(key);
+
 	// Expired entries are otherwise replaced only when their own IP returns, so a
-	// scan of distinct IPs would grow the map forever.
-	if (localBuckets.size >= LOCAL_BUCKET_MAX_KEYS) {
+	// scan of distinct IPs would grow the map forever. If everything is still live,
+	// the oldest insertion goes: LOCAL_BUCKET_MAX_KEYS is a hard bound, not a trigger.
+	if (!b && localBuckets.size >= LOCAL_BUCKET_MAX_KEYS) {
 		for (const [k, v] of localBuckets)
 			if (v.resetAt <= now) localBuckets.delete(k);
-	}
 
-	const b = localBuckets.get(key);
+		while (localBuckets.size >= LOCAL_BUCKET_MAX_KEYS) {
+			const oldest = localBuckets.keys().next().value;
+
+			if (oldest === undefined) break;
+			localBuckets.delete(oldest);
+		}
+	}
 
 	if (!b || b.resetAt <= now) {
 		localBuckets.set(key, { count: 1, resetAt: now + LOCAL_BUCKET_WINDOW_MS });
@@ -467,15 +475,13 @@ export function localBucketAllows(key: string, now: number): boolean {
 
 async function allowed(
 	limiter: FaqRateLimiter | undefined,
-	ip: string,
-	global: FaqRateLimiter | undefined,
+	key: string,
+	fallback: () => boolean,
 ): Promise<boolean> {
-	if (!limiter) return localBucketAllows(ip, Date.now());
+	if (!limiter) return fallback();
 
 	try {
-		if (!(await limiter.limit({ key: `faq:${ip}` })).success) return false;
-
-		return global ? (await global.limit({ key: "faq:global" })).success : true;
+		return (await limiter.limit({ key })).success;
 	} catch (err) {
 		// A limiter outage degrades cost control, not the FAQ. Visible, not silent.
 		log("faq.ratelimit.unavailable", {
@@ -856,20 +862,41 @@ export function askFaqHandler<E extends FaqEnv>(opts: InfiniteFaqOptions<E>) {
 		const ip = c.req.header("cf-connecting-ip") ?? "unknown";
 		const limiter = opts.rateLimiter?.(c.env);
 
-		if (!(await allowed(limiter, ip, opts.globalRateLimiter?.(c.env)))) {
-			log("faq.ask.ratelimited", { limiter: Boolean(limiter) });
-
-			return c.json(
+		const tooMany = () =>
+			c.json(
 				{ error: "Too many questions. Wait a minute and try again." },
 				429,
 				{ "retry-after": "60" },
 			);
+
+		if (
+			!(await allowed(limiter, `faq:${ip}`, () =>
+				localBucketAllows(ip, Date.now()),
+			))
+		) {
+			log("faq.ask.ratelimited", { limiter: Boolean(limiter), scope: "ip" });
+
+			return tooMany();
 		}
 
 		const read = await readQuestion(c);
 
 		if (read instanceof Response) return read;
 		const { question, form, context } = read;
+
+		// The account-wide budget is charged only for a question that will reach the
+		// model: a 400/413 must not let a crowd of junk bodies hold everyone at 429.
+		if (
+			!(await allowed(
+				opts.globalRateLimiter?.(c.env),
+				"faq:global",
+				() => true,
+			))
+		) {
+			log("faq.ask.ratelimited", { limiter: true, scope: "global" });
+
+			return tooMany();
+		}
 		const { corpus, record } = await ground(
 			opts,
 			c.env,

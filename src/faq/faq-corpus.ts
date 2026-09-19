@@ -139,10 +139,9 @@ export async function loadFaqCorpus(): Promise<FaqCorpusDoc[]> {
 
 /**
  * The record a visitor is looking at, as the first corpus document, re-read by id with
- * the page's own loader. Returns null for an unknown id, so a made-up id cannot put
- * anything into the prompt.
- */
-/**
+ * the page's own loader and kept per isolate. Returns null for an unknown id, so a
+ * made-up id cannot put anything into the prompt.
+ *
  * Rendered record documents, per isolate. A hospital file is a multi-MB JSON that
  * /hospital/:ccn parses once per 300 s thanks to its public cache; this route is
  * no-store, so without this every question re-read and re-parsed the file to keep
@@ -155,32 +154,64 @@ export const RECORD_DOC_CACHE_MAX = 64;
 
 export const RECORD_DOC_TTL_MS = 300_000;
 
-const recordDocs = new Map<
-	string,
-	{ doc: FaqCorpusDoc | null; expires: number }
->();
+/**
+ * Unknown ids are remembered separately so that rotating made-up ids (a store read
+ * each) cannot push the real records out of their 64 slots. An entry is a key and a
+ * timestamp, so 1,024 of them is under 100 KB.
+ */
+export const RECORD_MISS_CACHE_MAX = 1024;
+
+const recordDocs = new Map<string, { doc: FaqCorpusDoc; expires: number }>();
+
+const recordMisses = new Map<string, number>();
+
+/** Test seam: the cache keys in eviction order (oldest first). */
+export function recordDocKeys(): string[] {
+	return [...recordDocs.keys()];
+}
+
+function lruSet<V>(map: Map<string, V>, max: number, key: string, value: V) {
+	map.delete(key);
+
+	if (map.size >= max) {
+		const oldest = map.keys().next().value;
+
+		if (oldest !== undefined) map.delete(oldest);
+	}
+
+	map.set(key, value);
+}
 
 export async function recordContextDoc(
 	env: Bindings,
 	ctx: RecordContext,
 	request: Request,
 ): Promise<FaqCorpusDoc | null> {
-	const key = `${ctx.kind}:${ctx.id}`;
+	// The loaders normalise the id (procedure codes are uppercased), so the key must
+	// too, or one record occupies a slot per spelling.
+	const key = `${ctx.kind}:${ctx.kind === "procedure" ? ctx.id.toUpperCase() : ctx.id}`;
 	const now = Date.now();
 	const hit = recordDocs.get(key);
 
-	if (hit && hit.expires > now) return hit.doc;
-	const doc = await loadRecordDoc(env, ctx, request);
+	if (hit && hit.expires > now) {
+		// A hit is the newest entry again: least recently used goes first.
+		recordDocs.delete(key);
+		recordDocs.set(key, hit);
 
-	// Insertion order is the eviction order: the oldest entry goes first.
-	if (recordDocs.size >= RECORD_DOC_CACHE_MAX) {
-		const oldest = recordDocs.keys().next().value;
-
-		if (oldest !== undefined) recordDocs.delete(oldest);
+		return hit.doc;
 	}
 
-	recordDocs.delete(key);
-	recordDocs.set(key, { doc, expires: now + RECORD_DOC_TTL_MS });
+	const missedAt = recordMisses.get(key);
+
+	if (missedAt !== undefined && missedAt + RECORD_DOC_TTL_MS > now) return null;
+	const doc = await loadRecordDoc(env, ctx, request);
+
+	if (doc)
+		lruSet(recordDocs, RECORD_DOC_CACHE_MAX, key, {
+			doc,
+			expires: now + RECORD_DOC_TTL_MS,
+		});
+	else lruSet(recordMisses, RECORD_MISS_CACHE_MAX, key, now);
 
 	return doc;
 }

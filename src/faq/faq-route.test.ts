@@ -662,16 +662,41 @@ describe("POST /api/faq/ask — rate limiting", () => {
 		expect(calls).toHaveLength(0);
 	});
 
-	it("sweeps expired entries out of the per-isolate bucket once it holds LOCAL_BUCKET_MAX_KEYS", () => {
+	it("caps the per-isolate bucket at LOCAL_BUCKET_MAX_KEYS live IPs and sweeps expired ones", () => {
 		const t0 = 1_000_000;
-		const before = localBucketSize();
 
-		for (let i = 0; i < LOCAL_BUCKET_MAX_KEYS; i++)
+		for (let i = 0; i < LOCAL_BUCKET_MAX_KEYS + 5; i++)
 			localBucketAllows(`sweep:${i}`, t0);
-		expect(localBucketSize()).toBe(before + LOCAL_BUCKET_MAX_KEYS);
+		// Every entry is live, so the oldest insertions were evicted to make room.
+		expect(localBucketSize()).toBe(LOCAL_BUCKET_MAX_KEYS);
 		// A minute later every one of those has expired; the next call sweeps them.
 		expect(localBucketAllows("sweep:new", t0 + 60_001)).toBe(true);
-		expect(localBucketSize()).toBeLessThanOrEqual(before + 1);
+		expect(localBucketSize()).toBe(1);
+	});
+
+	it("does not charge the account-wide budget for a body that never reaches the model", async () => {
+		const globalKeys: string[] = [];
+		const globalLimiter: FaqRateLimiter = {
+			limit: async ({ key }) => {
+				globalKeys.push(key);
+
+				return { success: true };
+			},
+		};
+		const { ask, post, calls } = build({ globalLimiter });
+
+		expect((await ask("")).status).toBe(400);
+		expect(
+			(
+				await post("x".repeat(MAX_BODY_BYTES + 1), {
+					"content-type": "application/json",
+				})
+			).status,
+		).toBe(413);
+		expect(globalKeys).toEqual([]);
+		expect((await ask("hello")).status).toBe(200);
+		expect(globalKeys).toEqual(["faq:global"]);
+		expect(calls).toHaveLength(1);
 	});
 
 	it("lets the question through when the binding allows", async () => {
