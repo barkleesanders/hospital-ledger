@@ -339,7 +339,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--retry-item-timeout-seconds", type=int, default=3600)
     parser.add_argument("--project-name", default="hospital-ledger")
     parser.add_argument("--status-file", default=str(FINAL_STATUS_FILE))
-    parser.add_argument("--verify-url", default="https://hospital-ledger.pages.dev")
+    parser.add_argument("--verify-url", default="https://hospitalledger.com")
     parser.add_argument("--skip-wait", action="store_true")
     parser.add_argument("--skip-retry", action="store_true")
     parser.add_argument("--skip-upload", action="store_true")
