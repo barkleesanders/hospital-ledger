@@ -11,6 +11,8 @@
 #   bash scripts/refresh.sh --dry-run      # print what each step would do; no mutations
 #   bash scripts/refresh.sh --no-deploy    # everything except wrangler deploy (for testing)
 #   bash scripts/refresh.sh --skip-ingest  # skip Stage 4 (use existing data/parsed/)
+#   bash scripts/refresh.sh --no-git       # skip git sync/commit for ephemeral compute
+#   bash scripts/refresh.sh --no-r2        # build locally; caller publishes R2 separately
 #   bash scripts/refresh.sh --quick        # = --skip-ingest --no-deploy (smoke test)
 #
 # Exit codes:
@@ -53,12 +55,14 @@ export MEM_GUARD_MAX_GB="${MEM_GUARD_MAX_GB:-8}"
 export MEM_GUARD_MIN_FREE_GB="${MEM_GUARD_MIN_FREE_GB:-3}"
 
 # ---- args ------------------------------------------------------------------
-DRY_RUN=0; NO_DEPLOY=0; SKIP_INGEST=0; MAX_FAIL_PCT=50
+DRY_RUN=0; NO_DEPLOY=0; SKIP_INGEST=0; NO_GIT=0; NO_R2=0; MAX_FAIL_PCT=50
 for arg in "$@"; do
   case "$arg" in
     --dry-run)      DRY_RUN=1 ;;
     --no-deploy)    NO_DEPLOY=1 ;;
     --skip-ingest)  SKIP_INGEST=1 ;;
+    --no-git)       NO_GIT=1 ;;
+    --no-r2)        NO_R2=1 ;;
     --quick)        SKIP_INGEST=1; NO_DEPLOY=1 ;;
     --max-fail-pct=*) MAX_FAIL_PCT="${arg#*=}" ;;
     -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
@@ -122,13 +126,17 @@ run() {  # run a step; on dry-run, just print
 echo "hl-refresh $TS  (dry_run=$DRY_RUN no_deploy=$NO_DEPLOY skip_ingest=$SKIP_INGEST)"
 echo "log: $RUN_LOG"
 
-run "Step 0: git sync" bash -c '
-  git fetch origin --prune
-  AHEAD=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
-  BEHIND=$(git rev-list --count HEAD..@{u} 2>/dev/null || echo 0)
-  if [ "$BEHIND" -gt 0 ]; then echo "BEHIND origin by $BEHIND — pulling"; git pull --ff-only; fi
-  if [ "$AHEAD" -gt 0 ]; then echo "AHEAD of origin by $AHEAD commits (uncommitted local work) — refusing to refresh"; exit 1; fi
-'
+if [ "$NO_GIT" = 1 ]; then
+  echo "(skipping git sync per --no-git)"
+else
+  run "Step 0: git sync" bash -c '
+    git fetch origin --prune
+    AHEAD=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
+    BEHIND=$(git rev-list --count HEAD..@{u} 2>/dev/null || echo 0)
+    if [ "$BEHIND" -gt 0 ]; then echo "BEHIND origin by $BEHIND; pulling"; git pull --ff-only; fi
+    if [ "$AHEAD" -gt 0 ]; then echo "AHEAD of origin by $AHEAD commits; refusing to refresh"; exit 1; fi
+  '
+fi
 
 # ---- Step 1: probe (optional — only if probe_mrf_urls.py supports cron-friendly mode)
 # For now: skip the probe step in cron and let batch_ingest --resume re-attempt
@@ -203,9 +211,13 @@ run "Step 5a: predeploy_audit --fix (auto-correct stale README/home counts)" \
 run "Step 5b: predeploy_audit (must pass)" python3 scripts/predeploy_audit.py
 
 # ---- Step 6: R2 sync (trusts manifest; skips unchanged) --------------------
-run "Step 6: stage4_refresh UPLOAD_R2" bash -c '
-  SKIP_INGEST=1 SKIP_SLIM=1 UPLOAD_R2=1 python3 scripts/stage4_refresh.py
-'
+if [ "$NO_R2" = 1 ]; then
+  echo "(skipping R2 upload per --no-r2)"
+else
+  run "Step 6: stage4_refresh UPLOAD_R2" bash -c '
+    SKIP_INGEST=1 SKIP_SLIM=1 UPLOAD_R2=1 python3 scripts/stage4_refresh.py
+  '
+fi
 
 # ---- Step 7: commit allowlisted files (NEVER -A — protects against side-car blobs)
 ALLOW=(
@@ -222,7 +234,7 @@ ALLOW=(
   data/full_standardize_status.json
   data/r2_upload_manifest.json
 )
-if [ "$DRY_RUN" != 1 ]; then
+if [ "$DRY_RUN" != 1 ] && [ "$NO_GIT" != 1 ]; then
   git add "${ALLOW[@]}" 2>/dev/null || true
   if ! git diff --cached --quiet; then
     DELTA=$(python3 -c "
@@ -235,6 +247,8 @@ print(s.get('standardized_price_hospitals', '?'))
   else
     echo "(no allowlisted changes to commit)"
   fi
+elif [ "$NO_GIT" = 1 ]; then
+  echo "(skipping git commit and push per --no-git)"
 fi
 
 # ---- Step 8: deploy --------------------------------------------------------

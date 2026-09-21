@@ -6,6 +6,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = os.path.join(ROOT, 'db', 'hospital_ledger.db')
 CMS_CSV = os.path.join(ROOT, 'seed', 'hospitals.csv')
 TPAFS_CSV = os.path.join(ROOT, 'seed', 'tpafs_hospital_mrf_links.csv')
+SCOREBOARD_CSV = os.path.join(ROOT, 'data', 'hospital_ledger_scoreboard.csv')
 
 REQUIRED_TYPES = (
     'Acute Care Hospitals',
@@ -59,6 +60,25 @@ CREATE TABLE mrf_probe(
 
 CREATE INDEX idx_hosp_state ON hospitals(state);
 CREATE INDEX idx_seed_state ON mrf_seed(state);
+
+-- Rediscovery is durable enrichment state. Do not drop it when rebuilding
+-- CMS and TPAFS seeds, but create an empty table for a clean cloud bootstrap.
+CREATE TABLE IF NOT EXISTS mrf_rediscovered (
+  ccn TEXT,
+  source_page TEXT,
+  candidate_url TEXT,
+  anchor_text TEXT,
+  score INTEGER,
+  discovered_at TEXT,
+  head_status INTEGER,
+  head_content_type TEXT,
+  head_content_length INTEGER,
+  alive INTEGER,
+  rank INTEGER,
+  PRIMARY KEY (ccn, candidate_url)
+);
+CREATE INDEX IF NOT EXISTS idx_redisc_ccn ON mrf_rediscovered(ccn);
+CREATE INDEX IF NOT EXISTS idx_redisc_alive ON mrf_rediscovered(alive);
 """)
 
 with open(CMS_CSV) as f:
@@ -83,6 +103,52 @@ with open(TPAFS_CSV) as f:
                      x['state_or_region'], x['last_updated_date'], x['entry_date']))
 c.executemany("INSERT OR IGNORE INTO mrf_seed VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", rows)
 print(f"mrf_seed loaded: {c.execute('SELECT COUNT(*) FROM mrf_seed').fetchone()[0]}")
+
+# The tracked scoreboard is a portable snapshot of URL rediscovery and probe
+# history. It lets a clean cloud worker recover the full live-URL corpus even
+# when the prior SQLite checkpoint is unavailable.
+if os.path.exists(SCOREBOARD_CSV):
+    probe_rows = []
+    rediscovered_rows = []
+    with open(SCOREBOARD_CSV, encoding='utf-8-sig') as f:
+        for row in csv.DictReader(f):
+            ccn = (row.get('ccn') or '').strip()
+            url = (row.get('mrf_url') or '').strip()
+            if not ccn or not url:
+                continue
+            verified = (row.get('verified_utc') or '').strip() or 'scoreboard'
+            status_text = (row.get('http_status') or '').strip()
+            length_text = (row.get('bytes') or '').strip()
+            alive = 1 if (row.get('alive') or '').strip() in {'1', 'true', 'True'} else 0
+            status = int(status_text) if status_text.lstrip('-').isdigit() else None
+            length = int(length_text) if length_text.isdigit() else None
+            probe_rows.append((
+                ccn, url, verified, status, (row.get('content_type') or '').strip(),
+                length, url, alive,
+            ))
+            if (row.get('source') or '').strip() == 'rediscovered':
+                score_text = (row.get('rediscovery_score') or '').strip()
+                score = int(score_text) if score_text.lstrip('-').isdigit() else 0
+                rediscovered_rows.append((
+                    ccn, (row.get('source_page') or '').strip(), url, '', score,
+                    verified, status, (row.get('content_type') or '').strip(),
+                    length, alive, 0,
+                ))
+    c.executemany(
+        """INSERT OR IGNORE INTO mrf_probe
+           (ccn,mrf_url,probed_at,http_status,content_type,content_length,final_url,alive)
+           VALUES (?,?,?,?,?,?,?,?)""",
+        probe_rows,
+    )
+    c.executemany(
+        """INSERT OR IGNORE INTO mrf_rediscovered
+           (ccn,source_page,candidate_url,anchor_text,score,discovered_at,
+            head_status,head_content_type,head_content_length,alive,rank)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+        rediscovered_rows,
+    )
+    print(f"scoreboard probes loaded: {len(probe_rows)}")
+    print(f"scoreboard rediscovered URLs loaded: {len(rediscovered_rows)}")
 
 # coverage
 ph = ','.join('?' * len(REQUIRED_TYPES))
