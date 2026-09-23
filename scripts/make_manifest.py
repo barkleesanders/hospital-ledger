@@ -39,6 +39,10 @@ def main() -> int:
     ap.add_argument("--producer", required=True, help='who ran this, e.g. "muse.ai nova" or "mac-mini launchd"')
     ap.add_argument("--tier", choices=("counts", "full"), required=True)
     ap.add_argument("--note", default="")
+    ap.add_argument("--git-commit", default="",
+                    help="full git SHA of the pipeline commit that produced this data")
+    ap.add_argument("--git-repo", default="https://github.com/barkleesanders/hospital-ledger",
+                    help="GitHub repo URL for the commit link")
     args = ap.parse_args()
     root = Path(args.root)
     summary_p = root / "meta" / "summary.json"
@@ -74,6 +78,9 @@ def main() -> int:
         "unhashed_counts": counts,
         "artifacts": artifacts,
     }
+    if args.git_commit:
+        manifest["git_commit"] = args.git_commit
+        manifest["git_repo"] = args.git_repo
     out = root / "meta" / "manifest.json"
     out.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     print(f"wrote {out}: {len(artifacts)} hashed artifact(s), tier={args.tier}, generated_at={manifest['generated_at']}")
