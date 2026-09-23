@@ -221,6 +221,7 @@ ALLOW=(
   data/full_standardize_failures.jsonl
   data/full_standardize_status.json
   data/r2_upload_manifest.json
+  data/publish-state.json
 )
 if [ "$DRY_RUN" != 1 ]; then
   git add "${ALLOW[@]}" 2>/dev/null || true
