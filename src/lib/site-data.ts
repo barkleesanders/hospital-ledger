@@ -45,6 +45,10 @@ export type Manifest = {
 	generated_at: string;
 	producer?: string;
 	artifacts?: Record<string, { bytes?: number; sha256?: string }>;
+	/** Full git SHA of the pipeline commit that produced this data. */
+	git_commit?: string;
+	/** GitHub repo URL, e.g. https://github.com/barkleesanders/hospital-ledger */
+	git_repo?: string;
 };
 
 export type SiteDataSource = "r2" | "bundled";

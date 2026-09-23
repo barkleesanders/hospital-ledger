@@ -16,7 +16,7 @@ import { Layout } from "../components/Layout";
 import { ProcedureCarousel } from "../components/ProcedureCarousel";
 import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
-import { BUNDLED_SUMMARY, loadSummary } from "../lib/site-data";
+import { BUNDLED_SUMMARY, loadManifest, loadSummary } from "../lib/site-data";
 
 type HomeSummary = {
 	generated_at: string;
@@ -34,10 +34,21 @@ type HomeSummary = {
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
+/** Data-provenance for the last-updated banner: the publish manifest's
+ * generation time plus the GitHub commit that produced it. */
+export type Provenance = {
+	generated_at: string;
+	git_commit?: string;
+	git_repo?: string;
+};
+
+const DEFAULT_REPO = "https://github.com/barkleesanders/hospital-ledger";
+
 /** Exported so the "Ask anything" corpus (src/faq/faq-corpus.ts) renders the served copy. */
 export function homePage(
 	url: string,
 	SITE_COUNTS: HomeSummary = BUNDLED_SUMMARY,
+	provenance?: Provenance,
 ) {
 	const totalFacilities = SITE_COUNTS.total_facilities ?? 5426;
 	const cmsRequiredTotal = SITE_COUNTS.cms_required_total;
@@ -61,6 +72,27 @@ export function homePage(
 			stylesheets={["/faq.css"]}
 			moduleScripts={["/faq-island.js"]}
 		>
+			{provenance && (
+				<div class="bg-zinc-900 border-b border-zinc-800">
+					<div class="mx-auto max-w-6xl px-4 sm:px-6 py-2 text-xs text-zinc-400 flex items-center gap-2">
+						<span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
+						<span>
+							Data last updated {provenance.generated_at.slice(0, 10)}
+							{provenance.git_commit ? (
+								<>
+									{" "}· commit{" "}
+									<a
+										href={`${provenance.git_repo ?? DEFAULT_REPO}/commit/${provenance.git_commit}`}
+										class="font-mono underline hover:text-emerald-300"
+									>
+										{provenance.git_commit.slice(0, 7)}
+									</a>
+								</>
+							) : null}
+						</span>
+					</div>
+				</div>
+			)}
 			<header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
 				<div class="mx-auto max-w-6xl px-4 sm:px-6 pt-8 pb-10 sm:pt-10 sm:pb-12 md:pt-14 md:pb-16">
 					<div class="flex items-center gap-3 text-xs uppercase tracking-widest text-emerald-400">
@@ -1428,7 +1460,12 @@ export function homePage(
 
 export async function homePageHandler(c: Context<Env>): Promise<Response> {
 	const { summary, source } = await loadSummary(c.env);
-	return c.html(homePage("https://hospitalledger.com/", summary), 200, {
+	const manifest = await loadManifest(c.env);
+	return c.html(homePage("https://hospitalledger.com/", summary, {
+		generated_at: manifest.generated_at,
+		git_commit: manifest.git_commit,
+		git_repo: manifest.git_repo,
+	}), 200, {
 		"cache-control": "public, max-age=300",
 		"x-hl-template": "home-ssr",
 		"x-hl-source": source,
