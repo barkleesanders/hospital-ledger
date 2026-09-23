@@ -506,6 +506,78 @@ def live_verify_manifest(want_generated_at):
         time.sleep(10)
     return False
 
+# ---------------------------------------------------------------- git provenance
+# The publish manifest carries git_commit/git_repo so the site banner can link
+# the data to the exact GitHub commit. After a verified R2 publish, the manifest
+# + publish record are committed to the repo (allowlisted paths only, never -A)
+# and pushed to main.
+
+MINI_SSH = ["ssh", "-F", "/home/hatch/.ssh/mini_ssh_config",
+            "-o", "ConnectTimeout=20", "mini"]
+MINI_REPO = "/Users/barkleesanders/projects/hospital-ledger"
+GIT_REPO_URL = "https://github.com/barkleesanders/hospital-ledger"
+# Allowlisted repo paths the wave may commit. NEVER use `git add -A`.
+GIT_ALLOWLIST = ["data/publish-state.json"]
+
+
+def mini_git_head():
+    """HEAD SHA of the Mini repo (main). None on any failure (non-fatal)."""
+    try:
+        r = subprocess.run(
+            MINI_SSH + ["git", "-C", MINI_REPO, "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=30)
+        sha = r.stdout.strip()
+        return sha if r.returncode == 0 and len(sha) == 40 else None
+    except Exception as e:
+        log(f"mini_git_head failed: {e}")
+        return None
+
+
+def git_provenance_commit(out_dir, wave_rec):
+    """Commit the published manifest + wave record to the repo and push.
+
+    Copies out/meta/manifest.json to the Mini repo's allowlisted
+    data/publish-state.json (with the wave record attached), commits only the
+    allowlisted paths, and pushes to main. Returns (ok, message); never raises.
+    A failure here is a provenance-tracking gap, not a publish failure.
+    """
+    try:
+        manifest = json.loads((out_dir / "meta/manifest.json").read_text())
+        state_doc = {
+            "manifest": manifest,
+            "wave": wave_rec,
+            "committed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        local_tmp = Path("/tmp/hl_publish_state.json")
+        local_tmp.write_text(json.dumps(state_doc, indent=2, sort_keys=True) + "\n")
+
+        # 1. copy to Mini repo
+        r = subprocess.run(
+            ["scp", "-F", "/home/hatch/.ssh/mini_ssh_config",
+             "-o", "ConnectTimeout=20", str(local_tmp),
+             f"mini:{MINI_REPO}/data/publish-state.json"],
+            capture_output=True, text=True, timeout=60)
+        if r.returncode != 0:
+            return False, f"scp failed: {r.stderr[-200:]}"
+
+        # 2. commit allowlisted paths + push (single SSH invocation)
+        cmd = (
+            f"cd {MINI_REPO} && "
+            f"git add {' '.join(GIT_ALLOWLIST)} && "
+            f"git diff --cached --quiet || "
+            f"git commit -m 'chore(data): wave publish {wave_rec.get('wave', '?')} "
+            f"generated_at={manifest.get('generated_at', '?')}' && "
+            f"git push origin main"
+        )
+        r = subprocess.run(MINI_SSH + [cmd],
+                           capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            return False, f"commit/push failed: {(r.stdout + r.stderr)[-300:]}"
+        return True, "provenance committed + pushed"
+    except Exception as e:
+        return False, f"exception: {e}"
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -642,9 +714,17 @@ def main():
         for ccn in publish_ccns:
             (out / "prices" / f"{ccn}.json").write_bytes(
                 (ROOT / "public/data/prices" / f"{ccn}.json").read_bytes())
-        subprocess.run([VENV_PY, "scripts/make_manifest.py", str(out),
-                        "--producer", PRODUCER, "--tier", "counts",
-                        "--note", f"wave {state['waves_done'] + 1} pricing updated_ccns={','.join(publish_ccns)}"],
+        git_sha = mini_git_head()
+        if git_sha:
+            log(f"manifest git_commit={git_sha[:7]}")
+        else:
+            log("manifest git_commit unavailable (mini unreachable) — continuing without")
+        mk_args = [VENV_PY, "scripts/make_manifest.py", str(out),
+                   "--producer", PRODUCER, "--tier", "counts",
+                   "--note", f"wave {state['waves_done'] + 1} pricing updated_ccns={','.join(publish_ccns)}"]
+        if git_sha:
+            mk_args += ["--git-commit", git_sha, "--git-repo", GIT_REPO_URL]
+        subprocess.run(mk_args,
                        cwd=str(ROOT), check=True, capture_output=True, text=True, timeout=120)
 
         v = subprocess.run([VENV_PY, "scripts/validate_site_data.py", str(out),
@@ -682,6 +762,11 @@ def main():
             log(f"live verify: {'OK' if published else 'FAILED'}")
             if not published:
                 return record_failure("live-verify-fail", 4, std)
+            prov_ok, prov_msg = git_provenance_commit(
+                out, {"wave": state["waves_done"] + 1,
+                      "generated_at": want,
+                      "published_ccns": publish_ccns})
+            log(f"git provenance: {prov_msg}")
             state["unpublished"] = []
         else:
             log("--no-publish: assembled + validated, not uploaded")
