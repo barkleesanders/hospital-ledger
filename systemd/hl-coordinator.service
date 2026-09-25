@@ -1,0 +1,21 @@
+[Unit]
+Description=Hospital Ledger Tier 3 rebuild coordinator (gen-20260923-vm)
+After=network-online.target
+Wants=network-online.target
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=root
+Environment=HOME=/home/hatch
+EnvironmentFile=/home/hatch/hospital-ledger.env
+EnvironmentFile=/home/hatch/hl-proxy.env
+WorkingDirectory=/home/hatch/workspace/goals/hospital-ledger-weekly-refresh-counts-tier/hidden_files
+ExecStart=/usr/bin/python3 vm_coordinator.py
+Restart=on-failure
+RestartSec=60
+StandardOutput=append:/home/hatch/workspace/goals/hospital-ledger-weekly-refresh-counts-tier/hidden_files/hl-coordinator-stdout.log
+StandardError=append:/home/hatch/workspace/goals/hospital-ledger-weekly-refresh-counts-tier/hidden_files/hl-coordinator-stderr.log
+
+[Install]
+WantedBy=multi-user.target
