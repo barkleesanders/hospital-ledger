@@ -107,6 +107,89 @@ def _local_sha(path):
     return h.hexdigest()
 
 
+def _download_manifest_path():
+    return os.path.join(WDIR, "data", "download-manifest.json")
+
+
+def _load_download_manifest():
+    """{ccn: {sha256, bytes}} recorded by a previous attempt's download phase,
+    or {} when no previous attempt completed one."""
+    try:
+        return json.load(open(_download_manifest_path()))
+    except Exception:
+        return {}
+
+
+def _write_download_manifest(dl_ok):
+    json.dump({c: {"sha256": v["sha256"], "bytes": v["bytes"]}
+               for c, v in sorted(dl_ok.items())},
+              open(_download_manifest_path(), "w"), indent=1)
+
+
+def _partition_downloads(manifest, prev_dl):
+    """Reboot-resume split for the download phase.
+
+    A file is skipped (not re-downloaded) only when it exists on disk with
+    BOTH the recorded byte size and sha256. get_file writes dest+".part"
+    then atomically renames, so a present dest is always a whole file from a
+    previous successful GET; the size+hash check additionally guards against
+    a dest that was modified or truncated after the fact. Anything doubtful
+    is re-downloaded.
+    Returns (already_have, remaining, n_skipped) where already_have maps
+    ccn -> {sha256, bytes} in dl_ok format and remaining maps key -> entry.
+    """
+    already, remaining, n = {}, {}, 0
+    for m in manifest:
+        ccn = os.path.basename(m["dest"])[:-5]
+        rec = prev_dl.get(ccn) or {}
+        if (os.path.isfile(m["dest"])
+                and os.path.getsize(m["dest"]) == rec.get("bytes")
+                and _local_sha(m["dest"]) == rec.get("sha256")):
+            already[ccn] = {"sha256": rec["sha256"], "bytes": rec["bytes"]}
+            n += 1
+        else:
+            remaining[m["key"]] = m
+    return already, remaining, n
+
+
+def _parsed_fingerprint(pdir):
+    """sha256 over sorted (filename, size, sha256) of every parsed input.
+
+    slim_parsed.py reads only data/parsed/*.json[.gz] (+ its own code and
+    env, both fixed per wave attempt), so this fingerprint fully determines
+    its outputs.
+    """
+    h = hashlib.sha256()
+    names = sorted(f for f in os.listdir(pdir)
+                   if f.endswith(".json") or f.endswith(".json.gz"))
+    for f in names:
+        p = os.path.join(pdir, f)
+        h.update(f.encode())
+        h.update(str(os.path.getsize(p)).encode())
+        h.update(_local_sha(p).encode())
+    h.update(str(len(names)).encode())
+    return h.hexdigest()
+
+
+def _slim_manifest_path():
+    return os.path.join(WDIR, "data", "slim-manifest.json")
+
+
+def _slim_outputs_ready(inputs_fp, script_fp, outputs):
+    """True iff a previous attempt's slim ran to success on byte-identical
+    inputs with the same script, and every expected output is present and
+    non-empty. The manifest is written only after slim exits 0, so a killed
+    or failed slim can never report ready."""
+    try:
+        sm = json.load(open(_slim_manifest_path()))
+    except Exception:
+        return False
+    return (sm.get("inputs_fingerprint") == inputs_fp
+            and sm.get("script_sha256") == script_fp
+            and all(os.path.isfile(p) and os.path.getsize(p) > 0
+                    for p in outputs))
+
+
 def stage_uploads(uploads, verify_first=False):
     """Byte-verified staging of (local, key) pairs.
 
@@ -353,7 +436,18 @@ def _dl_one(m):
 # Round-based download: each round attempts all remaining files. A round
 # with zero progress means the pipe is down -> wait for recovery before
 # the next round. Survives flapping without failing the wave.
-remaining = {m["key"]: m for m in manifest}
+# Reboot resume: files fully downloaded by a killed attempt are verified
+# against the recorded manifest and skipped (no re-download). Source keys
+# are immutable within a generation; to force a re-fetch, delete
+# data/download-manifest.json.
+already_have, remaining, n_skipped = _partition_downloads(
+    manifest, _load_download_manifest())
+for ccn, rec in already_have.items():
+    dl_ok[ccn] = rec
+    dl_bytes += rec["bytes"]
+if n_skipped:
+    log(f"download: {n_skipped}/{len(manifest)} already on disk "
+        f"(size+sha256 verified), skipping re-download")
 round_n = 0
 while remaining and round_n < 6:
     round_n += 1
@@ -379,6 +473,9 @@ while remaining and round_n < 6:
 for key, m in remaining.items():
     ccn = os.path.basename(m["dest"])[:-5]
     dl_fail.append({"ccn": ccn, "err": "failed after 6 download rounds"})
+# Record what is on disk so a rebooted attempt can verify-and-skip instead
+# of re-downloading. Includes files skipped via the resume path above.
+_write_download_manifest(dl_ok)
 log(f"download: {len(dl_ok)}/{len(ccns)} ok, {dl_bytes / 1e9:.2f} GB, "
     f"{len(dl_fail)} failed, {time.time() - t0:.0f}s elapsed")
 
@@ -456,27 +553,41 @@ wscripts = os.path.join(WDIR, "scripts")
 os.makedirs(wscripts, exist_ok=True)
 shutil.copy(os.path.join(SCRIPTS, "slim_parsed.py"), wscripts)
 os.makedirs(os.path.join(WDIR, "tmp"), exist_ok=True)
-env = dict(os.environ, TMPDIR=os.path.join(WDIR, "tmp"))
-env.pop("CCNS", None)
-env.pop("CCNS_FILE", None)
-log(f"slim: full-mode run over {n_parsed_inputs} parsed files (TMPDIR=wave tmp)")
-p = subprocess.run([sys.executable, "scripts/slim_parsed.py"], cwd=WDIR,
-                   env=env, capture_output=True, text=True, timeout=14400)
-tail = (p.stdout or "").strip().splitlines()[-8:]
-log(f"slim: rc={p.returncode}")
-for t in tail:
-    log(f"  slim | {t[:160]}")
-if p.returncode != 0:
-    log(f"  slim stderr: {(p.stderr or '')[-500:]}")
-    fail(f"slim_parsed.py rc={p.returncode}")
-
 prices_dir = os.path.join(WDIR, "public", "data", "prices")
 index_path = os.path.join(prices_dir, "index.json")
 payer_raw = os.path.join(WDIR, "data", "_payer_raw.jsonl")
 compl_raw = os.path.join(WDIR, "data", "_compliance_per_hospital.jsonl")
 detail_raw = os.path.join(WDIR, "data", "_cpt_detail_raw.jsonl")
 wave_cpt_index = os.path.join(WDIR, "public", "data", "cpt-index.json")
-for req in (index_path, payer_raw, compl_raw, detail_raw, wave_cpt_index):
+slim_outputs = (index_path, payer_raw, compl_raw, detail_raw, wave_cpt_index)
+# Reboot resume: slim reads only data/parsed (+ its own code, fixed per
+# attempt). If the inputs are byte-identical to a previous successful run
+# with the same script and all outputs are present, skip the re-run.
+inputs_fp = _parsed_fingerprint(pdir)
+script_fp = _local_sha(os.path.join(wscripts, "slim_parsed.py"))
+if _slim_outputs_ready(inputs_fp, script_fp, slim_outputs):
+    log(f"slim: inputs unchanged since successful run "
+        f"({n_parsed_inputs} parsed files), skipping re-run")
+else:
+    env = dict(os.environ, TMPDIR=os.path.join(WDIR, "tmp"))
+    env.pop("CCNS", None)
+    env.pop("CCNS_FILE", None)
+    log(f"slim: full-mode run over {n_parsed_inputs} parsed files (TMPDIR=wave tmp)")
+    p = subprocess.run([sys.executable, "scripts/slim_parsed.py"], cwd=WDIR,
+                       env=env, capture_output=True, text=True, timeout=14400)
+    tail = (p.stdout or "").strip().splitlines()[-8:]
+    log(f"slim: rc={p.returncode}")
+    for t in tail:
+        log(f"  slim | {t[:160]}")
+    if p.returncode != 0:
+        log(f"  slim stderr: {(p.stderr or '')[-500:]}")
+        fail(f"slim_parsed.py rc={p.returncode}")
+    json.dump({"inputs_fingerprint": inputs_fp, "script_sha256": script_fp,
+               "outputs": [os.path.basename(p) for p in slim_outputs],
+               "n_parsed": n_parsed_inputs},
+              open(_slim_manifest_path(), "w"), indent=1)
+
+for req in slim_outputs:
     if not os.path.exists(req) or os.path.getsize(req) == 0:
         fail(f"slim output missing/empty: {req}")
 
