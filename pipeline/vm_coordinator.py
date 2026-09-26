@@ -7,6 +7,9 @@
   operator round-trip, until all 11 waves complete):
     * wave fails on staging only + workdir intact -> --resume-stage
       (verify-first re-stage, skips objects the failed attempt got right);
+    * wave killed mid-flight with no result file (VM reboot / coordinator
+      restart) + staging resumable -> --resume-stage (verify-first,
+      idempotent; fails closed to a full re-run if sources are missing);
     * any other failure -> full wave re-run;
     * back off 15 min between attempts;
     * HALT only after 5 consecutive failures of the same wave, with a
@@ -134,6 +137,16 @@ def main():
         reason = wave_fail_reason(w)
         mode = "full"
         if n >= 1 and reason.startswith("staging:") and staging_resumable(w) and n < 3:
+            mode = "resume-stage"
+        elif (reason == "unknown"
+              and not os.path.exists(os.path.join(RESULTS_DIR, f"w{w}.json"))
+              and staging_resumable(w)):
+            # No result file: the wave was killed mid-flight (VM reboot or
+            # coordinator restart), not failed. If it had reached staging,
+            # verify-first resume-stage recovers the work instead of a full
+            # re-run. resume_stage() fails closed (missing sources -> fail),
+            # so the worst case is one wasted resume attempt, then full.
+            log(f"wave {w} interrupted with no result; staging resumable -> resume-stage")
             mode = "resume-stage"
         log(f"pipe healthy; starting wave {w} (attempt {n + 1}, mode={mode})")
         ok = run_wave(w, mode)
