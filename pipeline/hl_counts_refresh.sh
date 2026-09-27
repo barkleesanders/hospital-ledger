@@ -171,9 +171,26 @@ phase45_guard() {
 phase5_assemble() {
   echo "[phase5] assemble contract tree"
   rm -rf "$OUT"; mkdir -p "$OUT/meta" "$OUT/prices"
-  cp "$ROOT/public/data/summary.json" "$OUT/meta/summary.json" || return 1
+  # Merge fresh compliance counts into live Tier-3 summary (2026-09-27 fix:
+  # the local ~/hospital-ledger/ working copy is stale pre-Tier-3; blindly
+  # copying its summary.json overwrote 3,699 hospitals with 26).
+  local live_summary="/tmp/counts-live-summary-$TS.json"
+  if ! "$VENV_PY" "$ROOT/scripts/r2_put.py" --get-file "meta/summary.json" "$live_summary" 2>/dev/null; then
+    echo "[phase5] FAIL: cannot fetch live meta/summary.json from R2 — refusing to overwrite Tier-3 data"
+    return 1
+  fi
+  "$VENV_PY" "$HIDDEN/../hospital-ledger-push/pipeline/merge_summary.py" \
+    "$ROOT/public/data/summary.json" "$live_summary" "$OUT/meta/summary.json" \
+    || { echo "[phase5] FAIL: merge_summary"; return 1; }
+  rm -f "$live_summary"
   cp "$ROOT/public/data/hospitals.json" "$OUT/meta/hospitals.json" || return 1
-  cp "$ROOT/public/data/prices/index.json" "$OUT/prices/index.json" || return 1
+  # DO NOT copy the stale local prices/index.json (26 entries) — the Tier-3
+  # index (3,810) is canonical in R2; the counts refresh does not own it.
+  # Fetch the live index to keep the manifest hash consistent.
+  if ! "$VENV_PY" "$ROOT/scripts/r2_put.py" --get-file "prices/index.json" "$OUT/prices/index.json" 2>/dev/null; then
+    echo "[phase5] FAIL: cannot fetch live prices/index.json from R2"
+    return 1
+  fi
   "$ROOT/.venv/bin/python" "$ROOT/scripts/make_manifest.py" "$OUT" --producer "$PRODUCER" --tier counts \
     --note "native refresh $TS" || { echo "[phase5] FAIL: make_manifest"; return 1; }
   [ -f "$OUT/meta/manifest.json" ] || { echo "[phase5] FAIL: manifest missing"; return 1; }
