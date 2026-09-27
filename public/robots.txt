@@ -1,5 +1,7 @@
 User-agent: *
 Allow: /
+Disallow:
+
 Content-Signal: search=yes, ai-train=yes, ai-input=yes
 
 Sitemap: https://hospitalledger.com/sitemap.xml
