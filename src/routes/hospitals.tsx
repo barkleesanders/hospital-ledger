@@ -156,7 +156,7 @@ export async function hospitalsIndexHandler(c: Context<Env>) {
 export async function hospitalsStateHandler(c: Context<Env>) {
 	const st = String(c.req.param("state") ?? "").toUpperCase();
 	const url = `https://hospitalledger.com/hospitals/${st}`;
-	if (!VALID_STATE.test(st)) {
+	if (!VALID_STATE.test(st) && st !== "UNKNOWN") {
 		return c.html(
 			<Layout
 				title="Hospitals — Hospital Ledger"
