@@ -731,7 +731,7 @@ export function homePage(url: string) {
 											Canonicalize payer names (Aetna vs AETNA vs Aetna Health
 											Inc.)
 										</td>
-										<td class="py-2 pr-3">72,951 raw rows</td>
+										<td class="py-2 pr-3">68,528 raw rows</td>
 										<td class="py-2 pr-3">
 											~250 wpm reading + ~500 unique merges
 										</td>
