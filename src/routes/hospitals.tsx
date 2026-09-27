@@ -79,12 +79,13 @@ const stateName: Record<string, string> = {
 	TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia",
 	WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
 	PR: "Puerto Rico", GU: "Guam", VI: "Virgin Islands",
+	AS: "American Samoa", MP: "Northern Mariana Islands",
 };
 
 function byState(entries: HospitalEntry[]): Map<string, HospitalEntry[]> {
 	const m = new Map<string, HospitalEntry[]>();
 	for (const e of entries) {
-		const st = e.state || "??";
+		const st = e.state || "UNKNOWN";
 		if (!m.has(st)) m.set(st, []);
 		m.get(st)!.push(e);
 	}
@@ -137,7 +138,7 @@ export async function hospitalsIndexHandler(c: Context<Env>) {
 							href={`/hospitals/${st}`}
 							class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 hover:border-emerald-700 hover:bg-zinc-900"
 						>
-							<div class="font-semibold">{stateName[st] ?? st}</div>
+							<div class="font-semibold">{st === "UNKNOWN" ? "Unknown state" : (stateName[st] ?? st)}</div>
 							<div class="text-sm text-zinc-400">
 								{(grouped.get(st) ?? []).length.toLocaleString("en-US")}{" "}
 								hospitals
@@ -191,7 +192,7 @@ export async function hospitalsStateHandler(c: Context<Env>) {
 		);
 	}
 	const list = byState(entries).get(st) ?? [];
-	const label = stateName[st] ?? st;
+	const label = st === "UNKNOWN" ? "Unknown state" : (stateName[st] ?? st);
 	if (!list.length) {
 		return c.html(
 			<Layout
