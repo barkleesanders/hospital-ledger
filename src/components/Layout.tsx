@@ -57,6 +57,11 @@ export type LayoutProps = PropsWithChildren<{
 	stylesheets?: string[];
 	// Same-origin ES-module scripts, deferred by nature (e.g. /faq-island.js).
 	moduleScripts?: string[];
+	// Optional structured data for this page, rendered as a JSON-LD script in
+	// <head>. Page components own their node's factual claims; Layout only
+	// serializes. The `<` escape is the same JSON-LD hardening the home page
+	// node uses.
+	jsonLd?: unknown;
 }>;
 
 const DEFAULT_OG_IMAGE = "https://hospitalledger.com/og.png";
@@ -72,6 +77,7 @@ export const Layout: FC<LayoutProps> = ({
 	scriptSrc,
 	stylesheets,
 	moduleScripts,
+	jsonLd,
 	children,
 }) => {
 	const resolvedOgImage = ogImage ?? DEFAULT_OG_IMAGE;
@@ -84,6 +90,11 @@ export const Layout: FC<LayoutProps> = ({
 				<title>{title}</title>
 				<meta name="description" content={description} />
 				{url ? <link rel="canonical" href={url} /> : null}
+				{jsonLd ? (
+					<script type="application/ld+json">
+						{raw(JSON.stringify(jsonLd).replace(/</g, "\\u003c"))}
+					</script>
+				) : null}
 
 				{/*
 				  Entity anchor — HOME PAGE ONLY, and deliberately NOT an Organization.
