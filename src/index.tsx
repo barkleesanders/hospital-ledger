@@ -11,8 +11,12 @@ import {
 	type FaqRateLimiter,
 	mountInfiniteFaq,
 } from "./faq/faq-route";
-import { CPT_NAMES } from "./lib/cpt-names";
 import { readR2Json } from "./lib/r2";
+// Full top-5,000 CPT/HCPCS code list for the sitemap, extracted from the live
+// CPT index at build time (public/data/cpt-codes.json). Codes change rarely;
+// regenerate when the index meaningfully changes.
+import CPT_CODES from "../public/data/cpt-codes.json";
+import HOSPITAL_GEO from "../public/data/hospital-geo.json";
 import { aboutNumbersPageHandler } from "./routes/about-the-numbers";
 import { complianceRankingHandler } from "./routes/api/compliance-ranking";
 import { cptIndexHandler } from "./routes/api/cpt-index";
@@ -23,6 +27,10 @@ import { pricesIndexHandler } from "./routes/api/prices-index";
 import { procedureHandler } from "./routes/api/procedure";
 import { homePageHandler } from "./routes/home";
 import { hospitalPageHandler } from "./routes/hospital";
+import {
+	hospitalsIndexHandler,
+	hospitalsStateHandler,
+} from "./routes/hospitals";
 import { payerPageHandler } from "./routes/payer";
 import { procedurePageHandler } from "./routes/procedure";
 
@@ -183,10 +191,23 @@ app.get("/sitemap.xml", async (c) => {
 	// publishes as `dateModified`. It is stable between refreshes (so Google can
 	// verify it), it advances on its own the next time `npm run refresh` runs,
 	// and it cannot drift from the page, because it IS the page's source.
-	const lastmod = summaryJson.generated_at.slice(0, 10);
+	//
+	// Read it from LIVE R2, not the build-time bundle: the bundled
+	// public/data/summary.json only changes on deploy, while the data refreshes
+	// weekly. (A stale bundled copy is exactly how the sitemap served a June
+	// lastmod in September.)
+	const liveSummary = await readR2Json<{ generated_at?: string }>(
+		c.env.HL_MRF_PARSED,
+		"meta/summary.json",
+	);
+	const lastmod = (liveSummary?.generated_at ?? summaryJson.generated_at).slice(
+		0,
+		10,
+	);
 
 	// Hospitals: try R2 prices/index.json first; fall back to static
-	// /data/hospitals.json filtered to has_live_mrf=true.
+	// /data/hospitals.json filtered to has_live_mrf=true. No cap — every
+	// hospital page belongs in the sitemap (Google allows 50,000 URLs/file).
 	let hospitalCcns: string[] = [];
 	const pricesIndex = await readR2Json<{ hospitals?: { ccn?: string }[] }>(
 		c.env.HL_MRF_PARSED,
@@ -195,8 +216,7 @@ app.get("/sitemap.xml", async (c) => {
 	if (pricesIndex?.hospitals?.length) {
 		hospitalCcns = pricesIndex.hospitals
 			.map((h) => String(h.ccn ?? ""))
-			.filter(Boolean)
-			.slice(0, 200);
+			.filter(Boolean);
 	} else if (c.env.ASSETS && typeof c.env.ASSETS.fetch === "function") {
 		const url = new URL(c.req.url);
 		url.pathname = "/data/hospitals.json";
@@ -209,8 +229,7 @@ app.get("/sitemap.xml", async (c) => {
 			}>;
 			hospitalCcns = arr
 				.filter((h) => h.has_live_mrf && h.ccn)
-				.map((h) => String(h.ccn))
-				.slice(0, 200);
+				.map((h) => String(h.ccn));
 		}
 	}
 
@@ -228,12 +247,27 @@ app.get("/sitemap.xml", async (c) => {
 			.slice(0, 100);
 	}
 
-	// CPT codes: full curated map (103 entries).
-	const cptCodes = Object.keys(CPT_NAMES);
+	// CPT codes: the full top-5,000 index (bundled snapshot), not just the 103
+	// curated homepage codes. Every listed code has a /procedure/:code page.
+	const cptCodes = CPT_CODES as string[];
+
+	// States present in the hospital directory (for /hospitals/:state URLs).
+	const states = new Set<string>();
+	const geo = HOSPITAL_GEO as unknown as Record<string, [string, string]>;
+	for (const g of Object.values(geo)) {
+		if (g?.[1]) states.add(g[1]);
+	}
 
 	const urls: string[] = [
 		`<url><loc>${SITE}/</loc><lastmod>${lastmod}</lastmod><priority>1.0</priority></url>`,
+		`<url><loc>${SITE}/about-the-numbers</loc><lastmod>${lastmod}</lastmod><priority>0.8</priority></url>`,
+		`<url><loc>${SITE}/hospitals</loc><lastmod>${lastmod}</lastmod><priority>0.9</priority></url>`,
 	];
+	for (const st of [...states].sort()) {
+		urls.push(
+			`<url><loc>${SITE}/hospitals/${st}</loc><lastmod>${lastmod}</lastmod><priority>0.8</priority></url>`,
+		);
+	}
 	for (const code of cptCodes) {
 		urls.push(
 			`<url><loc>${SITE}/procedure/${code}</loc><lastmod>${lastmod}</lastmod><priority>0.9</priority></url>`,
@@ -267,6 +301,8 @@ ${urls.join("\n")}
 app.get("/procedure/:code", procedurePageHandler);
 app.get("/payer/:slug", payerPageHandler);
 app.get("/hospital/:ccn", hospitalPageHandler);
+app.get("/hospitals", hospitalsIndexHandler);
+app.get("/hospitals/:state", hospitalsStateHandler);
 
 // SSR home page.
 app.get("/", homePageHandler);
