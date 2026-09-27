@@ -9,8 +9,20 @@ import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
 import { type HospitalData, loadHospital } from "../lib/data";
 import { fmtMoney } from "../lib/format";
+// Compact CCN → [city, state] lookup, generated from CMS Hospital General
+// Information at build time (public/data/hospital-geo.json). City/state change
+// rarely, so a bundled snapshot is safe; hospital names/prices always come
+// from live R2.
+import HOSPITAL_GEO from "../../public/data/hospital-geo.json";
 
 const VALID_CCN = /^\d{6}$/;
+
+/** "City, ST" for a CCN, or null when the CCN is not in the CMS snapshot. */
+const GEO = HOSPITAL_GEO as unknown as Record<string, [string, string]>;
+function geoFor(ccn: string): string | null {
+	const g = GEO[ccn];
+	return g ? `${g[0]}, ${g[1]}` : null;
+}
 
 /** The six data elements 45 CFR § 180 requires; shared with the "Ask anything" corpus. */
 export const ELEMENT_LABELS: Record<string, string> = {
@@ -76,12 +88,37 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 	}
 	const top = items.slice(0, 50);
 	const explainer = complianceExplainer(score);
+	const geo = geoFor(ccn);
+	const where = geo ? ` (${geo})` : "";
+	const priceCount = items.length;
+	const description =
+		`${name}${where}: ${priceCount.toLocaleString("en-US")} published prices ` +
+		`across ${cptCount.toLocaleString("en-US")} procedures, price-transparency ` +
+		`compliance grade ${grade}. Free, no signup.`;
+	const jsonLd = {
+		"@context": "https://schema.org",
+		"@type": "Hospital",
+		name,
+		url,
+		identifier: ccn,
+		...(geo
+			? {
+					address: {
+						"@type": "PostalAddress",
+						addressLocality: GEO[ccn]?.[0],
+						addressRegion: GEO[ccn]?.[1],
+						addressCountry: "US",
+					},
+				}
+			: {}),
+	};
 
 	return (
 		<Layout
-			title={`${name} — Hospital Ledger`}
-			description={`Prices and compliance for ${name}.`}
+			title={`${name}${where} prices — Hospital Ledger`}
+			description={description}
 			url={url}
+			jsonLd={jsonLd}
 			stylesheets={["/faq.css"]}
 			moduleScripts={["/faq-island.js"]}
 		>
