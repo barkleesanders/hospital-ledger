@@ -306,6 +306,17 @@ function procedurePage(data: ProcedureData, url: string) {
 			description={seoDesc}
 			ogTitle={`${name} (${data.code}) — Hospital Ledger`}
 			url={url}
+			jsonLd={{
+				"@context": "https://schema.org",
+				"@type": "MedicalProcedure",
+				name,
+				url,
+				code: {
+					"@type": "MedicalCode",
+					codeValue: data.code,
+					codingSystem: data.type === "HCPCS" ? "HCPCS" : "CPT",
+				},
+			}}
 			scriptSrc="/procedure-client.js"
 			stylesheets={["/faq.css"]}
 			moduleScripts={["/faq-island.js"]}
