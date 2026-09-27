@@ -1,0 +1,19 @@
+{
+  "bin": {
+    "hl": "./dist/cli.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "zod": "^3.25.0"
+  },
+  "description": "MCP server + CLI for HospitalLedger hospital price-transparency data",
+  "license": "MIT",
+  "name": "hospital-ledger-mcp",
+  "scripts": {
+    "build": "../node_modules/.bin/esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.js && ../node_modules/.bin/esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/cli.js && printf '#!/usr/bin/env node\\n' | cat - dist/server.js > dist/server.tmp && mv dist/server.tmp dist/server.js && printf '#!/usr/bin/env node\\n' | cat - dist/cli.js > dist/cli.tmp && mv dist/cli.tmp dist/cli.js && chmod +x dist/server.js dist/cli.js",
+    "typecheck": "../node_modules/.bin/tsc --noEmit -p tsconfig.json",
+    "verify": "node dist/cli.js status"
+  },
+  "type": "module",
+  "version": "1.0.0"
+}
