@@ -21,7 +21,12 @@ const VALID_CCN = /^\d{6}$/;
 const GEO = HOSPITAL_GEO as unknown as Record<string, [string, string]>;
 function geoFor(ccn: string): string | null {
 	const g = GEO[ccn];
-	return g ? `${g[0]}, ${g[1]}` : null;
+	return g ? `${titleWords(g[0])}, ${g[1]}` : null;
+}
+
+/** "SANTA ROSA" -> "Santa Rosa" (source CMS geo data is uppercase). */
+function titleWords(s: string): string {
+	return s.toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
 /** The six data elements 45 CFR § 180 requires; shared with the "Ask anything" corpus. */
@@ -91,10 +96,13 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 	const geo = geoFor(ccn);
 	const where = geo ? ` (${geo})` : "";
 	const priceCount = items.length;
+	const procPhrase =
+		cptCount > 0
+			? `across ${cptCount.toLocaleString("en-US")} procedures, `
+			: "";
 	const description =
 		`${name}${where}: ${priceCount.toLocaleString("en-US")} published prices ` +
-		`across ${cptCount.toLocaleString("en-US")} procedures, price-transparency ` +
-		`compliance grade ${grade}. Free, no signup.`;
+		`${procPhrase}price-transparency compliance grade ${grade}. Free, no signup.`;
 	const jsonLd = {
 		"@context": "https://schema.org",
 		"@type": "Hospital",
