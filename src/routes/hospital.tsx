@@ -113,7 +113,7 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 			? {
 					address: {
 						"@type": "PostalAddress",
-						addressLocality: GEO[ccn]?.[0],
+						addressLocality: geo.split(",")[0].trim(),
 						addressRegion: GEO[ccn]?.[1],
 						addressCountry: "US",
 					},
