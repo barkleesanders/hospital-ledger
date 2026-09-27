@@ -646,11 +646,11 @@ export function homePage(url: string) {
 						<span class="line" />
 					</div>
 					<h2 class="serif text-2xl sm:text-3xl md:text-4xl mb-3">
-						Three days. Two AI agents.{" "}
-						<em class="text-emerald-300">~3 person-years</em> of human work.
+						Three days to launch. Rebuilt deeper.{" "}
+						<em class="text-emerald-300">~3 person-years</em> of human work — updated daily.
 					</h2>
 					<p class="text-zinc-300 max-w-3xl leading-relaxed">
-						Hospital Ledger was built between May 12–15, 2026 by two AI coding
+						Hospital Ledger launched in May 2026 from a three-day build by two AI coding
 						agents —{" "}
 						<a
 							class="text-emerald-300 underline"
@@ -665,7 +665,7 @@ export function homePage(url: string) {
 						>
 							OpenAI Codex
 						</a>{" "}
-						— working in parallel under one operator. The headline number isn't
+						— working in parallel under one operator. In September 2026 the dataset was rebuilt from scratch at greater depth — a 5,000-code CPT index, payer files, CMS enforcement records — and put on an autonomous pipeline that keeps it current: pricing waves re-ingest changed hospital files every day, and compliance is re-verified every week. The headline number isn't
 						a vibe — it's a sum of real per-step rates a competent analyst with
 						Excel, Power Query, and Python would actually hit. Every hospital
 						labels "gross charge", "cash price", "negotiated rate", and "CPT
@@ -793,7 +793,7 @@ export function homePage(url: string) {
 							≈ <span class="text-emerald-300">2.85 person-years</span> at 40
 							hr/week fully-utilized, or roughly{" "}
 							<span class="text-emerald-300">5–6 calendar years</span> for one
-							analyst working a sustainable 20 hr/week on the side. The 99 GB of
+							analyst working a sustainable 20 hr/week on the side. And that is just the build — keeping it current never ends: the pipeline re-checks dozens of hospitals every night and re-verifies compliance weekly, work a human team would have to staff forever. The 99 GB of
 							raw MRF data is too large to retype — nobody types it; they
 							normalize. The cost is mapping, not keystrokes. Reading speed
 							(~250 wpm) and typing speed (~40 wpm) only show up inside the
