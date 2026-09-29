@@ -24,6 +24,7 @@ import { payerHandler } from "./routes/api/payer";
 import { payersIndexHandler } from "./routes/api/payers-index";
 import { pricesHandler } from "./routes/api/prices";
 import { pricesIndexHandler } from "./routes/api/prices-index";
+import { manifestHandler } from "./routes/api/manifest";
 import { procedureHandler } from "./routes/api/procedure";
 import { homePageHandler } from "./routes/home";
 import { hospitalPageHandler } from "./routes/hospital";
@@ -159,6 +160,7 @@ mountInfiniteFaq(app, {
 
 // API routes (preserve byte-similar shapes with the legacy Pages Functions).
 app.get("/api/prices-index", pricesIndexHandler);
+app.get("/api/manifest", manifestHandler);
 app.get("/api/cpt-index", cptIndexHandler);
 app.get("/api/payers-index", payersIndexHandler);
 app.get("/api/compliance-ranking", complianceRankingHandler);
