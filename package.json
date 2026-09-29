@@ -34,6 +34,6 @@
 		"typescript": "^5.7.2",
 		"vite": "^6.0.7",
 		"vitest": "^4.1.11",
-		"wrangler": "^4.124.0"
+		"wrangler": "^4.143.1"
 	}
 }
