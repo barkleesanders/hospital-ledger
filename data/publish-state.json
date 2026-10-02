@@ -1,5 +1,5 @@
 {
-  "committed_at": "2026-10-02T08:35:45.494175+00:00",
+  "committed_at": "2026-10-02T10:44:12.834621+00:00",
   "manifest": {
     "artifacts": {
       "meta/hospitals.json": {
@@ -8,46 +8,45 @@
       },
       "meta/summary.json": {
         "bytes": 6487,
-        "sha256": "2203a38a39633daa73306d2363a66e91aec55b71ee42e59a926cab6df97efca0"
+        "sha256": "f48ee55682081504c3cb3da25640df16fc4f8c478fef267c917582c731755604"
       },
       "prices/index.json": {
-        "bytes": 1383675,
-        "sha256": "2d4d6debce28406ee778bee14fe25d2dd6125e8e0617970123cc9a75cab065ed"
+        "bytes": 1383795,
+        "sha256": "1a01e9ca05b383ab4b92529eb78767c75cf6a827dab63b8ef76f548aa85c90ef"
       }
     },
     "contract_version": "1",
-    "generated_at": "2026-10-02T08:33:40Z",
-    "git_commit": "d8259df5092018013a64c983051de8ea07448cf2",
+    "generated_at": "2026-10-02T10:43:14Z",
+    "git_commit": "6b0b8220e2a3179d5f298bfa721271e6ac271c04",
     "git_repo": "https://github.com/barkleesanders/hospital-ledger",
-    "note": "wave 24 pricing updated_ccns=052033,051318,061311,060117,100023,100022,100049,050760,050777",
+    "note": "wave 24 pricing updated_ccns=199804,100110,100080,100054,100131,100126,100166,100161",
     "producer": "muse.ai nova (wave-loop)",
     "refresh_tier": "counts",
     "summary": {
       "cms_required_total": 4625,
       "compliance_pct": 86.3,
       "compliant": 3993,
-      "standardized_price_hospitals": 3700,
-      "standardized_price_rows": 67527541,
+      "standardized_price_hospitals": 3701,
+      "standardized_price_rows": 67519828,
       "total_facilities": 5426
     },
     "unhashed_counts": {
       "cpt_detail_files": 0,
       "payer_files": 0,
-      "prices_files": 9
+      "prices_files": 8
     }
   },
   "wave": {
-    "generated_at": "2026-10-02T08:33:40Z",
+    "generated_at": "2026-10-02T10:43:14Z",
     "published_ccns": [
-      "052033",
-      "051318",
-      "061311",
-      "060117",
-      "100023",
-      "100022",
-      "100049",
-      "050760",
-      "050777"
+      "199804",
+      "100110",
+      "100080",
+      "100054",
+      "100131",
+      "100126",
+      "100166",
+      "100161"
     ],
     "wave": 24
   }
