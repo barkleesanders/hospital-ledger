@@ -1,5 +1,5 @@
 {
-  "committed_at": "2026-09-30T10:30:32.886543+00:00",
+  "committed_at": "2026-10-02T08:35:45.494175+00:00",
   "manifest": {
     "artifacts": {
       "meta/hospitals.json": {
@@ -8,45 +8,47 @@
       },
       "meta/summary.json": {
         "bytes": 6487,
-        "sha256": "b998485ddc26574faf5498addae4ada70eebdf400245d6489843607a4a4b3486"
+        "sha256": "2203a38a39633daa73306d2363a66e91aec55b71ee42e59a926cab6df97efca0"
       },
       "prices/index.json": {
-        "bytes": 1383416,
-        "sha256": "b327eabf05168f57ff53fc5a5f2e602eb8b82d69356c8b2affeeb8a5eb28db6d"
+        "bytes": 1383675,
+        "sha256": "2d4d6debce28406ee778bee14fe25d2dd6125e8e0617970123cc9a75cab065ed"
       }
     },
     "contract_version": "1",
-    "generated_at": "2026-09-30T10:29:42Z",
-    "git_commit": "1ebbc203c2a4310d8488e22beca0ffacb6c919b6",
+    "generated_at": "2026-10-02T08:33:40Z",
+    "git_commit": "d8259df5092018013a64c983051de8ea07448cf2",
     "git_repo": "https://github.com/barkleesanders/hospital-ledger",
-    "note": "wave 22 pricing updated_ccns=050690,050686,050723,050710,050767,050772,050765",
+    "note": "wave 24 pricing updated_ccns=052033,051318,061311,060117,100023,100022,100049,050760,050777",
     "producer": "muse.ai nova (wave-loop)",
     "refresh_tier": "counts",
     "summary": {
       "cms_required_total": 4625,
       "compliance_pct": 86.3,
       "compliant": 3993,
-      "standardized_price_hospitals": 3699,
-      "standardized_price_rows": 67720495,
+      "standardized_price_hospitals": 3700,
+      "standardized_price_rows": 67527541,
       "total_facilities": 5426
     },
     "unhashed_counts": {
       "cpt_detail_files": 0,
       "payer_files": 0,
-      "prices_files": 7
+      "prices_files": 9
     }
   },
   "wave": {
-    "generated_at": "2026-09-30T10:29:42Z",
+    "generated_at": "2026-10-02T08:33:40Z",
     "published_ccns": [
-      "050690",
-      "050686",
-      "050723",
-      "050710",
-      "050767",
-      "050772",
-      "050765"
+      "052033",
+      "051318",
+      "061311",
+      "060117",
+      "100023",
+      "100022",
+      "100049",
+      "050760",
+      "050777"
     ],
-    "wave": 22
+    "wave": 24
   }
 }
