@@ -1,5 +1,5 @@
 {
-  "committed_at": "2026-10-02T10:44:12.834621+00:00",
+  "committed_at": "2026-10-03T10:38:10.805871+00:00",
   "manifest": {
     "artifacts": {
       "meta/hospitals.json": {
@@ -8,18 +8,18 @@
       },
       "meta/summary.json": {
         "bytes": 6487,
-        "sha256": "f48ee55682081504c3cb3da25640df16fc4f8c478fef267c917582c731755604"
+        "sha256": "ff2594c3a48a47e52e4280a4b28190267082407017603adc796a1dd60b9380b7"
       },
       "prices/index.json": {
-        "bytes": 1383795,
-        "sha256": "1a01e9ca05b383ab4b92529eb78767c75cf6a827dab63b8ef76f548aa85c90ef"
+        "bytes": 1383522,
+        "sha256": "51d6237b741513422e52d5a9be2e871a9d63c05019fa459371838314935a904c"
       }
     },
     "contract_version": "1",
-    "generated_at": "2026-10-02T10:43:14Z",
-    "git_commit": "6b0b8220e2a3179d5f298bfa721271e6ac271c04",
+    "generated_at": "2026-10-03T10:36:57Z",
+    "git_commit": "10d74bd569dbb48407a963d59c707a4ee8888373",
     "git_repo": "https://github.com/barkleesanders/hospital-ledger",
-    "note": "wave 24 pricing updated_ccns=199804,100110,100080,100054,100131,100126,100166,100161",
+    "note": "wave 25 pricing updated_ccns=100167,100156,100180,100204,100189,100179,100212,100206",
     "producer": "muse.ai nova (wave-loop)",
     "refresh_tier": "counts",
     "summary": {
@@ -27,7 +27,7 @@
       "compliance_pct": 86.3,
       "compliant": 3993,
       "standardized_price_hospitals": 3701,
-      "standardized_price_rows": 67519828,
+      "standardized_price_rows": 67484768,
       "total_facilities": 5426
     },
     "unhashed_counts": {
@@ -37,17 +37,17 @@
     }
   },
   "wave": {
-    "generated_at": "2026-10-02T10:43:14Z",
+    "generated_at": "2026-10-03T10:36:57Z",
     "published_ccns": [
-      "199804",
-      "100110",
-      "100080",
-      "100054",
-      "100131",
-      "100126",
-      "100166",
-      "100161"
+      "100167",
+      "100156",
+      "100180",
+      "100204",
+      "100189",
+      "100179",
+      "100212",
+      "100206"
     ],
-    "wave": 24
+    "wave": 25
   }
 }
