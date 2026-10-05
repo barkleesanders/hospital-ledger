@@ -1,33 +1,33 @@
 {
-  "committed_at": "2026-10-04T10:15:34.854405+00:00",
+  "committed_at": "2026-10-05T10:57:03.264479+00:00",
   "manifest": {
     "artifacts": {
       "meta/hospitals.json": {
-        "bytes": 3219982,
-        "sha256": "7f094767f824f569c69284fca765c7b62c43bf484cfdfaf5467661fd1c008a8b"
+        "bytes": 3220189,
+        "sha256": "f016a20d76c876f1e75dbf9c95c041feba6c373cde8b8636354335bbf579d358"
       },
       "meta/summary.json": {
         "bytes": 6487,
-        "sha256": "608f689cf444d1caa2a2d9755d4402c49df61e27c1334c2a3b45503b9ddb5a68"
+        "sha256": "4a6d3e0048220155c273466930fb873d608e7012e425f8c3ceef37c7cd2bd667"
       },
       "prices/index.json": {
-        "bytes": 1383282,
-        "sha256": "89caeb9c366c1ae6011bb436570256a4855bee63cb0ecf9ebb3f0c32f99d03b2"
+        "bytes": 1382996,
+        "sha256": "270553baf3da22567063ab81fcc9fb26a5d3f8e46c9d605fa94cff556f618102"
       }
     },
     "contract_version": "1",
-    "generated_at": "2026-10-04T10:14:42Z",
-    "git_commit": "47bf49e0bddd3f2d2a788102de8769dc74ddf711",
+    "generated_at": "2026-10-05T10:55:55Z",
+    "git_commit": "8c441fb00f7efd1fee7d105f225b4ec806e9753a",
     "git_repo": "https://github.com/barkleesanders/hospital-ledger",
-    "note": "wave 26 pricing updated_ccns=100209,100224,100223,100228,100226,100191,100213",
+    "note": "wave 27 pricing updated_ccns=100242,100238,100231,100246,100236,100243,100232",
     "producer": "muse.ai nova (wave-loop)",
     "refresh_tier": "counts",
     "summary": {
       "cms_required_total": 4625,
-      "compliance_pct": 86.3,
-      "compliant": 3993,
+      "compliance_pct": 86.4,
+      "compliant": 3994,
       "standardized_price_hospitals": 3701,
-      "standardized_price_rows": 67429276,
+      "standardized_price_rows": 67386571,
       "total_facilities": 5426
     },
     "unhashed_counts": {
@@ -37,16 +37,16 @@
     }
   },
   "wave": {
-    "generated_at": "2026-10-04T10:14:42Z",
+    "generated_at": "2026-10-05T10:55:55Z",
     "published_ccns": [
-      "100209",
-      "100224",
-      "100223",
-      "100228",
-      "100226",
-      "100191",
-      "100213"
+      "100242",
+      "100238",
+      "100231",
+      "100246",
+      "100236",
+      "100243",
+      "100232"
     ],
-    "wave": 26
+    "wave": 27
   }
 }
