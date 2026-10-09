@@ -1,5 +1,5 @@
 {
-  "committed_at": "2026-10-08T10:22:29.110405+00:00",
+  "committed_at": "2026-10-09T10:24:13.013210+00:00",
   "manifest": {
     "artifacts": {
       "meta/hospitals.json": {
@@ -8,18 +8,18 @@
       },
       "meta/summary.json": {
         "bytes": 6487,
-        "sha256": "1fa1dd68329d8f0e78df9a18ff59616e7f857435764593f747b3600294aa3602"
+        "sha256": "14aa2fc39354f29242482fbcdbfc9b67890d20f688b4e678dfa1ee7ee941a59d"
       },
       "prices/index.json": {
-        "bytes": 1382513,
-        "sha256": "5849f7b18852392a907381217fac69fe6345d77ec9430f5edd8d3e5cd60a1273"
+        "bytes": 1382623,
+        "sha256": "9f83d74773ec2891bf114838ec957efb64dc60034b1620624be00c8ee1c0095b"
       }
     },
     "contract_version": "1",
-    "generated_at": "2026-10-08T10:21:25Z",
-    "git_commit": "56f4b2034928558dd0a5eeff9b4496a47e4d8f0c",
+    "generated_at": "2026-10-09T10:23:12Z",
+    "git_commit": "8af7447f4985183aa7971b3029a4dd7200e30786",
     "git_repo": "https://github.com/barkleesanders/hospital-ledger",
-    "note": "wave 30 pricing updated_ccns=110095,110100,110101,120011,131326,131302",
+    "note": "wave 31 pricing updated_ccns=140103,140116,140130,140211,140242,140281",
     "producer": "muse.ai nova (wave-loop)",
     "refresh_tier": "counts",
     "summary": {
@@ -27,7 +27,7 @@
       "compliance_pct": 86.4,
       "compliant": 3994,
       "standardized_price_hospitals": 3701,
-      "standardized_price_rows": 67049497,
+      "standardized_price_rows": 67026466,
       "total_facilities": 5426
     },
     "unhashed_counts": {
@@ -37,15 +37,15 @@
     }
   },
   "wave": {
-    "generated_at": "2026-10-08T10:21:25Z",
+    "generated_at": "2026-10-09T10:23:12Z",
     "published_ccns": [
-      "110095",
-      "110100",
-      "110101",
-      "120011",
-      "131326",
-      "131302"
+      "140103",
+      "140116",
+      "140130",
+      "140211",
+      "140242",
+      "140281"
     ],
-    "wave": 30
+    "wave": 31
   }
 }
