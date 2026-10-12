@@ -1,5 +1,5 @@
 {
-  "committed_at": "2026-10-11T10:17:18.458807+00:00",
+  "committed_at": "2026-10-12T10:16:07.062856+00:00",
   "manifest": {
     "artifacts": {
       "meta/hospitals.json": {
@@ -8,46 +8,43 @@
       },
       "meta/summary.json": {
         "bytes": 6487,
-        "sha256": "d3e688ff3441aab4a3b3d64314dfc868dc025ef5118ecf433edeed2df984959e"
+        "sha256": "e28621dfe187114d933856aea1b4e27a7afad38a2ea0eb7914c1f90ff07158c3"
       },
       "prices/index.json": {
-        "bytes": 1382665,
-        "sha256": "4d685f225ba0bfeb4a8872ab80fb1cdd88817e6573186faa1bc2dc9ef30593ff"
+        "bytes": 1383771,
+        "sha256": "5236a5bbd28cda35f397cdeb1a3b54fffc768964ce038dd8e8efb2940e0aca69"
       }
     },
     "contract_version": "1",
-    "generated_at": "2026-10-11T10:16:00Z",
-    "git_commit": "648e36ee4f2ef527805c1a67d0844e1f1ab73756",
+    "generated_at": "2026-10-12T10:13:41Z",
+    "git_commit": "1a83dd772a3d6e72d669754eb40c43c86a119038",
     "git_repo": "https://github.com/barkleesanders/hospital-ledger",
-    "note": "wave 32 pricing updated_ccns=140286,141303,141307,141333,141340,141348,052033,199804",
+    "note": "wave 33 pricing updated_ccns=141349,143027,150002,192012,192016",
     "producer": "muse.ai nova (wave-loop)",
     "refresh_tier": "counts",
     "summary": {
       "cms_required_total": 4625,
       "compliance_pct": 86.4,
       "compliant": 3994,
-      "standardized_price_hospitals": 3701,
-      "standardized_price_rows": 67003972,
+      "standardized_price_hospitals": 3704,
+      "standardized_price_rows": 67025614,
       "total_facilities": 5426
     },
     "unhashed_counts": {
       "cpt_detail_files": 0,
       "payer_files": 0,
-      "prices_files": 8
+      "prices_files": 5
     }
   },
   "wave": {
-    "generated_at": "2026-10-11T10:16:00Z",
+    "generated_at": "2026-10-12T10:13:41Z",
     "published_ccns": [
-      "140286",
-      "141303",
-      "141307",
-      "141333",
-      "141340",
-      "141348",
-      "052033",
-      "199804"
+      "141349",
+      "143027",
+      "150002",
+      "192012",
+      "192016"
     ],
-    "wave": 32
+    "wave": 33
   }
 }
