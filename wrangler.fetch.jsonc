@@ -1,0 +1,18 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	// The pipeline's edge fetch (src/edge-fetch-worker.ts, ops/edge-fetch.md).
+	// A route on the zone runs before the site's Custom Domain Worker
+	// (developers.cloudflare.com/workers/configuration/routing/custom-domains/,
+	// "Interaction with Routes", read 2026-10-13).
+	"name": "hospital-ledger-fetch",
+	"main": "src/edge-fetch-worker.ts",
+	"compatibility_date": "2025-11-01",
+	"workers_dev": false,
+	"preview_urls": false,
+	"routes": [
+		{ "pattern": "hospitalledger.com/api/fetch*", "zone_name": "hospitalledger.com" }
+	],
+	// Egress from the US: many hospital origins refuse non-US addresses
+	// (developers.cloudflare.com/workers/configuration/placement/, read 2026-10-13).
+	"placement": { "region": "aws:us-east-1" }
+}

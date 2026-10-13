@@ -43,6 +43,9 @@ try:
 except ImportError:
     sys.exit("Install: pip install httpx openpyxl pandas tqdm")
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import hl_edge  # noqa: E402  (HL_FETCH_PROXY set = fetch via hospitalledger.com/api/fetch)
+
 try:
     import ijson
 except ImportError:
@@ -1266,7 +1269,7 @@ def curl_fetch(url, max_bytes):
         body_path = body_file.name
     try:
         proc = subprocess.run(
-            [
+            hl_edge.curl_argv([
                 'curl',
                 '-fsSL',
                 '--max-filesize',
@@ -1276,7 +1279,7 @@ def curl_fetch(url, max_bytes):
                 '-w',
                 '%{url_effective}\n%{content_type}',
                 url,
-            ],
+            ], url),
             text=True,
             capture_output=True,
             check=False,
@@ -1285,7 +1288,7 @@ def curl_fetch(url, max_bytes):
             detail = (proc.stderr or proc.stdout or '').strip()
             raise RuntimeError(f'curl:{proc.returncode}:{detail[:120]}')
         meta = (proc.stdout or '').splitlines()
-        final_url = meta[0].strip() if meta else url
+        final_url = (meta[0].strip() if meta else '') or url
         content_type = meta[1].strip() if len(meta) > 1 else ''
         with open(body_path, 'rb') as f:
             raw = f.read()
@@ -1320,7 +1323,7 @@ def _curl_head_size(url):
     url = normalize_source_url(url)
     try:
         proc = subprocess.run(
-            ['curl', '-fsSLI', '-A', UA, url],
+            hl_edge.curl_argv(['curl', '-fsSLI', '-A', UA, url], url),
             text=True, capture_output=True, check=False, timeout=60,
         )
         if proc.returncode != 0:
@@ -1330,7 +1333,7 @@ def _curl_head_size(url):
         size = None
         for line in (proc.stdout or '').splitlines():
             low = line.lower()
-            if low.startswith('content-length:'):
+            if low.startswith(('content-length:', 'x-hl-upstream-content-length:')):
                 try:
                     size = int(line.split(':', 1)[1].strip())
                 except ValueError:
@@ -1350,7 +1353,8 @@ def fetch(url, max_bytes=500 * 1024 * 1024):
     """
     url = normalize_source_url(url)
     try:
-        with httpx.Client(headers={'User-Agent': UA}, follow_redirects=True, timeout=60.0, verify=False) as client:
+        with httpx.Client(headers={'User-Agent': UA}, follow_redirects=True, timeout=60.0, verify=False,
+                          **hl_edge.httpx_kwargs()) as client:
             with client.stream('GET', url) as r:
                 r.raise_for_status()
                 content_type = r.headers.get('content-type', '')
@@ -1438,6 +1442,8 @@ def fetch(url, max_bytes=500 * 1024 * 1024):
                     except Exception:
                         pass
                 return raw, final_url, content_type, truncated
+    except hl_edge.EdgeConfigError:
+        raise
     except Exception as httpx_error:
         # httpx WAF-blocked on a CSV (some hospital CDNs 403 httpx's TLS/HTTP2
         # fingerprint but allow curl). If a curl HEAD shows the file is large,
@@ -1543,7 +1549,8 @@ def stream_parse_large_json(url, max_items=200_000):
     if ijson is None:
         return None
     url = normalize_source_url(url)
-    with httpx.Client(headers={'User-Agent': UA}, follow_redirects=True, timeout=120.0, verify=False) as client:
+    with httpx.Client(headers={'User-Agent': UA}, follow_redirects=True, timeout=120.0, verify=False,
+                      **hl_edge.httpx_kwargs()) as client:
         with client.stream('GET', url) as r:
             r.raise_for_status()
             chunks = r.iter_bytes()
@@ -1673,7 +1680,7 @@ def _curl_range_download(url, tmp_path, total_size, slice_bytes=48 * 1024 * 1024
         while start < total_size:
             end = min(start + slice_bytes - 1, total_size - 1)
             proc = subprocess.run(
-                ['curl', '-fsS', '-r', f'{start}-{end}', '-A', UA, '--', url],
+                hl_edge.curl_argv(['curl', '-fsS', '-r', f'{start}-{end}', '-A', UA, '--', url], url),
                 capture_output=True, check=False, timeout=300,
             )
             if proc.returncode != 0:
@@ -1699,14 +1706,14 @@ def _curl_stream_to_tempfile(url):
     with tempfile.NamedTemporaryFile(suffix='.csv', delete=False) as tf:
         tmp_path = tf.name
     proc = subprocess.run(
-        [
+        hl_edge.curl_argv([
             'curl', '-fsSL',
             '--max-filesize', str(CSV_STREAM_HARD_CAP),
             '-A', UA,
             '-o', tmp_path,
             '-w', '%{content_type}',
             url,
-        ],
+        ], url),
         text=True, capture_output=True, check=False,
     )
     if proc.returncode == 0:
@@ -1753,7 +1760,7 @@ def stream_parse_large_csv(url, max_rows=200_000):
         try:
             httpx_client = httpx.Client(
                 headers={'User-Agent': UA}, follow_redirects=True,
-                timeout=120.0, verify=False)
+                timeout=120.0, verify=False, **hl_edge.httpx_kwargs())
             httpx_ctx = httpx_client.stream('GET', url)
             httpx_response = httpx_ctx.__enter__()
             httpx_response.raise_for_status()

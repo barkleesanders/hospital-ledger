@@ -82,6 +82,32 @@ def strip_ipv6_no_proxy():
             os.environ[k] = ",".join(p for p in v.split(",") if ":" not in p)
 
 
+def load_edge():
+    """scripts/hl_edge.py: routes hospital fetches via hospitalledger.com/api/fetch.
+
+    HL_FETCH_PROXY / HL_FETCH_TOKEN come from the environment or, failing that,
+    ~/hospital-ledger.env; they are exported so mrf_parse.py subprocesses inherit
+    them. Unset = direct fetch, unchanged behaviour.
+    """
+    envf = ROOT / "hospital-ledger.env"
+    if not envf.exists():
+        envf = Path.home() / "hospital-ledger.env"
+    if envf.exists():
+        for line in envf.read_text().splitlines():
+            k, _, v = line.strip().partition("=")
+            if k.strip() in ("HL_FETCH_PROXY", "HL_FETCH_TOKEN") and v.strip():
+                os.environ.setdefault(k.strip(), v.strip())
+    for d in (ROOT / "scripts", Path(__file__).resolve().parents[2] / "scripts"):
+        if (d / "hl_edge.py").exists():
+            spec = importlib.util.spec_from_file_location("hl_edge", d / "hl_edge.py")
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+    if os.environ.get("HL_FETCH_PROXY"):
+        raise SystemExit("HL_FETCH_PROXY is set but scripts/hl_edge.py was not found")
+    return None
+
+
 # ---------------------------------------------------------------- standard loop gate
 
 def load_std_loop():
@@ -149,8 +175,16 @@ def record_success(std):
 
 # ---------------------------------------------------------------- queue / state
 
-def load_granted():
+def load_granted(edge=None):
+    """Hosts this VM may contact. None = every seed host (edge proxy on)."""
     files = sorted(GOAL.glob("exact_hosts_granted_*.txt"))
+    if edge is not None and edge.enabled():
+        # Hosts already approved on this VM may still be fetched directly when
+        # the edge cannot reach them (bot shield, bad origin cert); no others.
+        if files:
+            os.environ.setdefault("HL_EDGE_DIRECT_HOSTS_FILE", str(files[-1]))
+        log("granted set: all seed hosts (fetched via the edge proxy; the VM contacts only its domain)")
+        return None
     if not files:
         raise SystemExit("no granted-host inventory found")
     granted = {l.strip() for l in files[-1].read_text().splitlines() if l.strip()}
@@ -167,11 +201,12 @@ def build_queue(granted):
     q = []
     for ccn, name, url in rows:
         host = (urllib.parse.urlparse(url).hostname or "").lower()
-        if host in granted:
+        if granted is None or host in granted:
             q.append({"ccn": ccn, "name": name or ccn, "url": url, "host": host})
     q.sort(key=lambda r: (r["ccn"], r["url"]))
-    QUEUE_PATH.write_text(json.dumps({"built_at": now_iso(), "n": len(q), "queue": q}))
-    log(f"queue built: {len(q)} granted-host MRF URLs")
+    mode = "all" if granted is None else "granted"
+    QUEUE_PATH.write_text(json.dumps({"built_at": now_iso(), "n": len(q), "mode": mode, "queue": q}))
+    log(f"queue built: {len(q)} {'seed' if granted is None else 'granted-host'} MRF URLs")
     return q
 
 
@@ -598,12 +633,22 @@ def main():
               file=sys.stderr)
         return 3
 
-    granted = load_granted()
+    edge = load_edge()
+    if edge is not None and edge.enabled():
+        try:
+            log(edge.preflight())
+        except Exception as e:
+            return record_failure(f"edge-proxy-preflight: {e}", 2, std)
+    granted = load_granted(edge)
     import httpx  # fail fast here: before the snapshot write below, so an
                   # import/startup failure exits before any state mutation
-    queue = json.loads(QUEUE_PATH.read_text())["queue"] if QUEUE_PATH.exists() else build_queue(granted)
-    if not queue or not all((urllib.parse.urlparse(r["url"]).hostname or "").lower() in granted
-                            for r in queue[:50]):
+    qdoc = json.loads(QUEUE_PATH.read_text()) if QUEUE_PATH.exists() else {}
+    queue = qdoc.get("queue") or build_queue(granted)
+    # Rebuild when the queue was built for the other mode (granted-only vs all hosts).
+    want_mode = "all" if granted is None else "granted"
+    if not queue or qdoc.get("mode", "granted") != want_mode or (granted is not None and not all(
+            (urllib.parse.urlparse(r["url"]).hostname or "").lower() in granted
+            for r in queue[:50])):
         queue = build_queue(granted)
 
     state = load_state()
@@ -634,7 +679,8 @@ def main():
 
     changed, errors, resolved = [], [], 0
     dead = []
-    with httpx.Client(timeout=30, follow_redirects=True, headers=UA) as c:
+    with httpx.Client(timeout=30, follow_redirects=True, headers=UA,
+                      **(edge.httpx_kwargs() if edge else {})) as c:
         changed, errors, resolved, dead = detect_changes(c, wave_urls, state, index_ccns)
     log(f"checked={len(wave_urls)} resolved={resolved} changed={len(changed)} "
         f"errors={len(errors)} dead={len(dead)}")

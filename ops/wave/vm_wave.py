@@ -57,6 +57,21 @@ PROBE_CAP = 750 * 1024 * 1024  # hl_wave.py MAX_BYTES semantics
 sys.path.insert(0, HF)
 from vm_r2client import R2Client  # noqa: E402
 
+# Hospital fetches go through hospitalledger.com/api/fetch when HL_FETCH_PROXY
+# is set (scripts/hl_edge.py), so the VM needs no per-hospital approval.
+for _line in (open(os.path.expanduser("~/hospital-ledger.env")).read().splitlines()
+              if os.path.exists(os.path.expanduser("~/hospital-ledger.env")) else []):
+    _k, _, _v = _line.strip().partition("=")
+    if _k.strip() in ("HL_FETCH_PROXY", "HL_FETCH_TOKEN") and _v.strip():
+        os.environ.setdefault(_k.strip(), _v.strip())
+_granted = sorted(f for f in os.listdir(HF) if f.startswith("exact_hosts_granted_")) if os.path.isdir(HF) else []
+if _granted:
+    os.environ.setdefault("HL_EDGE_DIRECT_HOSTS_FILE", os.path.join(HF, _granted[-1]))
+sys.path.insert(0, SCRIPTS)
+import hl_edge  # noqa: E402
+if hl_edge.enabled():
+    print(hl_edge.preflight(), flush=True)  # raises before any work if the proxy refuses us
+
 t0 = time.time()
 
 
@@ -197,7 +212,8 @@ def probe_url(url):
     import httpx
     try:
         with httpx.Client(headers={"User-Agent": "Mozilla/5.0 (compatible; HospitalLedger/1.0)"},
-                          follow_redirects=True, timeout=60.0, verify=False) as c:
+                          follow_redirects=True, timeout=60.0, verify=False,
+                          **hl_edge.httpx_kwargs()) as c:
             with c.stream("GET", url) as r:
                 sc = r.status_code
                 if sc in (404, 410):
@@ -220,6 +236,7 @@ if dl_fail:
     wscripts = os.path.join(WDIR, "scripts")
     os.makedirs(wscripts, exist_ok=True)
     shutil.copy(os.path.join(SCRIPTS, "mrf_parse.py"), wscripts)
+    shutil.copy(os.path.join(SCRIPTS, "hl_edge.py"), wscripts)
     os.makedirs(os.path.join(WDIR, "data", "parsed"), exist_ok=True)
     for fm in dl_fail:
         ccn = fm["ccn"]
