@@ -150,45 +150,97 @@ def file_sha256(path: str, chunk: int = CHUNK) -> str:
     return h.hexdigest()
 
 
+def _drain_verified(r, sink) -> int:
+    """Stream r into sink(chunk) and prove the whole body arrived.
+
+    The VM's S3 egress leg intermittently ends a GET body early without an
+    error (2026-10-13: ~1.34 MB of a 1,548,059-byte prices/index.json, twice
+    in a row), and a short body then reached the JSON parser. A body shorter
+    than its Content-Length raises IncompleteRead so the caller retries.
+    """
+    expected = r.headers.get("Content-Length")
+    total = 0
+    while True:
+        chunk = r.read(CHUNK)
+        if not chunk:
+            break
+        sink(chunk)
+        total += len(chunk)
+    if expected is not None and expected.isdigit() and total != int(expected):
+        raise http.client.IncompleteRead(b"", int(expected) - total)
+    return total
+
+
+def _get_with_retry(key: str, consume, *, timeout: int, reset=None):
+    """Signed GET of key, retried with backoff while the body arrives short.
+
+    consume(r) drains the response; reset() discards a partial result before
+    the next attempt. HTTP errors are final and returned as False.
+    """
+    for attempt in range(LIST_MAX_RETRIES):
+        try:
+            with _open_signed("GET", key, timeout=timeout) as r:
+                consume(r)
+            return True
+        except urllib.error.HTTPError as e:
+            print(f"GET {key} -> {e.code}", file=sys.stderr)
+            return False
+        except (http.client.IncompleteRead, ConnectionError, TimeoutError) as e:
+            if reset:
+                reset()
+            wait = 2 ** attempt
+            print(f"GET {key}: short or broken body ({type(e).__name__}; attempt "
+                  f"{attempt + 1}/{LIST_MAX_RETRIES}), retrying in {wait}s",
+                  file=sys.stderr)
+            if attempt + 1 < LIST_MAX_RETRIES:
+                time.sleep(wait)
+    print(f"GET {key}: body still incomplete after {LIST_MAX_RETRIES} attempts",
+          file=sys.stderr)
+    return False
+
+
 def get_bytes(key: str) -> bytes | None:
-    """Signed GET of a (small) key; return body bytes, or None on HTTP error."""
-    try:
-        with _open_signed("GET", key) as r:
-            return r.read()
-    except urllib.error.HTTPError as e:
-        print(f"GET {key} -> {e.code}", file=sys.stderr)
-        return None
+    """Signed GET of a (small) key; return the complete body, or None."""
+    parts: list[bytes] = []
+    ok = _get_with_retry(key, lambda r: _drain_verified(r, parts.append),
+                         timeout=300, reset=parts.clear)
+    return b"".join(parts) if ok else None
 
 
 def get_sha256(key: str) -> str | None:
-    """Signed GET of key; return hex sha256, streaming in 1 MiB chunks."""
-    try:
-        h = hashlib.sha256()
-        with _open_signed("GET", key, timeout=600) as r:
-            while True:
-                chunk = r.read(CHUNK)
-                if not chunk:
-                    break
-                h.update(chunk)
-        return h.hexdigest()
-    except urllib.error.HTTPError as e:
-        print(f"GET {key} -> {e.code}", file=sys.stderr)
-        return None
+    """Signed GET of key; return hex sha256 of the complete body, streaming."""
+    state = {"h": hashlib.sha256()}
+
+    def reset():
+        state["h"] = hashlib.sha256()
+
+    ok = _get_with_retry(key, lambda r: _drain_verified(r, lambda c: state["h"].update(c)),
+                         timeout=600, reset=reset)
+    return state["h"].hexdigest() if ok else None
 
 
 def get_file(key: str, dest: str) -> bool:
-    """Signed GET of key; stream it to dest. Return True on success."""
-    try:
-        with _open_signed("GET", key, timeout=600) as r, open(dest, "wb") as fh:
-            while True:
-                chunk = r.read(CHUNK)
-                if not chunk:
-                    break
-                fh.write(chunk)
-        return True
-    except urllib.error.HTTPError as e:
-        print(f"GET {key} -> {e.code}", file=sys.stderr)
-        return False
+    """Signed GET of key; stream it to dest. Return True only for a complete body.
+
+    Writes to dest + ".part" and renames on success, so a truncated download
+    never sits at dest looking like a finished file.
+    """
+    part = dest + ".part"
+
+    def consume(r):
+        with open(part, "wb") as fh:
+            _drain_verified(r, fh.write)
+
+    def reset():
+        if os.path.exists(part):
+            os.remove(part)
+
+    ok = _get_with_retry(key, consume, timeout=600, reset=reset)
+    if ok:
+        os.replace(part, dest)
+    else:
+        reset()
+    return ok
 
 
 # ---------------------------------------------------------------- listing (paginated, IncompleteRead-tolerant)
