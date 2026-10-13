@@ -14,5 +14,6 @@
 	],
 	// Egress from the US: many hospital origins refuse non-US addresses
 	// (developers.cloudflare.com/workers/configuration/placement/, read 2026-10-13).
-	"placement": { "region": "aws:us-east-1" }
+	"placement": { "region": "aws:us-east-1" },
+	"observability": { "enabled": true, "head_sampling_rate": 1 }
 }
