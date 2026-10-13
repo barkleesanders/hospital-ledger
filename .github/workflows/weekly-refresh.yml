@@ -1,0 +1,50 @@
+name: Validate Hospital Ledger refresh pipeline
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/weekly-refresh.yml"
+      - "scripts/**"
+      - "tests/**"
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - "requirements*.txt"
+      - "wrangler.jsonc"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install Python test dependencies
+        run: python -m pip install --disable-pip-version-check httpx==0.28.1 boto3==1.40.76
+      - run: npm ci
+      - name: Validate Python and shell
+        run: |
+          python -m unittest discover -s tests -v
+          python -m py_compile \
+            scripts/bootstrap_r2_credentials.py \
+            scripts/prepare_incremental_refresh.py \
+            scripts/batch_ingest.py \
+            scripts/r2_store.py \
+            scripts/refresh_resume.py \
+            scripts/refresh_artifacts.py \
+            scripts/validate_refresh_output.py
+          bash -n scripts/cloud_refresh.sh scripts/refresh.sh scripts/mem_guard.sh
+      - name: Validate Worker
+        run: |
+          npm run typecheck
+          npm run build

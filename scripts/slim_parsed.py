@@ -11,14 +11,14 @@ Also builds:
  - public/data/prices/index.json — CCN -> {n_items, top_codes}
  - public/data/cpt-index.json    — CPT code -> [{ccn, gross, cash, payers_count}]
 """
-import json, os, sys, glob, re, gzip, subprocess, tempfile, atexit, io
+import json, os, sys, glob, re, gzip, subprocess, tempfile, atexit, io, shutil
 from collections import defaultdict
 
 # zstd binary for compressing the multi-GB CPT temp spill files (~6x smaller).
 # Without it the uncompressed spills (~9 GB transient) overrun a disk-tight box
 # (2026-06-08: mem_guard killed the run on the 3 GB free-disk floor). Falls back
 # to plain text when zstd is unavailable.
-_ZSTD = '/opt/homebrew/bin/zstd' if os.path.exists('/opt/homebrew/bin/zstd') else None
+_ZSTD = shutil.which('zstd')
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'data', 'parsed')

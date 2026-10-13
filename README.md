@@ -46,7 +46,9 @@ Numbers below are verified from the deployed site (`public/data/summary.json`,
 The site is built from 11 stages running end-to-end; all 11 are running in
 production. Stages 1–2 land in the SQLite mirror at `db/hospital_ledger.db`;
 stages 3–11 land in JSONL gap files under `data/` and the deployed JSON bundles
-under `public/data/`.
+under `public/data/`. The cloud-native Sunday runner, durable R2 checkpoint
+layout, rollback behavior, and recovery commands are documented in
+[`docs/cloud-refresh.md`](docs/cloud-refresh.md).
 
 | Stage | Description | Status |
 |---|---|---|
