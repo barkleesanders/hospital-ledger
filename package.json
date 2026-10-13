@@ -36,5 +36,13 @@
 		"vite": "^6.0.7",
 		"vitest": "^4.1.11",
 		"wrangler": "^4.124.0"
+	},
+	"overrides": {
+		"miniflare": {
+			"undici": "7.29.1"
+		},
+		"jsdom": {
+			"undici": "^8.10.2"
+		}
 	}
 }
