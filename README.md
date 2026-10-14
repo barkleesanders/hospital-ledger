@@ -67,6 +67,21 @@ remaining (out of 3,986 CMS-required+live targets); 163 terminal exceptions
 documented in `data/coverage_terminal_exceptions.json`; full failure cluster
 breakdown in `data/coverage_closeout_status.json`.
 
+## Keeping the data current
+
+A daily wave keeps the published data fresh: it probes the MRF seed set,
+reparses what changed, validates, and publishes `meta/*` +
+`prices/index.json` to R2 — the live manifest is the receipt. All
+hospital fetches go through an edge proxy on hospitalledger.com, and
+publishing is guarded by canonical-base verification and a hardened
+publish lock. The full current setup — architecture, invariants, and the
+failure modes that shaped them — is documented in
+[ops/current-pipeline.md](ops/current-pipeline.md) and
+[ops/edge-fetch.md](ops/edge-fetch.md). The agent skills that operate
+the pipeline live in [skills/](skills/) and are kept current by the
+waves themselves: lessons learned in a run are written back the same
+day.
+
 ## Ask anything (site FAQ)
 
 Every page except the methodology page carries an "Ask anything" row: the home
