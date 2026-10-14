@@ -150,45 +150,136 @@ def file_sha256(path: str, chunk: int = CHUNK) -> str:
     return h.hexdigest()
 
 
+_CONTENT_RANGE = re.compile(r"bytes (\d+)-(\d+)/(\d+)")
+_PLAIN_MD5_ETAG = re.compile(r'^"?([0-9a-f]{32})"?$')
+
+
+def _get_with_retry(key: str, sink, *, timeout: int, reset=None):
+    """Signed GET of key into sink(chunk); True only once the whole object arrived.
+
+    The muse.ai VM's egress proxy ends R2 GET bodies early with a clean EOF:
+    278-377 KB per connection, 15 of 15 attempts short on a 1,386,703-byte
+    prices/index.json (measured by the VM, 2026-10-13), so restarting from
+    byte 0 never finishes. Each short body is resumed with Range from the
+    first missing byte, pinned to the object's ETag with If-Match so pieces
+    of two different object versions are never joined. A single-part ETag is
+    the body's MD5 and is checked at the end. Attempts that add bytes do not
+    count against the retry budget; LIST_MAX_RETRIES attempts without
+    progress, an HTTP error, or a final MD5 mismatch return False.
+    """
+    got = 0
+    total = None
+    etag = None
+    md5 = hashlib.md5()
+    stalls = 0
+
+    def restart():
+        nonlocal got, total, etag, md5
+        got, total, etag, md5 = 0, None, None, hashlib.md5()
+        if reset:
+            reset()
+
+    while stalls < LIST_MAX_RETRIES:
+        extra = {"range": f"bytes={got}-", "if-match": etag} if got else None
+        before = got
+        try:
+            with _open_signed("GET", key, timeout=timeout, extra_headers=extra) as r:
+                if got and r.status != 206:
+                    restart()  # server ignored the Range: this body starts at 0
+                if not got:
+                    length = r.headers.get("Content-Length")
+                    total = int(length) if length and length.isdigit() else None
+                    etag = r.headers.get("ETag")
+                else:
+                    m = _CONTENT_RANGE.match(r.headers.get("Content-Range") or "")
+                    if not m or int(m.group(1)) != got or int(m.group(3)) != total:
+                        raise http.client.IncompleteRead(b"", 0)
+                while True:
+                    chunk = r.read(CHUNK)
+                    if not chunk:
+                        break
+                    if total is not None and got + len(chunk) > total:
+                        restart()  # longer than declared: trust none of it
+                        raise http.client.IncompleteRead(b"", 0)
+                    sink(chunk)
+                    md5.update(chunk)
+                    got += len(chunk)
+            if total is None or got == total:
+                plain = _PLAIN_MD5_ETAG.match(etag or "")
+                if plain and md5.hexdigest() != plain.group(1):
+                    print(f"GET {key}: body MD5 does not match ETag {etag}", file=sys.stderr)
+                    restart()
+                    stalls += 1
+                    continue
+                return True
+            raise http.client.IncompleteRead(b"", total - got)
+        except urllib.error.HTTPError as e:
+            if got and e.code in (412, 416):
+                print(f"GET {key}: object changed mid-download ({e.code}), restarting",
+                      file=sys.stderr)
+                restart()
+                stalls += 1
+                continue
+            print(f"GET {key} -> {e.code}", file=sys.stderr)
+            return False
+        except (http.client.IncompleteRead, ConnectionError, TimeoutError) as e:
+            if got > before:
+                print(f"GET {key}: body ended at {got}/{total} bytes, resuming",
+                      file=sys.stderr)
+                continue
+            stalls += 1
+            wait = 2 ** stalls
+            print(f"GET {key}: no progress ({type(e).__name__}; attempt "
+                  f"{stalls}/{LIST_MAX_RETRIES}), retrying in {wait}s", file=sys.stderr)
+            if stalls < LIST_MAX_RETRIES:
+                time.sleep(wait)
+    print(f"GET {key}: body still incomplete after {LIST_MAX_RETRIES} attempts "
+          "without progress", file=sys.stderr)
+    if reset:
+        reset()
+    return False
+
+
 def get_bytes(key: str) -> bytes | None:
-    """Signed GET of a (small) key; return body bytes, or None on HTTP error."""
-    try:
-        with _open_signed("GET", key) as r:
-            return r.read()
-    except urllib.error.HTTPError as e:
-        print(f"GET {key} -> {e.code}", file=sys.stderr)
-        return None
+    """Signed GET of a (small) key; return the complete body, or None."""
+    parts: list[bytes] = []
+    ok = _get_with_retry(key, parts.append, timeout=300, reset=parts.clear)
+    return b"".join(parts) if ok else None
 
 
 def get_sha256(key: str) -> str | None:
-    """Signed GET of key; return hex sha256, streaming in 1 MiB chunks."""
-    try:
-        h = hashlib.sha256()
-        with _open_signed("GET", key, timeout=600) as r:
-            while True:
-                chunk = r.read(CHUNK)
-                if not chunk:
-                    break
-                h.update(chunk)
-        return h.hexdigest()
-    except urllib.error.HTTPError as e:
-        print(f"GET {key} -> {e.code}", file=sys.stderr)
-        return None
+    """Signed GET of key; return hex sha256 of the complete body, streaming."""
+    state = {"h": hashlib.sha256()}
+
+    def reset():
+        state["h"] = hashlib.sha256()
+
+    ok = _get_with_retry(key, lambda c: state["h"].update(c), timeout=600, reset=reset)
+    return state["h"].hexdigest() if ok else None
 
 
 def get_file(key: str, dest: str) -> bool:
-    """Signed GET of key; stream it to dest. Return True on success."""
+    """Signed GET of key; stream it to dest. Return True only for a complete body.
+
+    Writes to dest + ".part" and renames on success, so a truncated download
+    never sits at dest looking like a finished file.
+    """
+    part = dest + ".part"
+    fh = open(part, "wb")
+
+    def reset():
+        fh.seek(0)
+        fh.truncate()
+
     try:
-        with _open_signed("GET", key, timeout=600) as r, open(dest, "wb") as fh:
-            while True:
-                chunk = r.read(CHUNK)
-                if not chunk:
-                    break
-                fh.write(chunk)
-        return True
-    except urllib.error.HTTPError as e:
-        print(f"GET {key} -> {e.code}", file=sys.stderr)
-        return False
+        ok = _get_with_retry(key, fh.write, timeout=600, reset=reset)
+    finally:
+        fh.close()
+    if ok:
+        os.replace(part, dest)
+    elif os.path.exists(part):
+        os.remove(part)
+    return ok
 
 
 # ---------------------------------------------------------------- listing (paginated, IncompleteRead-tolerant)
