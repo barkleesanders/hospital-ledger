@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-14 — Refresh pipeline: current-setup sync
+
+- Documented the pipeline as it runs today in `ops/current-pipeline.md`
+  (daily wave, edge fetch, canonical index discipline, publish lock,
+  failure modes) and added `ops/edge-fetch.md`.
+- Synced the deployed code: `scripts/r2_put.py` (Content-Length-verified
+  GET with ETag-pinned Range resume) + its 10-test suite, and
+  `ops/wave/hl_wave.py` (verify_synced_base, hardened publish lock,
+  per-key uploads) + its 25-test regression suite.
+- Added `skills/` with the two living agent skills that operate the
+  pipeline (counts-tier refresh runbook + coverage-gap research method).
+- Latest publish at sync time: manifest `generated_at`
+  2026-10-14T00:56:57Z, index 3,831 hospitals.
+
+
 ## 2026-09-18 — "Ask anything" row (infinite-faq)
 
 ### Security follow-up (a1845fe)

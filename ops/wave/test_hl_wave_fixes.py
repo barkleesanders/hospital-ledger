@@ -1,0 +1,353 @@
+#!/usr/bin/env python3
+"""Regression tests for the 2026-10-13 hl_wave.py fixes.
+
+1. verify_synced_base: a synced build base must match the live manifest's
+   artifact record (size + sha256) or the publish parks -- wave 35 built
+   on a stale site-bundled index served by the CDN fallback.
+2. retry_pending_publish: the Oct 1 stderr log shows this died with
+   NameError: RETRY_ESCALATE_ATTEMPTS. The escalation branch must run on
+   the defined RETRY_MAX_ATTEMPTS constant. These tests exercise every
+   early branch incl. escalation, with the publish phase stubbed.
+
+Run: ~/hospital-ledger/.venv/bin/python3 test_hl_wave_fixes.py
+"""
+import argparse
+import hashlib
+import importlib.util
+import json
+import sys
+import tempfile
+import time
+import unittest
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+spec = importlib.util.spec_from_file_location("hl_wave", HERE / "hl_wave.py")
+hw = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(hw)
+
+
+def manifest_text(artifacts):
+    return json.dumps({"artifacts": artifacts})
+
+
+class VerifySyncedBase(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dest = Path(self.tmp.name) / "index.json"
+        self.data = b'{"hospitals": []}' * 10
+        self.dest.write_bytes(self.data)
+        self.sha = hashlib.sha256(self.data).hexdigest()
+        self.good = {"prices/index.json": {"bytes": len(self.data),
+                                           "sha256": self.sha}}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def patch_manifest(self, text_or_none, raises=False):
+        if raises:
+            def boom(url):
+                raise RuntimeError("boom")
+            hw._fetch_live_manifest_text = boom
+        else:
+            hw._fetch_live_manifest_text = lambda url: (text_or_none, "test")
+
+    def test_match_ok(self):
+        self.patch_manifest(manifest_text(self.good))
+        ok, detail = hw.verify_synced_base("prices/index.json", self.dest)
+        self.assertTrue(ok, detail)
+
+    def test_sha_mismatch_rejected(self):
+        bad = {"prices/index.json": {"bytes": len(self.data),
+                                     "sha256": "0" * 64}}
+        self.patch_manifest(manifest_text(bad))
+        ok, detail = hw.verify_synced_base("prices/index.json", self.dest)
+        self.assertFalse(ok)
+        self.assertIn("mismatch", detail)
+
+    def test_size_mismatch_rejected(self):
+        bad = {"prices/index.json": {"bytes": len(self.data) + 1,
+                                     "sha256": self.sha}}
+        self.patch_manifest(manifest_text(bad))
+        ok, _ = hw.verify_synced_base("prices/index.json", self.dest)
+        self.assertFalse(ok)
+
+    def test_stale_bundle_rejected(self):
+        # The wave-35 shape: manifest records canonical (3,823-hospital
+        # object); the synced file is a different, older object.
+        self.dest.write_bytes(b'{"hospitals": "stale"}')
+        self.patch_manifest(manifest_text(self.good))
+        ok, _ = hw.verify_synced_base("prices/index.json", self.dest)
+        self.assertFalse(ok)
+
+    def test_missing_artifact_record_rejected(self):
+        self.patch_manifest(manifest_text({}))
+        ok, _ = hw.verify_synced_base("prices/index.json", self.dest)
+        self.assertFalse(ok)
+
+    def test_manifest_unreachable_rejected(self):
+        self.patch_manifest(None)
+        ok, _ = hw.verify_synced_base("prices/index.json", self.dest)
+        self.assertFalse(ok)
+
+    def test_manifest_fetch_raises_rejected(self):
+        self.patch_manifest(None, raises=True)
+        ok, _ = hw.verify_synced_base("prices/index.json", self.dest)
+        self.assertFalse(ok)
+
+
+class RetryPendingPublish(unittest.TestCase):
+    CCN = "193074"  # price file exists in ~/hospital-ledger/public/data/prices
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.pending_path = Path(self.tmp.name) / "hl_pending_publish.json"
+        self._orig = {k: getattr(hw, k) for k in
+                      ("PENDING_PATH", "run_publish_phase", "record_success",
+                       "load_state", "load_index_ccns", "load_route_health",
+                       "save_route_health")}
+        hw.PENDING_PATH = self.pending_path
+        hw.record_success = lambda std: None
+        hw.load_state = lambda: {"waves_done": 0, "unpublished": []}
+        hw.load_index_ccns = lambda: (set(), 3823)
+        hw.load_route_health = lambda: {}
+        hw.save_route_health = lambda h: None
+        self.args = argparse.Namespace(dry_run=False, no_publish=False)
+
+    def tearDown(self):
+        for k, v in self._orig.items():
+            setattr(hw, k, v)
+        self.tmp.cleanup()
+
+    def write_pending(self, **kw):
+        p = {"publish_ccns": [self.CCN], "attempts": 0,
+             "next_retry_at": 0, "ts": "2026-10-13T00:00:00Z"}
+        p.update(kw)
+        self.pending_path.write_text(json.dumps(p))
+
+    def test_nothing_pending_returns_0(self):
+        rc = hw.retry_pending_publish(self.args, {}, {})
+        self.assertEqual(rc, 0)
+
+    def test_not_due_returns_0_without_publishing(self):
+        self.write_pending(next_retry_at=time.time() + 3600)
+        def forbidden(*a, **k):
+            raise AssertionError("run_publish_phase must not be called")
+        hw.run_publish_phase = forbidden
+        rc = hw.retry_pending_publish(self.args, {}, {})
+        self.assertEqual(rc, 0)
+
+    def test_escalation_branch_published(self):
+        # attempts at the escalation threshold: the branch that once died
+        # with NameError: RETRY_ESCALATE_ATTEMPTS must execute cleanly.
+        self.write_pending(attempts=hw.RETRY_MAX_ATTEMPTS)
+        hw.run_publish_phase = lambda *a, **k: {
+            "status": "published", "publish_ccns": [self.CCN]}
+        rc = hw.retry_pending_publish(self.args, {}, {})
+        self.assertEqual(rc, 0)
+
+    def test_due_deferred_returns_0(self):
+        self.write_pending(attempts=1)
+        hw.run_publish_phase = lambda *a, **k: {
+            "status": "deferred", "reason": "base-verify-fail"}
+        rc = hw.retry_pending_publish(self.args, {}, {})
+        self.assertEqual(rc, 0)
+
+    def test_escalate_constant_not_referenced(self):
+        src = (HERE / "hl_wave.py").read_text()
+        self.assertNotIn("RETRY_ESCALATE_ATTEMPTS", src)
+        self.assertTrue(hasattr(hw, "RETRY_MAX_ATTEMPTS"))
+
+
+class PublishRetryRouteHealth(unittest.TestCase):
+    """2026-10-13: lock contention must not be recorded as an r2_put
+    transport failure (it earned a bogus 30m cooldown in the live wave)."""
+
+    def setUp(self):
+        self._orig = {k: getattr(hw, k) for k in
+                      ("publish", "note_route", "route_usable")}
+        self.notes = []
+        hw.note_route = lambda h, route, ok, detail="": \
+            self.notes.append((route, ok))
+        hw.route_usable = lambda h, route: True
+        self._sleep = hw.time.sleep
+        hw.time.sleep = lambda s: None
+
+    def tearDown(self):
+        for k, v in self._orig.items():
+            setattr(hw, k, v)
+        hw.time.sleep = self._sleep
+
+    def test_lock_contention_not_a_route_failure(self):
+        hw.publish = lambda *a, **k: \
+            (False, "publish lock held by another publisher")
+        ok, _ = hw._publish_with_retry(Path("."), ["193074"], {}, {})
+        self.assertFalse(ok)
+        self.assertEqual(self.notes, [])
+
+    def test_transport_failure_counts(self):
+        hw.publish = lambda *a, **k: (False, "VM publish failed rc=1: boom")
+        ok, _ = hw._publish_with_retry(Path("."), ["193074"], {}, {},
+                                       attempts=1)
+        self.assertFalse(ok)
+        self.assertEqual(self.notes, [("r2_put", False)])
+
+    def test_success_counts_ok(self):
+        hw.publish = lambda *a, **k: (True, "12 keys uploaded + verified")
+        ok, _ = hw._publish_with_retry(Path("."), ["193074"], {}, {},
+                                       attempts=1)
+        self.assertTrue(ok)
+        self.assertEqual(self.notes, [("r2_put", True)])
+
+
+class PublishLockRelease(unittest.TestCase):
+    """2026-10-13: a cut lock-release DELETE left a zombie lock for the
+    full TTL; release() must retry the idempotent owner-matched op."""
+
+    class R:
+        def __init__(self, rc):
+            self.returncode = rc
+            self.stdout = ""
+            self.stderr = ""
+
+    def make_lock(self, seq):
+        lock = hw.PublishLock({}, owner="test-owner")
+        lock.acquired = True
+        lock.release_retry_delay = 0
+        calls = []
+        lock._r2 = lambda *a: (calls.append(a), seq[len(calls) - 1])[1]
+        return lock, calls
+
+    def test_release_retries_until_success(self):
+        lock, calls = self.make_lock([self.R(1), self.R(1), self.R(0)])
+        lock.release()
+        self.assertEqual(len(calls), 3)
+
+    def test_release_gives_up_after_3_without_raising(self):
+        lock, calls = self.make_lock([self.R(1)] * 5)
+        lock.release()
+        self.assertEqual(len(calls), 3)
+
+
+class PublishLockAcquire(unittest.TestCase):
+    """2026-10-13: acquire must survive cut responses -- retry transport
+    failures, adopt a lock our own earlier attempt landed, and still
+    refuse a genuinely foreign lock immediately."""
+
+    class R:
+        def __init__(self, rc, out="", err=""):
+            self.returncode = rc
+            self.stdout = out
+            self.stderr = err
+
+    def setUp(self):
+        self._sleep = hw.time.sleep
+        hw.time.sleep = lambda s: None
+
+    def tearDown(self):
+        hw.time.sleep = self._sleep
+
+    def make_lock(self, seq, owner="hl_wave:test:1"):
+        lock = hw.PublishLock({}, owner=owner)
+        lock.heartbeat_interval = 3600
+        calls = []
+        lock._r2 = lambda *a: (calls.append(a), seq[min(len(calls) - 1,
+                                                        len(seq) - 1)])[1]
+        return lock, calls
+
+    def test_transport_failures_then_success(self):
+        lock, calls = self.make_lock(
+            [self.R(1, err="RemoteDisconnected"), self.R(0)])
+        self.assertTrue(lock.acquire())
+        self.assertEqual(len(calls), 2)
+        lock._r2 = lambda *a: self.R(0)
+        lock.release()
+
+    def test_adopt_own_lock(self):
+        lock, calls = self.make_lock([self.R(
+            1, out="acquire: lock held by hl_wave:test:1 "
+                   "(owner=hl_wave:test:1)")])
+        self.assertTrue(lock.acquire())
+        self.assertEqual(len(calls), 1)
+        lock._r2 = lambda *a: self.R(0)
+        lock.release()
+
+    def test_foreign_lock_refused_immediately(self):
+        lock, calls = self.make_lock([self.R(
+            1, out="acquire: lock held by other:999 (owner=other:999)")])
+        self.assertFalse(lock.acquire())
+        self.assertEqual(len(calls), 1)
+
+    def test_requester_mention_is_not_adoption(self):
+        # r2_put ownership errors name BOTH parties ("... not
+        # <requester>"); our owner appearing as the requester must not
+        # be mistaken for holding the lock (false-adopted live once).
+        lock, calls = self.make_lock([self.R(
+            1, out="acquire: lock held by other:999, not hl_wave:test:1")])
+        self.assertFalse(lock.acquire())
+        self.assertEqual(len(calls), 1)
+
+    def test_all_transport_failures_give_up(self):
+        lock, calls = self.make_lock([self.R(1, err="RemoteDisconnected")])
+        self.assertFalse(lock.acquire())
+        self.assertEqual(len(calls), 3)
+
+
+class PublishLockedPerKey(unittest.TestCase):
+    """2026-10-13: uploads are per-key with retries, so one cut
+    connection can no longer discard the whole publish."""
+
+    class R:
+        def __init__(self, rc):
+            self.returncode = rc
+            self.stdout = ""
+            self.stderr = "boom"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.out = Path(self.tmp.name)
+        (self.out / "prices").mkdir()
+        (self.out / "meta").mkdir()
+        for k in ("prices/111111.json", "prices/222222.json",
+                  "prices/index.json", "meta/summary.json",
+                  "meta/hospitals.json", "meta/manifest.json"):
+            (self.out / k).write_bytes(b'{"x": 1}')
+        self.ccns = ["111111", "222222"]
+        self._run = hw.subprocess.run
+        self._sha = hw.r2_get_sha256
+        self._sleep = hw.time.sleep
+        hw.time.sleep = lambda s: None
+        hw.r2_get_sha256 = lambda k, penv: hashlib.sha256(
+            (self.out / k).read_bytes()).hexdigest()
+
+    def tearDown(self):
+        hw.subprocess.run = self._run
+        hw.r2_get_sha256 = self._sha
+        hw.time.sleep = self._sleep
+        self.tmp.cleanup()
+
+    def test_all_keys_ok(self):
+        hw.subprocess.run = lambda *a, **k: self.R(0)
+        ok, msg = hw._publish_locked(self.out, self.ccns, {})
+        self.assertTrue(ok, msg)
+
+    def test_flaky_key_recovers(self):
+        state = {"n": 0}
+        def run(*a, **k):
+            state["n"] += 1
+            return self.R(1 if state["n"] <= 2 else 0)
+        hw.subprocess.run = run
+        ok, msg = hw._publish_locked(self.out, self.ccns, {})
+        self.assertTrue(ok, msg)
+
+    def test_dead_key_fails_and_names_it(self):
+        def run(cmd, *a, **k):
+            return self.R(1 if cmd[-1] == "prices/index.json" else 0)
+        hw.subprocess.run = run
+        ok, msg = hw._publish_locked(self.out, self.ccns, {})
+        self.assertFalse(ok)
+        self.assertIn("prices/index.json", msg)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
