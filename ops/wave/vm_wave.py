@@ -59,6 +59,7 @@ from vm_r2client import R2Client  # noqa: E402
 
 # Hospital fetches go through hospitalledger.com/api/fetch when HL_FETCH_PROXY
 # is set (scripts/hl_edge.py), so the VM needs no per-hospital approval.
+# (Ported from bundle ops/wave/vm_wave.py, pipeline sha 25b775fa, 2026-10-13.)
 for _line in (open(os.path.expanduser("~/hospital-ledger.env")).read().splitlines()
               if os.path.exists(os.path.expanduser("~/hospital-ledger.env")) else []):
     _k, _, _v = _line.strip().partition("=")
@@ -100,16 +101,293 @@ def update_status(**kw):
 
 
 def fail(reason):
+    # Records the failure and exits non-zero. Does NOT set halted: the
+    # coordinator owns the retry budget (stage-resume -> full re-run, halt
+    # only after 5 consecutive failures) per Barklee's 2026-09-24 auto-fix
+    # directive. The setup watchdog pages only on a real halt.
     log(f"WAVE FAILED: {reason}")
-    update_status(in_flight=[], failed=sorted(set(json.load(open(STATUS)).get("failed", [])) | {W}),
-                 halted=True)
+    update_status(in_flight=[],
+                  failed=sorted(set(json.load(open(STATUS)).get("failed", [])) | {W}))
     res = {"wave": W, "verdict": "fail", "reason": reason,
            "elapsed_s": round(time.time() - t0, 1)}
     json.dump(res, open(os.path.join(RESULTS_DIR, f"w{W}.json"), "w"), indent=1)
     sys.exit(1)
 
 
+# ---------------------------------------------------------------- helpers shared by full + resume-stage paths
+def _local_sha(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _download_manifest_path():
+    return os.path.join(WDIR, "data", "download-manifest.json")
+
+
+def _load_download_manifest():
+    """{ccn: {sha256, bytes}} recorded by a previous attempt's download phase,
+    or {} when no previous attempt completed one."""
+    try:
+        return json.load(open(_download_manifest_path()))
+    except Exception:
+        return {}
+
+
+def _write_download_manifest(dl_ok):
+    json.dump({c: {"sha256": v["sha256"], "bytes": v["bytes"]}
+               for c, v in sorted(dl_ok.items())},
+              open(_download_manifest_path(), "w"), indent=1)
+
+
+def _partition_downloads(manifest, prev_dl):
+    """Reboot-resume split for the download phase.
+
+    A file is skipped (not re-downloaded) only when it exists on disk with
+    BOTH the recorded byte size and sha256. get_file writes dest+".part"
+    then atomically renames, so a present dest is always a whole file from a
+    previous successful GET; the size+hash check additionally guards against
+    a dest that was modified or truncated after the fact. Anything doubtful
+    is re-downloaded.
+    Returns (already_have, remaining, n_skipped) where already_have maps
+    ccn -> {sha256, bytes} in dl_ok format and remaining maps key -> entry.
+    """
+    already, remaining, n = {}, {}, 0
+    for m in manifest:
+        ccn = os.path.basename(m["dest"])[:-5]
+        rec = prev_dl.get(ccn) or {}
+        if (os.path.isfile(m["dest"])
+                and os.path.getsize(m["dest"]) == rec.get("bytes")
+                and _local_sha(m["dest"]) == rec.get("sha256")):
+            already[ccn] = {"sha256": rec["sha256"], "bytes": rec["bytes"]}
+            n += 1
+        else:
+            remaining[m["key"]] = m
+    return already, remaining, n
+
+
+def _parsed_fingerprint(pdir):
+    """sha256 over sorted (filename, size, sha256) of every parsed input.
+
+    slim_parsed.py reads only data/parsed/*.json[.gz] (+ its own code and
+    env, both fixed per wave attempt), so this fingerprint fully determines
+    its outputs.
+    """
+    h = hashlib.sha256()
+    names = sorted(f for f in os.listdir(pdir)
+                   if f.endswith(".json") or f.endswith(".json.gz"))
+    for f in names:
+        p = os.path.join(pdir, f)
+        h.update(f.encode())
+        h.update(str(os.path.getsize(p)).encode())
+        h.update(_local_sha(p).encode())
+    h.update(str(len(names)).encode())
+    return h.hexdigest()
+
+
+def _slim_manifest_path():
+    return os.path.join(WDIR, "data", "slim-manifest.json")
+
+
+def _slim_outputs_ready(inputs_fp, script_fp, outputs):
+    """True iff a previous attempt's slim ran to success on byte-identical
+    inputs with the same script, and every expected output is present and
+    non-empty. The manifest is written only after slim exits 0, so a killed
+    or failed slim can never report ready."""
+    try:
+        sm = json.load(open(_slim_manifest_path()))
+    except Exception:
+        return False
+    return (sm.get("inputs_fingerprint") == inputs_fp
+            and sm.get("script_sha256") == script_fp
+            and all(os.path.isfile(p) and os.path.getsize(p) > 0
+                    for p in outputs))
+
+
+def stage_uploads(uploads, verify_first=False):
+    """Byte-verified staging of (local, key) pairs.
+
+    verify_first=True: length-checked GET first; PUT only when the remote
+    object is missing or differs (idempotent resume -- skips the ~24 min
+    re-PUT of objects a failed attempt already staged).
+    Returns (staged, stage_fail).
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    staged, stage_fail = [], []
+    _tls = threading.local()
+
+    def _uput():
+        c = getattr(_tls, "client", None)
+        if c is None:
+            c = _tls.client = R2Client(workers=1)
+        return c
+
+    def _one(pair):
+        local, key = pair
+        try:
+            if verify_first:
+                lh = _local_sha(local)
+                vok, vinfo = _uput().get_sha256(
+                    key, expect_len=os.path.getsize(local))
+                if vok and vinfo == lh:
+                    return True, lh, local, key
+            ok, info = _uput().put_verified(local, key)
+            return ok, info, local, key
+        except Exception as e:
+            return False, f"{type(e).__name__}: {e}"[:200], local, key
+
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        for ok, info, local, key in ex.map(_one, uploads):
+            if ok:
+                staged.append({"key": key, "bytes": os.path.getsize(local),
+                               "sha256": info})
+            else:
+                stage_fail.append({"key": key, "err": info})
+                log(f"  UPLOAD FAIL {key}: {info}")
+    log(f"stage: {len(staged)}/{len(uploads)} ok, {len(stage_fail)} failed")
+    return staged, stage_fail
+
+
+def finalize_wave(ctx, staged):
+    """Stage the wave manifest LAST, retain build cache, clean up, mark done."""
+    manifest_doc = {
+        "gen_id": GEN_ID,
+        "wave": W,
+        "ccns": sorted(ctx["have_inputs"]),
+        "n_ccns": len(ctx["have_inputs"]),
+        "downloaded": sorted(ctx["dl_ok"]),
+        "probed": sorted(ctx["probed_ok"]),
+        "still_missing": ctx["still_missing"],
+        "quarantined": ctx["quarantined"],
+        "known_quarantined": ctx.get("known_quarantined", []),
+        "standardized_rows": ctx["std_rows"],
+        "download_bytes": ctx["download_bytes"],
+        "cpt_format": {"distinct_codes": ctx["cpt"]["distinct"],
+                       "malformed_codes": ctx["cpt"]["malformed_codes"],
+                       "malformed_rows": ctx["cpt"]["malformed_rows"],
+                       "outside_live_top5k": ctx["cpt"]["outside_live_top5k"],
+                       "verdict": "pass"},
+        "artifacts": staged,
+        "verdict": "pass",
+        "mode": ctx.get("mode", "full"),
+        "started_at": ctx["t0_iso"],
+        "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+    mbody = json.dumps(manifest_doc, indent=1).encode()
+    mtmp = os.path.join(WDIR, "manifest.json")
+    open(mtmp, "wb").write(mbody)
+    mkey = PREFIX + f"waves/{W}/manifest.json"
+    guard_key(mkey)
+    ok, minfo = R2Client(workers=1).put_verified(mtmp, mkey)
+    if not ok:
+        fail(f"staging: wave manifest upload failed: {minfo}")
+    staged.append({"key": mkey, "bytes": len(mbody), "sha256": minfo})
+    log(f"stage: wave manifest staged ({mkey})")
+
+    # Retain merge inputs locally (build cache): prices/ + fragments. The
+    # bulky parsed/ downloads and tmp/ spill are deleted to bound disk.
+    KEEP = os.path.join(WAVES_DIR, "keep", f"w{W}")
+    os.makedirs(KEEP, exist_ok=True)
+    for sub in ("public", "data"):
+        src = os.path.join(WDIR, sub)
+        if os.path.exists(src):
+            shutil.move(src, os.path.join(KEEP, sub))
+    shutil.rmtree(WDIR, ignore_errors=True)
+    res = {"wave": W, "verdict": "pass",
+           "n_ccns": len(ctx["have_inputs"]),
+           "downloaded": len(ctx["dl_ok"]), "probed": len(ctx["probed_ok"]),
+           "still_missing": ctx["still_missing"],
+           "quarantined": ctx["quarantined"],
+           "known_quarantined": ctx.get("known_quarantined", []),
+           "standardized_rows": ctx["std_rows"],
+           "download_bytes": ctx["download_bytes"],
+           "staged": len(staged), "kept": KEEP,
+           "mode": ctx.get("mode", "full"),
+           "elapsed_s": round(time.time() - t0, 1),
+           "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat()}
+    json.dump(res, open(os.path.join(RESULTS_DIR, f"w{W}.json"), "w"), indent=1)
+    s = json.load(open(STATUS))
+    s["done"] = sorted(set(s.get("done", [])) | {W})
+    s["failed"] = sorted(set(s.get("failed", [])) - {W})
+    s["in_flight"] = []
+    s["cursor"] = W + 1
+    s["consecutive_failures"] = 0
+    s["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    json.dump(s, open(STATUS, "w"), indent=1)
+    free_after = df_free()
+    log(f"WAVE {W} PASS ({ctx.get('mode', 'full')}): {len(ctx['have_inputs'])} CCNs, "
+        f"{ctx['std_rows']} rows, {len(staged)} staged, "
+        f"{res['elapsed_s'] / 3600:.2f}h elapsed, df free={free_after / 1e9:.1f} GB")
+
+
+def build_uploads():
+    """(local, key) staging list from the wave workdir. Shared by both paths."""
+    prices_dir = os.path.join(WDIR, "public", "data", "prices")
+    index_path = os.path.join(prices_dir, "index.json")
+    payer_raw = os.path.join(WDIR, "data", "_payer_raw.jsonl")
+    compl_raw = os.path.join(WDIR, "data", "_compliance_per_hospital.jsonl")
+    detail_raw = os.path.join(WDIR, "data", "_cpt_detail_raw.jsonl")
+    wave_cpt_index = os.path.join(WDIR, "public", "data", "cpt-index.json")
+    uploads = []
+    for f in sorted(os.listdir(prices_dir)):
+        if f.endswith(".json") and f != "index.json":
+            uploads.append((os.path.join(prices_dir, f), PREFIX + f"prices/{f}"))
+    for local, key in ((detail_raw, PREFIX + f"waves/{W}/_cpt_detail_raw.jsonl"),
+                       (payer_raw, PREFIX + f"waves/{W}/_payer_raw.jsonl"),
+                       (compl_raw, PREFIX + f"waves/{W}/_compliance_per_hospital.jsonl"),
+                       (index_path, PREFIX + f"waves/{W}/prices-index.json"),
+                       (wave_cpt_index, PREFIX + f"waves/{W}/cpt-index.json")):
+        uploads.append((local, key))
+    for _, key in uploads:
+        guard_key(key)
+    return uploads
+
+
+def resume_stage():
+    """--resume-stage: re-run ONLY staging from a failed wave's workdir.
+
+    Used by the coordinator's auto-fix ladder for staging-only failures:
+    verify-first re-stage (skips objects the failed attempt already got
+    right), stage the manifest LAST, retain, mark done. Exits 0 on pass,
+    1 via fail() otherwise.
+    """
+    os.makedirs(WDIR, exist_ok=True)
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    free = df_free()
+    if free < MIN_FREE:
+        fail(f"insufficient disk: {free / 1e9:.1f} GB < 25 GB")
+    # Prerequisite check BEFORE any status write: a failed probe must never
+    # clear a legitimate halt (2026-09-24: a probe cleared halted and systemd
+    # relaunched the coordinator into a full re-run).
+    state_path = os.path.join(WDIR, "stage-state.json")
+    if not os.path.exists(state_path):
+        fail(f"resume-stage: no stage-state.json in {WDIR} (workdir incomplete?)")
+    update_status(in_flight=[W], cursor=W, halted=False)
+    ctx = json.load(open(state_path))
+    ctx["mode"] = "resume-stage"
+    uploads = build_uploads()
+    missing = [local for local, _ in uploads if not os.path.exists(local)]
+    if missing:
+        fail(f"resume-stage: {len(missing)} upload sources missing, e.g. {missing[0]}")
+    log(f"resume-stage: {len(uploads)} objects (verify-first, idempotent)")
+    staged, stage_fail = stage_uploads(uploads, verify_first=True)
+    if stage_fail:
+        fail(f"staging: {len(stage_fail)} uploads failed, e.g. {stage_fail[0]}")
+    finalize_wave(ctx, staged)
+
+
 # ---------------------------------------------------------------- 0. pre-flight
+# --resume-stage: skip the pipeline, re-run only staging from a failed
+# attempt's workdir (coordinator auto-fix ladder).
+if len(sys.argv) > 2 and sys.argv[2] == "--resume-stage":
+    if len(sys.argv) > 4 and sys.argv[3] == "--workers":
+        WORKERS = int(sys.argv[4])
+    log(f"resume-stage requested for wave {W}")
+    resume_stage()
+    sys.exit(0)
 os.makedirs(WDIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 free = df_free()
@@ -174,7 +452,18 @@ def _dl_one(m):
 # Round-based download: each round attempts all remaining files. A round
 # with zero progress means the pipe is down -> wait for recovery before
 # the next round. Survives flapping without failing the wave.
-remaining = {m["key"]: m for m in manifest}
+# Reboot resume: files fully downloaded by a killed attempt are verified
+# against the recorded manifest and skipped (no re-download). Source keys
+# are immutable within a generation; to force a re-fetch, delete
+# data/download-manifest.json.
+already_have, remaining, n_skipped = _partition_downloads(
+    manifest, _load_download_manifest())
+for ccn, rec in already_have.items():
+    dl_ok[ccn] = rec
+    dl_bytes += rec["bytes"]
+if n_skipped:
+    log(f"download: {n_skipped}/{len(manifest)} already on disk "
+        f"(size+sha256 verified), skipping re-download")
 round_n = 0
 while remaining and round_n < 6:
     round_n += 1
@@ -200,6 +489,9 @@ while remaining and round_n < 6:
 for key, m in remaining.items():
     ccn = os.path.basename(m["dest"])[:-5]
     dl_fail.append({"ccn": ccn, "err": "failed after 6 download rounds"})
+# Record what is on disk so a rebooted attempt can verify-and-skip instead
+# of re-downloading. Includes files skipped via the resume path above.
+_write_download_manifest(dl_ok)
 log(f"download: {len(dl_ok)}/{len(ccns)} ok, {dl_bytes / 1e9:.2f} GB, "
     f"{len(dl_fail)} failed, {time.time() - t0:.0f}s elapsed")
 
@@ -279,27 +571,41 @@ wscripts = os.path.join(WDIR, "scripts")
 os.makedirs(wscripts, exist_ok=True)
 shutil.copy(os.path.join(SCRIPTS, "slim_parsed.py"), wscripts)
 os.makedirs(os.path.join(WDIR, "tmp"), exist_ok=True)
-env = dict(os.environ, TMPDIR=os.path.join(WDIR, "tmp"))
-env.pop("CCNS", None)
-env.pop("CCNS_FILE", None)
-log(f"slim: full-mode run over {n_parsed_inputs} parsed files (TMPDIR=wave tmp)")
-p = subprocess.run([sys.executable, "scripts/slim_parsed.py"], cwd=WDIR,
-                   env=env, capture_output=True, text=True, timeout=14400)
-tail = (p.stdout or "").strip().splitlines()[-8:]
-log(f"slim: rc={p.returncode}")
-for t in tail:
-    log(f"  slim | {t[:160]}")
-if p.returncode != 0:
-    log(f"  slim stderr: {(p.stderr or '')[-500:]}")
-    fail(f"slim_parsed.py rc={p.returncode}")
-
 prices_dir = os.path.join(WDIR, "public", "data", "prices")
 index_path = os.path.join(prices_dir, "index.json")
 payer_raw = os.path.join(WDIR, "data", "_payer_raw.jsonl")
 compl_raw = os.path.join(WDIR, "data", "_compliance_per_hospital.jsonl")
 detail_raw = os.path.join(WDIR, "data", "_cpt_detail_raw.jsonl")
 wave_cpt_index = os.path.join(WDIR, "public", "data", "cpt-index.json")
-for req in (index_path, payer_raw, compl_raw, detail_raw, wave_cpt_index):
+slim_outputs = (index_path, payer_raw, compl_raw, detail_raw, wave_cpt_index)
+# Reboot resume: slim reads only data/parsed (+ its own code, fixed per
+# attempt). If the inputs are byte-identical to a previous successful run
+# with the same script and all outputs are present, skip the re-run.
+inputs_fp = _parsed_fingerprint(pdir)
+script_fp = _local_sha(os.path.join(wscripts, "slim_parsed.py"))
+if _slim_outputs_ready(inputs_fp, script_fp, slim_outputs):
+    log(f"slim: inputs unchanged since successful run "
+        f"({n_parsed_inputs} parsed files), skipping re-run")
+else:
+    env = dict(os.environ, TMPDIR=os.path.join(WDIR, "tmp"))
+    env.pop("CCNS", None)
+    env.pop("CCNS_FILE", None)
+    log(f"slim: full-mode run over {n_parsed_inputs} parsed files (TMPDIR=wave tmp)")
+    p = subprocess.run([sys.executable, "scripts/slim_parsed.py"], cwd=WDIR,
+                       env=env, capture_output=True, text=True, timeout=14400)
+    tail = (p.stdout or "").strip().splitlines()[-8:]
+    log(f"slim: rc={p.returncode}")
+    for t in tail:
+        log(f"  slim | {t[:160]}")
+    if p.returncode != 0:
+        log(f"  slim stderr: {(p.stderr or '')[-500:]}")
+        fail(f"slim_parsed.py rc={p.returncode}")
+    json.dump({"inputs_fingerprint": inputs_fp, "script_sha256": script_fp,
+               "outputs": [os.path.basename(p) for p in slim_outputs],
+               "n_parsed": n_parsed_inputs},
+              open(_slim_manifest_path(), "w"), indent=1)
+
+for req in slim_outputs:
     if not os.path.exists(req) or os.path.getsize(req) == 0:
         fail(f"slim output missing/empty: {req}")
 
@@ -311,6 +617,19 @@ price_files = {f[:-5] for f in os.listdir(prices_dir) if f.endswith(".json") and
 have_inputs = set(dl_ok) | set(probed_ok)
 quarantined = sorted(c for c in have_inputs
                      if c not in price_files or index_by_ccn.get(c, {}).get("n", 0) == 0)
+# Known-bad sources (operator-documented in known-quarantined.json, keyed by
+# wave): hospitals whose published files contain zero usable price rows
+# (placeholders, wrong formats, price-less CDM dumps). They are excluded
+# from the gate's failure rate but stay recorded in stage-state.json.
+# Reversible: delete a manifest entry and the gate trips on it again.
+known_q = set()
+try:
+    _manifest = json.load(open(os.path.join(HF, "known-quarantined.json")))
+    known_q = {e["ccn"] for e in _manifest.get(str(W), [])}
+except FileNotFoundError:
+    pass
+known_hit = sorted(c for c in quarantined if c in known_q)
+unexpected_q = [c for c in quarantined if c not in known_q]
 # schema spot-check: every price file must be a JSON dict with an items list
 bad_schema = []
 for c in sorted(price_files):
@@ -324,13 +643,14 @@ for c in sorted(price_files):
     except Exception as e:
         bad_schema.append({"ccn": c, "err": f"{type(e).__name__}: {str(e)[:80]}"})
 std_rows = sum(index_by_ccn.get(c, {}).get("n", 0) for c in price_files)
-q_rate = len(quarantined) / max(1, n_parsed_inputs)
+q_rate = len(unexpected_q) / max(1, n_parsed_inputs)
 log(f"standardize: {len(price_files)} price files, {std_rows} rows, "
-    f"quarantined={len(quarantined)} ({q_rate * 100:.2f}%), bad_schema={len(bad_schema)}")
+    f"quarantined={len(quarantined)} ({len(known_hit)} known-bad documented, "
+    f"{len(unexpected_q)} unexpected, {q_rate * 100:.2f}%), bad_schema={len(bad_schema)}")
 if bad_schema:
     fail(f"schema validation: {len(bad_schema)} price files invalid, e.g. {bad_schema[0]}")
 if q_rate > 0.05:
-    fail(f"standardize health gate: {len(quarantined)}/{n_parsed_inputs} quarantined (>5%)")
+    fail(f"standardize health gate: {len(unexpected_q)}/{n_parsed_inputs} unexpected quarantined (>5%)")
 
 # CPT format gate: codes must be 5-char alphanumeric (CPT/HCPCS shape).
 # NOTE: the earlier "universe" gate compared wave codes against the LIVE
@@ -367,115 +687,30 @@ if len(badfmt_codes) > 25 or u_rate > 0.02:
          f"{u_rate * 100:.2f}% malformed rows (spike)")
 
 # ---------------------------------------------------------------- 5. stage
-uploads = []
-for c in sorted(price_files):
-    uploads.append((os.path.join(prices_dir, f"{c}.json"), PREFIX + f"prices/{c}.json"))
-fragments = [
-    (detail_raw, PREFIX + f"waves/{W}/_cpt_detail_raw.jsonl"),
-    (payer_raw, PREFIX + f"waves/{W}/_payer_raw.jsonl"),
-    (compl_raw, PREFIX + f"waves/{W}/_compliance_per_hospital.jsonl"),
-    (index_path, PREFIX + f"waves/{W}/prices-index.json"),
-    (wave_cpt_index, PREFIX + f"waves/{W}/cpt-index.json"),
-]
-for local, key in fragments:
-    uploads.append((local, key))
-for _, key in uploads:
-    guard_key(key)
+# Persist everything resume-stage needs BEFORE any upload, so a staging-only
+# failure can be healed without re-running download/parse/slim.
+stage_ctx = {
+    "have_inputs": sorted(have_inputs),
+    "dl_ok": sorted(dl_ok),
+    "probed_ok": sorted(probed_ok),
+    "still_missing": still_missing,
+    "quarantined": quarantined,
+    "known_quarantined": known_hit,
+    "std_rows": std_rows,
+    "download_bytes": dl_bytes,
+    "cpt": {"distinct": len(wave_codes),
+            "malformed_codes": len(badfmt_codes),
+            "malformed_rows": badfmt_rows,
+            "total_rows": total_rows,
+            "outside_live_top5k": outside_live_top5k},
+    "mode": "full",
+    "t0_iso": datetime.datetime.fromtimestamp(t0, datetime.timezone.utc).isoformat(),
+}
+json.dump(stage_ctx, open(os.path.join(WDIR, "stage-state.json"), "w"), indent=1)
+uploads = build_uploads()
 log(f"stage: {len(uploads)} objects to {PREFIX} (byte-verified PUTs, {WORKERS} workers)")
-staged, stage_fail = [], []
-# Thread-local client pool: each upload worker reuses its own persistent
-# connection across its share of objects (no per-object CONNECT).
-import threading
-_tls = threading.local()
-
-
-def _uput():
-    c = getattr(_tls, "client", None)
-    if c is None:
-        c = _tls.client = R2Client(workers=1)
-    return c
-
-
-def _put_one(pair):
-    local, key = pair
-    try:
-        return _uput().put_verified(local, key) + (local, key)
-    except Exception as e:
-        return False, f"{type(e).__name__}: {e}"[:200], local, key
-
-
-with ThreadPoolExecutor(max_workers=WORKERS) as ex:
-    for ok, info, local, key in ex.map(_put_one, uploads):
-        if ok:
-            staged.append({"key": key, "bytes": os.path.getsize(local), "sha256": info})
-        else:
-            stage_fail.append({"key": key, "err": info})
-            log(f"  UPLOAD FAIL {key}: {info}")
-log(f"stage: {len(staged)}/{len(uploads)} ok, {len(stage_fail)} failed")
+staged, stage_fail = stage_uploads(uploads)
 if stage_fail:
     fail(f"staging: {len(stage_fail)} uploads failed, e.g. {stage_fail[0]}")
 
-# wave manifest LAST
-manifest_doc = {
-    "gen_id": GEN_ID,
-    "wave": W,
-    "ccns": sorted(have_inputs),
-    "n_ccns": len(have_inputs),
-    "downloaded": sorted(dl_ok),
-    "probed": sorted(probed_ok),
-    "still_missing": still_missing,
-    "quarantined": quarantined,
-    "standardized_rows": std_rows,
-    "download_bytes": dl_bytes,
-    "cpt_format": {"distinct_codes": len(wave_codes),
-                   "malformed_codes": len(badfmt_codes),
-                   "malformed_rows": badfmt_rows,
-                   "outside_live_top5k": outside_live_top5k,
-                   "verdict": "pass"},
-    "artifacts": staged,
-    "verdict": "pass",
-    "started_at": datetime.datetime.fromtimestamp(t0, datetime.timezone.utc).isoformat(),
-    "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-}
-mbody = json.dumps(manifest_doc, indent=1).encode()
-mtmp = os.path.join(WDIR, "manifest.json")
-open(mtmp, "wb").write(mbody)
-mkey = PREFIX + f"waves/{W}/manifest.json"
-guard_key(mkey)
-ok, minfo = R2Client(workers=1).put_verified(mtmp, mkey)
-if not ok:
-    fail(f"wave manifest upload failed: {minfo}")
-staged.append({"key": mkey, "bytes": len(mbody), "sha256": minfo})
-log(f"stage: wave manifest staged ({mkey})")
-
-# ---------------------------------------------------------------- 6. retain + cleanup + report
-# Retain merge inputs locally (build cache): prices/ + fragments. The bulky
-# parsed/ downloads and tmp/ spill are deleted to bound disk. R2 staging
-# remains the system of record; this cache only avoids a ~19 GB re-download
-# at merge time. (Adaptation of "delete the local wave directory": the
-# transient workspace IS deleted; validated outputs are retained as cache.)
-KEEP = os.path.join(WAVES_DIR, "keep", f"w{W}")
-os.makedirs(KEEP, exist_ok=True)
-for sub in ("public", "data"):
-    src = os.path.join(WDIR, sub)
-    if os.path.exists(src):
-        shutil.move(src, os.path.join(KEEP, sub))
-shutil.rmtree(WDIR, ignore_errors=True)
-res = {"wave": W, "verdict": "pass", "n_ccns": len(have_inputs),
-       "downloaded": len(dl_ok), "probed": len(probed_ok),
-       "still_missing": still_missing, "quarantined": quarantined,
-       "standardized_rows": std_rows, "download_bytes": dl_bytes,
-       "staged": len(staged), "kept": KEEP,
-       "elapsed_s": round(time.time() - t0, 1),
-       "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat()}
-json.dump(res, open(os.path.join(RESULTS_DIR, f"w{W}.json"), "w"), indent=1)
-s = json.load(open(STATUS))
-s["done"] = sorted(set(s.get("done", [])) | {W})
-s["in_flight"] = []
-s["cursor"] = W + 1
-s["consecutive_failures"] = 0
-s["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
-json.dump(s, open(STATUS, "w"), indent=1)
-free_after = df_free()
-log(f"WAVE {W} PASS: {len(have_inputs)} CCNs, {std_rows} rows, {len(staged)} staged, "
-    f"{res['elapsed_s'] / 3600:.2f}h elapsed, df free={free_after / 1e9:.1f} GB")
+finalize_wave(stage_ctx, staged)
