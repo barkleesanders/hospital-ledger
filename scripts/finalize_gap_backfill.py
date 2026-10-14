@@ -339,7 +339,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--retry-workers", type=int, default=3)
     parser.add_argument("--retry-item-timeout-seconds", type=int, default=600)
     parser.add_argument("--project-name", default="hospital-ledger")
-    parser.add_argument("--verify-url", default="https://hospital-ledger.pages.dev")
+    parser.add_argument("--verify-url", default="https://hospitalledger.com")
     parser.add_argument("--sample-ccns", nargs="*", default=["050334", "110121", "310064"])
     return parser.parse_args(argv)
 

@@ -262,7 +262,7 @@
       <a class="button mono" href="/data/gap_backfill_sharded.status.json" target="_blank" rel="noopener">gap_backfill_sharded.status.json</a>
       <a class="button mono" href="/data/gap_shard_supervisor.status.json" target="_blank" rel="noopener">gap_shard_supervisor.status.json</a>
       <a class="button mono" href="/data/finalize_gap_backfill.status.json" target="_blank" rel="noopener">finalize_gap_backfill.status.json</a>
-      <a class="button mono" href="https://hospital-ledger.pages.dev" target="_blank" rel="noopener">Open production site</a>
+      <a class="button mono" href="https://hospitalledger.com" target="_blank" rel="noopener">Open production site</a>
     </div>
     <div id="file-warning" class="notice">
       This page was opened via <span class="mono">file://</span>. Use the local server URL instead so the page can fetch JSON and log files.
@@ -762,7 +762,7 @@ function renderStages(gap, finalizer, preview) {
       badge: finalizer?.verify ? 'verified' : 'pending',
       body: finalizer?.verify
         ? `Last verified live snapshot: ${fmtNum(finalizer.verify.usable)} usable previews out of ${fmtNum(finalizer.verify.entries)}.`
-        : 'This stays pending until the finalizer finishes its verify step against hospital-ledger.pages.dev.',
+        : 'This stays pending until the finalizer finishes its verify step against hospitalledger.com.',
     },
   ];
   document.getElementById('stage-list').innerHTML = stages.map((stage) => `
