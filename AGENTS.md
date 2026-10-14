@@ -126,3 +126,32 @@ bd prime                # Refresh Beads context
 
 **Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md for details and anti-patterns.
 <!-- END BEADS CODEX SETUP -->
+
+## Repo sync & ground truth (2026-10-13)
+
+- **Canonical source:** this repo, branch `main`. Every other copy is a mirror
+  or a deploy target — never edit a mirror expecting it to flow back.
+- **Wave code lives at `ops/wave/`** (`hl_wave.py`, `vm_wave.py`,
+  `vm_coordinator.py`). `pipeline/vm_wave.py` is the shim-push staging copy
+  and MUST stay byte-identical to `ops/wave/vm_wave.py` (verify:
+  `shasum -a 256 ops/wave/vm_wave.py pipeline/vm_wave.py`).
+- **Live wave copies:** the Muse daily wave runs the goal-workspace copies
+  (`hidden_files/hl_wave.py`, `hidden_files/vm_wave.py` on the VM). They must
+  match `ops/wave/` byte-for-byte; re-copy from the repo after any edit.
+- **Ground truth is R2, never a local bundle.** `scripts/predeploy_audit.py`
+  reads R2 `meta/summary.json` via the public routes; local files are an
+  offline fallback only (`--offline`). Payer claims verify against R2
+  `/data/payer-stats.json` (shape `{"rows","ccns","rates"}`) once the payer
+  pipeline publishes it, else against a full local `_payer_raw.jsonl`, else
+  they SKIP — a partial copy must never false-fail the gate.
+- **Fetch path:** hospital fetches go through the edge proxy
+  (`https://hospitalledger.com/api/fetch`, `scripts/hl_edge.py`,
+  `HL_FETCH_PROXY`/`HL_FETCH_TOKEN` in the VM env). No per-hospital network
+  approvals; direct fetch is a fallback for granted hosts only.
+- **Publish safety:** never publish a partial generation, never delete R2
+  objects, counts+pricing validation must pass before publish, and the
+  publish lock is fail-closed (contention parks CCNs for the retry job —
+  it is not an error to escalate by hand).
+- **Deploys:** the VM pipeline at `~/hospital-ledger` is unpacked from the
+  pipeline bundle tarball (`hospital-ledger-pipeline.tar.gz` + `.sha256`);
+  rebuild and re-sha the bundle whenever `ops/` or `scripts/` change.
