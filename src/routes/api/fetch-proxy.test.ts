@@ -9,8 +9,7 @@ function app(token: string | undefined = TOKEN) {
 	const a = new Hono<FetchEnv>();
 	a.get("/api/fetch", fetchProxyHandler);
 	const env: FetchEnv["Bindings"] = { FETCH_PROXY_TOKEN: token };
-	return (path: string, init: RequestInit = {}) =>
-		a.request(path, init, env);
+	return (path: string, init: RequestInit = {}) => a.request(path, init, env);
 }
 
 const auth = { authorization: `Bearer ${TOKEN}` };
@@ -118,8 +117,7 @@ describe("pass-through", () => {
 			expect(res.status).toBe(status);
 			expect(res.headers.get("x-hl-proxy-error")).toBeNull();
 			const sent = new Headers(
-				(fetchSpy.mock.calls[0] as unknown as [string, RequestInit])[1]
-					.headers,
+				(fetchSpy.mock.calls[0] as unknown as [string, RequestInit])[1].headers,
 			);
 			expect(sent.get("range")).toBe("bytes=0-0");
 			expect(sent.get("if-none-match")).toBe('"abc"');
@@ -136,7 +134,9 @@ describe("pass-through", () => {
 		vi.stubGlobal("fetch", fetchSpy);
 		const res = await app()(q(MRF), { method: "HEAD", headers: auth });
 		expect(res.status).toBe(200);
-		const init = (fetchSpy.mock.calls[0] as unknown as [string, RequestInit])[1];
+		const init = (
+			fetchSpy.mock.calls[0] as unknown as [string, RequestInit]
+		)[1];
 		expect(init.method).toBe("HEAD");
 	});
 
@@ -226,7 +226,10 @@ describe("bot-shield interstitials", () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () =>
-				upstream(big, { status: 403, headers: { "content-type": "text/html" } }),
+				upstream(big, {
+					status: 403,
+					headers: { "content-type": "text/html" },
+				}),
 			),
 		);
 		const res = await app()(q(MRF), { headers: auth });
@@ -240,7 +243,10 @@ describe("bot-shield interstitials", () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () =>
-				upstream(body, { status: 200, headers: { "content-type": "text/html" } }),
+				upstream(body, {
+					status: 200,
+					headers: { "content-type": "text/html" },
+				}),
 			),
 		);
 		const res = await app()(q(MRF), { headers: auth });
@@ -270,11 +276,17 @@ describe("HEAD against a bot shield", () => {
 	it("re-asks with GET and reports the challenge instead of a fake 'alive' 202", async () => {
 		const fetchSpy = vi.fn(async (_u: string, init: RequestInit) =>
 			init.method === "HEAD"
-				? upstream(null, { status: 202, headers: { "content-type": "text/html" } })
-				: upstream('<meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=x">', {
+				? upstream(null, {
 						status: 202,
 						headers: { "content-type": "text/html" },
-					}),
+					})
+				: upstream(
+						'<meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=x">',
+						{
+							status: 202,
+							headers: { "content-type": "text/html" },
+						},
+					),
 		);
 		vi.stubGlobal("fetch", fetchSpy);
 		const res = await app()(q(MRF), { method: "HEAD", headers: auth });

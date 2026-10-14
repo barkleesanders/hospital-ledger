@@ -4,16 +4,16 @@
  */
 
 import type { Context } from "hono";
-import { Layout, PageHeader } from "../components/Layout";
-import { FaqAskRow } from "../faq/faq-section";
-import type { Env } from "../index";
-import { type HospitalData, loadHospital } from "../lib/data";
-import { fmtMoney } from "../lib/format";
 // Compact CCN → [city, state] lookup, generated from CMS Hospital General
 // Information at build time (public/data/hospital-geo.json). City/state change
 // rarely, so a bundled snapshot is safe; hospital names/prices always come
 // from live R2.
 import HOSPITAL_GEO from "../../public/data/hospital-geo.json";
+import { Layout, PageHeader } from "../components/Layout";
+import { FaqAskRow } from "../faq/faq-section";
+import type { Env } from "../index";
+import { type HospitalData, loadHospital } from "../lib/data";
+import { fmtMoney } from "../lib/format";
 
 const VALID_CCN = /^\d{6}$/;
 
