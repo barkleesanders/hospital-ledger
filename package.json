@@ -18,6 +18,7 @@
 		"audit:csp": "python3 scripts/csp_audit.py",
 		"test:faq": "vitest run --config vitest.faq.config.mjs",
 		"test:fetch-proxy": "vitest run --config vitest.fetch-proxy.config.mjs",
+		"test:site-data": "vitest run --config vitest.site-data.config.mjs",
 		"build:faq-island": "node tools/build-faq-island.mjs",
 		"probe:constrained": "node tests/probe-constrained.mjs probe"
 	},

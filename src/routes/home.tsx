@@ -12,42 +12,28 @@
  */
 
 import type { Context } from "hono";
-import summaryJson from "../../public/data/summary.json";
 import { Layout } from "../components/Layout";
 import { ProcedureCarousel } from "../components/ProcedureCarousel";
 import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
+import { bundledSummary, loadSummary, type Summary } from "../lib/site-data";
 
-type HomeSummary = {
-	generated_at: string;
-	total_facilities?: number;
-	cms_required_total: number;
-	compliant: number;
-	compliance_pct: number;
-	standardized_price_index_hospitals?: number;
-	standardized_price_hospitals?: number;
-	standardized_price_rows?: number;
-	cpt_indexed_hospitals?: number;
-	cpt_indexed_rows?: number;
-	enforcement_actions_total: number;
-};
-
-const SITE_COUNTS = summaryJson as HomeSummary;
-const totalFacilities = SITE_COUNTS.total_facilities ?? 5426;
-const cmsRequiredTotal = SITE_COUNTS.cms_required_total;
-const liveMrfRequired = SITE_COUNTS.compliant;
-const standardizedPriceHospitals =
-	SITE_COUNTS.standardized_price_hospitals ??
-	SITE_COUNTS.standardized_price_index_hospitals ??
-	3654;
-const parsedMrfOutputs = SITE_COUNTS.standardized_price_index_hospitals ?? 3768;
-const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 62577586;
-const cptIndexedRows = SITE_COUNTS.cpt_indexed_rows ?? 14247687;
-const updatedDate = SITE_COUNTS.generated_at.slice(0, 10);
 const fmt = (n: number) => n.toLocaleString("en-US");
 
 /** Exported so the "Ask anything" corpus (src/faq/faq-corpus.ts) renders the served copy. */
-export function homePage(url: string) {
+export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
+	const totalFacilities = SITE_COUNTS.total_facilities ?? 5426;
+	const cmsRequiredTotal = SITE_COUNTS.cms_required_total;
+	const liveMrfRequired = SITE_COUNTS.compliant;
+	const standardizedPriceHospitals =
+		SITE_COUNTS.standardized_price_hospitals ??
+		SITE_COUNTS.standardized_price_index_hospitals ??
+		3654;
+	const parsedMrfOutputs =
+		SITE_COUNTS.standardized_price_index_hospitals ?? 3768;
+	const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 62577586;
+	const cptIndexedRows = SITE_COUNTS.cpt_indexed_rows ?? 14247687;
+	const updatedDate = SITE_COUNTS.generated_at.slice(0, 10);
 	return (
 		<Layout
 			title="Hospital Ledger — what the law required, what hospitals delivered"
@@ -57,6 +43,7 @@ export function homePage(url: string) {
 			scriptSrc={["/cpt-names.js", "/home-client.js", "/procedure-carousel.js"]}
 			stylesheets={["/faq.css"]}
 			moduleScripts={["/faq-island.js"]}
+			summary={SITE_COUNTS}
 		>
 			<header class="border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
 				<div class="mx-auto max-w-6xl px-4 sm:px-6 pt-8 pb-10 sm:pt-10 sm:pb-12 md:pt-14 md:pb-16">
@@ -647,11 +634,12 @@ export function homePage(url: string) {
 					</div>
 					<h2 class="serif text-2xl sm:text-3xl md:text-4xl mb-3">
 						Three days to launch. Rebuilt deeper.{" "}
-						<em class="text-emerald-300">~3 person-years</em> of human work — updated daily.
+						<em class="text-emerald-300">~3 person-years</em> of human work —
+						updated daily.
 					</h2>
 					<p class="text-zinc-300 max-w-3xl leading-relaxed">
-						Hospital Ledger launched in May 2026 from a three-day build by two AI coding
-						agents —{" "}
+						Hospital Ledger launched in May 2026 from a three-day build by two
+						AI coding agents —{" "}
 						<a
 							class="text-emerald-300 underline"
 							href="https://www.anthropic.com/claude-code"
@@ -665,12 +653,17 @@ export function homePage(url: string) {
 						>
 							OpenAI Codex
 						</a>{" "}
-						— working in parallel under one operator. In September 2026 the dataset was rebuilt from scratch at greater depth — a 5,000-code CPT index, payer files, CMS enforcement records — and put on an autonomous pipeline that keeps it current: pricing waves re-ingest changed hospital files every day, and compliance is re-verified every week. The headline number isn't
-						a vibe — it's a sum of real per-step rates a competent analyst with
-						Excel, Power Query, and Python would actually hit. Every hospital
-						labels "gross charge", "cash price", "negotiated rate", and "CPT
-						code" differently; the CMS rule mandates the data points, not the
-						column names. So every file is a new schema-mapping problem.
+						— working in parallel under one operator. In September 2026 the
+						dataset was rebuilt from scratch at greater depth — a 5,000-code CPT
+						index, payer files, CMS enforcement records — and put on an
+						autonomous pipeline that keeps it current: pricing waves re-ingest
+						changed hospital files every day, and compliance is re-verified
+						every week. The headline number isn't a vibe — it's a sum of real
+						per-step rates a competent analyst with Excel, Power Query, and
+						Python would actually hit. Every hospital labels "gross charge",
+						"cash price", "negotiated rate", and "CPT code" differently; the CMS
+						rule mandates the data points, not the column names. So every file
+						is a new schema-mapping problem.
 					</p>
 
 					<div class="mt-5 rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 sm:p-5">
@@ -793,12 +786,15 @@ export function homePage(url: string) {
 							≈ <span class="text-emerald-300">2.85 person-years</span> at 40
 							hr/week fully-utilized, or roughly{" "}
 							<span class="text-emerald-300">5–6 calendar years</span> for one
-							analyst working a sustainable 20 hr/week on the side. And that is just the build — keeping it current never ends: the pipeline re-checks dozens of hospitals every night and re-verifies compliance weekly, work a human team would have to staff forever. The 99 GB of
-							raw MRF data is too large to retype — nobody types it; they
-							normalize. The cost is mapping, not keystrokes. Reading speed
-							(~250 wpm) and typing speed (~40 wpm) only show up inside the
-							per-MRF column-mapping pass and the payer-name canonicalization
-							row.
+							analyst working a sustainable 20 hr/week on the side. And that is
+							just the build — keeping it current never ends: the pipeline
+							re-checks dozens of hospitals every night and re-verifies
+							compliance weekly, work a human team would have to staff forever.
+							The 99 GB of raw MRF data is too large to retype — nobody types
+							it; they normalize. The cost is mapping, not keystrokes. Reading
+							speed (~250 wpm) and typing speed (~40 wpm) only show up inside
+							the per-MRF column-mapping pass and the payer-name
+							canonicalization row.
 						</p>
 					</div>
 
@@ -1424,8 +1420,10 @@ export function homePage(url: string) {
 }
 
 export async function homePageHandler(c: Context<Env>): Promise<Response> {
-	return c.html(homePage("https://hospitalledger.com/"), 200, {
+	const { summary, source } = await loadSummary(c.env);
+	return c.html(homePage("https://hospitalledger.com/", summary), 200, {
 		"cache-control": "public, max-age=300",
 		"x-hl-template": "home-ssr",
+		"x-hl-source": source,
 	});
 }

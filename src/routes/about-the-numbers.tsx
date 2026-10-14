@@ -10,42 +10,30 @@
  */
 
 import type { Context } from "hono";
-import summaryJson from "../../public/data/summary.json";
 import { Layout } from "../components/Layout";
 import type { Env } from "../index";
+import { bundledSummary, loadSummary, type Summary } from "../lib/site-data";
 
-type Summary = {
-	generated_at: string;
-	total_facilities?: number;
-	cms_required_total: number;
-	compliant: number;
-	compliance_pct: number;
-	standardized_price_index_hospitals?: number;
-	standardized_price_hospitals?: number;
-	standardized_price_rows?: number;
-	zero_price_index_entries?: number;
-};
-
-const S = summaryJson as Summary;
-const totalFacilities = S.total_facilities ?? 5426;
-const cmsRequired = S.cms_required_total;
-const compliant = S.compliant;
-const indexEntries = S.standardized_price_index_hospitals ?? 3768;
-const standardized = S.standardized_price_hospitals ?? 3654;
-const zeroEntries = S.zero_price_index_entries ?? indexEntries - standardized;
-const notInIndex = compliant - indexEntries;
-const totalGap = compliant - standardized;
-const updated = S.generated_at.slice(0, 10);
 const fmt = (n: number) => n.toLocaleString("en-US");
 
 /** Exported so the "Ask anything" corpus (src/faq/faq-corpus.ts) renders the served copy. */
-export function aboutPage(url: string) {
+export function aboutPage(url: string, S: Summary = bundledSummary) {
+	const totalFacilities = S.total_facilities ?? 5426;
+	const cmsRequired = S.cms_required_total;
+	const compliant = S.compliant;
+	const indexEntries = S.standardized_price_index_hospitals ?? 3768;
+	const standardized = S.standardized_price_hospitals ?? 3654;
+	const zeroEntries = S.zero_price_index_entries ?? indexEntries - standardized;
+	const notInIndex = compliant - indexEntries;
+	const totalGap = compliant - standardized;
+	const updated = S.generated_at.slice(0, 10);
 	return (
 		<Layout
 			title="About the numbers — Hospital Ledger"
 			description={`Why the homepage says ${fmt(standardized)} hospitals when CMS required ${fmt(cmsRequired)} and ${fmt(compliant)} have a live MRF. Pipeline, count definitions, and the live gap.`}
 			ogTitle="About the numbers — Hospital Ledger"
 			url={url}
+			summary={S}
 		>
 			<main class="mx-auto max-w-3xl px-4 sm:px-6 py-10 sm:py-14">
 				<p class="text-xs uppercase tracking-widest text-emerald-400">
@@ -276,12 +264,14 @@ curl -s https://hospitalledger.com/data/prices/index.json | jq '[.hospitals[] | 
 export async function aboutNumbersPageHandler(
 	c: Context<Env>,
 ): Promise<Response> {
+	const { summary, source } = await loadSummary(c.env);
 	return c.html(
-		aboutPage("https://hospitalledger.com/about-the-numbers"),
+		aboutPage("https://hospitalledger.com/about-the-numbers", summary),
 		200,
 		{
 			"cache-control": "public, max-age=300",
 			"x-hl-template": "about-the-numbers-ssr",
+			"x-hl-source": source,
 		},
 	);
 }
