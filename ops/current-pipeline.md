@@ -100,6 +100,22 @@ Two mechanisms enforce this:
   regresses below the pre-wave count (this is what stopped the
   stale-base build at 3,818 < 3,823 during the October repair run).
 
+**Update 2026-10-13 (site Worker `ad5c96b9`, PR #8):** the site now
+serves the R2 objects directly on its public routes — home,
+`/about-the-numbers`, `/data/summary.json`, `/data/hospitals.json` and
+`/data/prices/index.json` all read R2 (response headers
+`x-hl-source: r2`, `x-hl-price-index-source: r2`), so a wave publish
+reaches the site within ~5 minutes with no Worker deploy. In
+particular `/data/prices/index.json` now byte-matches the R2
+`prices/index.json` (verified 2026-10-13 against the manifest record:
+1,389,589 bytes / sha256 `007e52651400…` / 3,831 hospitals at
+`generated_at` 2026-10-14T00:56:57Z); the bundled copy described above
+is no longer what that route serves. If an R2 object is missing or
+unparsable the Worker falls back to the bundled copy and the header
+reads `bundled` / `assets` — treat that as a publish problem. The
+discipline above is unchanged: R2 + the manifest remain the canonical
+reference, and `verify_synced_base()` still gates every build.
+
 ## Moving bytes: `scripts/r2_put.py`
 
 All R2 traffic goes through `scripts/r2_put.py`. Its GET path is built
