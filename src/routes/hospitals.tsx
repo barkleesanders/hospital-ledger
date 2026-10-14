@@ -7,14 +7,14 @@
  */
 
 import type { Context } from "hono";
-import { Layout, PageHeader } from "../components/Layout";
-import type { Env } from "../index";
-import type { Bindings } from "../lib/data";
-import { readR2Json } from "../lib/r2";
-import { titleCase } from "../lib/format";
 // Bundled CCN → [city, state] snapshot (see hospital.tsx). R2 gives us the live
 // hospital list; this gives us the geography to group it by.
 import HOSPITAL_GEO from "../../public/data/hospital-geo.json";
+import { Layout, PageHeader } from "../components/Layout";
+import type { Env } from "../index";
+import type { Bindings } from "../lib/data";
+import { titleCase } from "../lib/format";
+import { readR2Json } from "../lib/r2";
 
 type HospitalEntry = { ccn: string; name: string; city: string; state: string };
 
@@ -66,28 +66,71 @@ async function loadEntries(
 }
 
 const stateName: Record<string, string> = {
-	AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
-	CO: "Colorado", CT: "Connecticut", DE: "Delaware", DC: "District of Columbia",
-	FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois",
-	IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana",
-	ME: "Maine", MD: "Maryland", MA: "Massachusetts", MI: "Michigan",
-	MN: "Minnesota", MS: "Mississippi", MO: "Missouri", MT: "Montana",
-	NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey",
-	NM: "New Mexico", NY: "New York", NC: "North Carolina", ND: "North Dakota",
-	OH: "Ohio", OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania",
-	RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota",
-	TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia",
-	WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
-	PR: "Puerto Rico", GU: "Guam", VI: "Virgin Islands",
-	AS: "American Samoa", MP: "Northern Mariana Islands",
+	AL: "Alabama",
+	AK: "Alaska",
+	AZ: "Arizona",
+	AR: "Arkansas",
+	CA: "California",
+	CO: "Colorado",
+	CT: "Connecticut",
+	DE: "Delaware",
+	DC: "District of Columbia",
+	FL: "Florida",
+	GA: "Georgia",
+	HI: "Hawaii",
+	ID: "Idaho",
+	IL: "Illinois",
+	IN: "Indiana",
+	IA: "Iowa",
+	KS: "Kansas",
+	KY: "Kentucky",
+	LA: "Louisiana",
+	ME: "Maine",
+	MD: "Maryland",
+	MA: "Massachusetts",
+	MI: "Michigan",
+	MN: "Minnesota",
+	MS: "Mississippi",
+	MO: "Missouri",
+	MT: "Montana",
+	NE: "Nebraska",
+	NV: "Nevada",
+	NH: "New Hampshire",
+	NJ: "New Jersey",
+	NM: "New Mexico",
+	NY: "New York",
+	NC: "North Carolina",
+	ND: "North Dakota",
+	OH: "Ohio",
+	OK: "Oklahoma",
+	OR: "Oregon",
+	PA: "Pennsylvania",
+	RI: "Rhode Island",
+	SC: "South Carolina",
+	SD: "South Dakota",
+	TN: "Tennessee",
+	TX: "Texas",
+	UT: "Utah",
+	VT: "Vermont",
+	VA: "Virginia",
+	WA: "Washington",
+	WV: "West Virginia",
+	WI: "Wisconsin",
+	WY: "Wyoming",
+	PR: "Puerto Rico",
+	GU: "Guam",
+	VI: "Virgin Islands",
+	AS: "American Samoa",
+	MP: "Northern Mariana Islands",
 };
 
 function byState(entries: HospitalEntry[]): Map<string, HospitalEntry[]> {
 	const m = new Map<string, HospitalEntry[]>();
 	for (const e of entries) {
 		const st = e.state || "UNKNOWN";
-		if (!m.has(st)) m.set(st, []);
-		m.get(st)!.push(e);
+		const list = m.get(st);
+		if (list) list.push(e);
+		else m.set(st, [e]);
 	}
 	for (const list of m.values()) {
 		list.sort((a, b) => a.name.localeCompare(b.name));
@@ -129,8 +172,8 @@ export async function hospitalsIndexHandler(c: Context<Env>) {
 					Hospitals with published prices
 				</h1>
 				<p class="mt-2 text-zinc-400">
-					{total.toLocaleString("en-US")} hospitals · grouped by state · data from
-					each hospital's federally-mandated machine-readable file
+					{total.toLocaleString("en-US")} hospitals · grouped by state · data
+					from each hospital's federally-mandated machine-readable file
 				</p>
 				<div class="mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
 					{states.map((st) => (
@@ -138,7 +181,9 @@ export async function hospitalsIndexHandler(c: Context<Env>) {
 							href={`/hospitals/${st}`}
 							class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 hover:border-emerald-700 hover:bg-zinc-900"
 						>
-							<div class="font-semibold">{st === "UNKNOWN" ? "Unknown state" : (stateName[st] ?? st)}</div>
+							<div class="font-semibold">
+								{st === "UNKNOWN" ? "Unknown state" : (stateName[st] ?? st)}
+							</div>
 							<div class="text-sm text-zinc-400">
 								{(grouped.get(st) ?? []).length.toLocaleString("en-US")}{" "}
 								hospitals
@@ -167,7 +212,9 @@ export async function hospitalsStateHandler(c: Context<Env>) {
 				<main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
 					<h1 class="text-2xl font-semibold">Unknown state</h1>
 					<p class="mt-2 text-zinc-400">
-						<a href="/hospitals" class="underline">Browse all states</a>
+						<a href="/hospitals" class="underline">
+							Browse all states
+						</a>
 					</p>
 				</main>
 			</Layout>,
@@ -204,7 +251,9 @@ export async function hospitalsStateHandler(c: Context<Env>) {
 				<main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
 					<h1 class="text-2xl font-semibold">No hospitals in {label}</h1>
 					<p class="mt-2 text-zinc-400">
-						<a href="/hospitals" class="underline">Browse all states</a>
+						<a href="/hospitals" class="underline">
+							Browse all states
+						</a>
 					</p>
 				</main>
 			</Layout>,
@@ -220,7 +269,9 @@ export async function hospitalsStateHandler(c: Context<Env>) {
 			<PageHeader eyebrow="Directory" />
 			<main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
 				<div class="text-sm text-zinc-400">
-					<a href="/hospitals" class="hover:text-zinc-200">← All states</a>
+					<a href="/hospitals" class="hover:text-zinc-200">
+						← All states
+					</a>
 				</div>
 				<h1 class="mt-2 text-2xl sm:text-3xl md:text-4xl font-semibold">
 					{label} hospitals

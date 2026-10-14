@@ -1,4 +1,10 @@
+import type { Context } from "hono";
 import { Hono } from "hono";
+// Full top-5,000 CPT/HCPCS code list for the sitemap, extracted from the live
+// CPT index at build time (public/data/cpt-codes.json). Codes change rarely;
+// regenerate when the index meaningfully changes.
+import CPT_CODES from "../public/data/cpt-codes.json";
+import HOSPITAL_GEO from "../public/data/hospital-geo.json";
 import summaryJson from "../public/data/summary.json";
 import {
 	loadFaqCorpus,
@@ -11,20 +17,15 @@ import {
 	type FaqRateLimiter,
 	mountInfiniteFaq,
 } from "./faq/faq-route";
-import { readR2Json } from "./lib/r2";
-// Full top-5,000 CPT/HCPCS code list for the sitemap, extracted from the live
-// CPT index at build time (public/data/cpt-codes.json). Codes change rarely;
-// regenerate when the index meaningfully changes.
-import CPT_CODES from "../public/data/cpt-codes.json";
-import HOSPITAL_GEO from "../public/data/hospital-geo.json";
+import { r2Passthrough, readR2Json } from "./lib/r2";
 import { aboutNumbersPageHandler } from "./routes/about-the-numbers";
 import { complianceRankingHandler } from "./routes/api/compliance-ranking";
 import { cptIndexHandler } from "./routes/api/cpt-index";
+import { manifestHandler } from "./routes/api/manifest";
 import { payerHandler } from "./routes/api/payer";
 import { payersIndexHandler } from "./routes/api/payers-index";
 import { pricesHandler } from "./routes/api/prices";
 import { pricesIndexHandler } from "./routes/api/prices-index";
-import { manifestHandler } from "./routes/api/manifest";
 import { procedureHandler } from "./routes/api/procedure";
 import { homePageHandler } from "./routes/home";
 import { hospitalPageHandler } from "./routes/hospital";
@@ -171,6 +172,37 @@ app.get("/api/procedure/:code", procedureHandler);
 // Legacy /api/{hospitals,summary}.json shorthands → /data fallback.
 app.get("/api/hospitals.json", (c) => c.redirect("/data/hospitals.json", 301));
 app.get("/api/summary.json", (c) => c.redirect("/data/summary.json", 301));
+
+// Site data, R2-first. These paths are in wrangler.jsonc assets.run_worker_first,
+// so the request reaches the Worker instead of the static asset bundled at
+// build time. The muse.ai wave publishes meta/summary.json, meta/hospitals.json
+// and prices/index.json to R2; the bundled public/data copies are the fallback
+// (env.ASSETS.fetch reads the static asset directly, never re-entering here).
+async function metaOrAsset(
+	c: Context<Env>,
+	key: string,
+	assetPath: string,
+): Promise<Response> {
+	const r2 = await r2Passthrough(c.env.HL_MRF_PARSED, key, {
+		cacheControl: "public, max-age=300",
+		source: "r2",
+	});
+	if (r2) return r2;
+	const url = new URL(c.req.url);
+	url.pathname = assetPath;
+	url.search = "";
+	const resp = await c.env.ASSETS.fetch(url.toString());
+	const out = new Response(resp.body, resp);
+	out.headers.set("x-hl-source", "bundled");
+	return out;
+}
+app.get("/data/summary.json", (c) =>
+	metaOrAsset(c, "meta/summary.json", "/data/summary.json"),
+);
+app.get("/data/hospitals.json", (c) =>
+	metaOrAsset(c, "meta/hospitals.json", "/data/hospitals.json"),
+);
+app.get("/data/prices/index.json", pricesIndexHandler);
 
 // XML sitemap — top procedures, top payers, top hospitals, plus the home page.
 app.get("/sitemap.xml", async (c) => {

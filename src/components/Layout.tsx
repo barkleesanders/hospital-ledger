@@ -8,32 +8,28 @@
 
 import { raw } from "hono/html";
 import type { FC, PropsWithChildren } from "hono/jsx";
-import summaryJson from "../../public/data/summary.json";
+import { bundledSummary, type Summary } from "../lib/site-data";
+
+const n = (v: number | undefined) => (v ?? 0).toLocaleString("en-US");
 
 /**
- * The same generated summary the home page renders its headline stats from.
- * The Dataset node below derives every figure from this object rather than
- * repeating a literal, so a data refresh cannot leave the schema asserting a
- * number the page no longer shows.
+ * Dataset description, assembled from the same summary the page renders (the
+ * live R2 copy when the handler passes one, else the bundled build-time copy).
+ * Google requires 50–5000 characters and requires the markup to match the
+ * visible page, which is why this is derived rather than written out.
  */
-const DATA = summaryJson;
-
-const n = (v: number) => v.toLocaleString("en-US");
-
-/**
- * Dataset description. Google requires 50–5000 characters and requires the
- * markup to match the visible page, which is why this is assembled from DATA
- * rather than written out.
- */
-const DATASET_DESCRIPTION =
-	`Compliance status for ${n(DATA.total_facilities)} U.S. hospitals under the federal hospital ` +
-	`price transparency rule (45 CFR Part 180), of which ${n(DATA.cms_required_total)} are required ` +
-	`to publish a machine-readable file; ${n(DATA.compliant)} have a verified live file ` +
-	`(${DATA.compliance_pct}%). Each record pairs CMS Hospital General Information with live ` +
-	`verification of the hospital's machine-readable file URL, plus CMS enforcement history ` +
-	`(${n(DATA.enforcement_actions_total)} actions). Includes ${n(DATA.standardized_price_rows)} ` +
-	`standardized price rows across ${n(DATA.standardized_price_hospitals)} hospitals and ` +
-	`${n(DATA.cpt_indexed_rows)} CPT-indexed rows. Public domain, no signup, no tracking.`;
+function datasetDescription(D: Summary): string {
+	return (
+		`Compliance status for ${n(D.total_facilities)} U.S. hospitals under the federal hospital ` +
+		`price transparency rule (45 CFR Part 180), of which ${n(D.cms_required_total)} are required ` +
+		`to publish a machine-readable file; ${n(D.compliant)} have a verified live file ` +
+		`(${D.compliance_pct}%). Each record pairs CMS Hospital General Information with live ` +
+		`verification of the hospital's machine-readable file URL, plus CMS enforcement history ` +
+		`(${n(D.enforcement_actions_total)} actions). Includes ${n(D.standardized_price_rows)} ` +
+		`standardized price rows across ${n(D.standardized_price_hospitals)} hospitals and ` +
+		`${n(D.cpt_indexed_rows)} CPT-indexed rows. Public domain, no signup, no tracking.`
+	);
+}
 
 export type LayoutProps = PropsWithChildren<{
 	title: string;
@@ -62,6 +58,9 @@ export type LayoutProps = PropsWithChildren<{
 	// serializes. The `<` escape is the same JSON-LD hardening the home page
 	// node uses.
 	jsonLd?: unknown;
+	// The counts the page rendered from (R2 meta/summary.json via loadSummary),
+	// so the Dataset node states the same numbers. Defaults to the bundled copy.
+	summary?: Summary;
 }>;
 
 const DEFAULT_OG_IMAGE = "https://hospitalledger.com/og.png";
@@ -78,8 +77,10 @@ export const Layout: FC<LayoutProps> = ({
 	stylesheets,
 	moduleScripts,
 	jsonLd,
+	summary,
 	children,
 }) => {
+	const DATA = summary ?? bundledSummary;
 	const resolvedOgImage = ogImage ?? DEFAULT_OG_IMAGE;
 	const resolvedOgTitle = ogTitle ?? title;
 	return (
@@ -199,7 +200,7 @@ export const Layout: FC<LayoutProps> = ({
 										"@type": "Dataset",
 										"@id": "https://hospitalledger.com/#dataset",
 										name: "U.S. Hospital Price Transparency Compliance Ledger",
-										description: DATASET_DESCRIPTION,
+										description: datasetDescription(DATA),
 										url: "https://hospitalledger.com/",
 										license:
 											"http://creativecommons.org/publicdomain/zero/1.0/",

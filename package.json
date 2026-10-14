@@ -17,6 +17,8 @@
 		"typecheck": "tsc --noEmit && tsc -p tsconfig.island.json && tsc -p tsconfig.test.json",
 		"audit:csp": "python3 scripts/csp_audit.py",
 		"test:faq": "vitest run --config vitest.faq.config.mjs",
+		"test:fetch-proxy": "vitest run --config vitest.fetch-proxy.config.mjs",
+		"test:site-data": "vitest run --config vitest.site-data.config.mjs",
 		"build:faq-island": "node tools/build-faq-island.mjs",
 		"probe:constrained": "node tests/probe-constrained.mjs probe"
 	},
@@ -35,5 +37,13 @@
 		"vite": "^6.0.7",
 		"vitest": "^4.1.11",
 		"wrangler": "^4.124.0"
+	},
+	"overrides": {
+		"miniflare": {
+			"undici": "7.29.1"
+		},
+		"jsdom": {
+			"undici": "^8.10.2"
+		}
 	}
 }

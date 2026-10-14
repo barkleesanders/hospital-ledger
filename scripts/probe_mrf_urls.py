@@ -20,6 +20,9 @@ except ImportError:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--quiet', 'httpx'])
     import httpx
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import hl_edge  # noqa: E402  (HL_FETCH_PROXY set = fetch via hospitalledger.com/api/fetch)
+
 
 async def probe_one(client, sem, ccn, url):
     async with sem:
@@ -42,6 +45,8 @@ async def probe_one(client, sem, ccn, url):
             result['content_length'] = int(cl) if cl and cl.isdigit() else None
             result['final_url'] = str(r.url)[:500]
             result['alive'] = 1 if 200 <= r.status_code < 400 else 0
+        except hl_edge.EdgeConfigError:
+            raise  # a refused proxy must not be recorded as a dead hospital
         except (httpx.TimeoutException, httpx.ConnectError, httpx.RemoteProtocolError) as e:
             result['http_status'] = -1
             result['content_type'] = f"err:{type(e).__name__}"
@@ -54,8 +59,11 @@ async def probe_one(client, sem, ccn, url):
 async def run(rows, concurrency):
     sem = asyncio.Semaphore(concurrency)
     limits = httpx.Limits(max_keepalive_connections=concurrency, max_connections=concurrency * 2)
+    if hl_edge.enabled():
+        print(f"  {hl_edge.preflight()}", file=sys.stderr)
     async with httpx.AsyncClient(headers={'User-Agent': UA, 'Accept': '*/*'},
-                                 limits=limits, verify=False) as client:
+                                 limits=limits, verify=False,
+                                 **hl_edge.httpx_kwargs(async_=True, limits=limits)) as client:
         tasks = [probe_one(client, sem, ccn, url) for ccn, url in rows]
         done = 0
         results = []

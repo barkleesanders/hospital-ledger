@@ -1,9 +1,9 @@
 /**
  * GET /api/prices-index
  *
- * Returns the slim per-hospital price-availability index from R2 with an
- * ASSETS fallback. Picks whichever source has more `hospitals[]` entries
- * (some legacy assets are stale; R2 is canonical when present).
+ * Returns the slim per-hospital price-availability index: R2 when it holds a
+ * usable index (canonical; the muse.ai wave publishes it), else the ASSETS
+ * copy bundled at build time. Also serves /data/prices/index.json.
  *
  * Ports site/functions/api/prices-index.js. Keeps the
  * x-hl-price-index-source / x-hl-price-index-hospitals headers the home
@@ -81,18 +81,15 @@ function indexResponse(c: IndexCandidate): Response {
 
 export async function pricesIndexHandler(c: Context<Env>): Promise<Response> {
 	const env = c.env;
-	const request = c.req.raw;
-	const [r2, assets] = await Promise.all([
-		fromR2(env),
-		fromAssets(env, request),
-	]);
-	const candidates = [r2, assets].filter(
-		(x): x is IndexCandidate => x !== null,
-	);
-	if (!candidates.length)
-		return json({ error: "price index not found" }, { status: 404 });
-	candidates.sort((a, b) => b.count - a.count);
-	const best = candidates[0];
+	// R2 is canonical: the muse.ai wave publishes prices/index.json there and a
+	// wave that legitimately drops hospitals must not be overridden by the stale
+	// copy bundled at build time. The asset is read only when R2 has no usable
+	// index (missing object, unparsable, or zero hospitals).
+	const r2 = await fromR2(env);
+	if (r2 && r2.count > 0) return indexResponse(r2);
+	const assets = await fromAssets(env, c.req.raw);
+	if (assets && assets.count > 0) return indexResponse(assets);
+	const best = r2 ?? assets;
 	if (!best) return json({ error: "price index not found" }, { status: 404 });
 	return indexResponse(best);
 }

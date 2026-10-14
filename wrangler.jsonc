@@ -20,7 +20,15 @@
 	"assets": {
 		"directory": "./public",
 		"binding": "ASSETS",
-		"not_found_handling": "none"
+		"not_found_handling": "none",
+		// R2-first site data (src/index.tsx metaOrAsset / pricesIndexHandler): the
+		// muse.ai wave updates these in R2 without a deploy; the bundled copies under
+		// public/data are the fallback the Worker reads itself.
+		"run_worker_first": [
+			"/data/summary.json",
+			"/data/hospitals.json",
+			"/data/prices/index.json"
+		]
 	},
 	"r2_buckets": [
 		{
