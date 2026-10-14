@@ -94,6 +94,24 @@ def _summary() -> dict:
     return _SUMMARY_CACHE
 
 
+# A full-sized local file can still be stale: the laptop's 2026-09-11 extract
+# has 68,528 rows (past the 10k floor) while the README's 72,951 came from the
+# 2026-09-27 VM run. Trust it only if it is no older than the canonical
+# summary's generated_at minus this window.
+PAYER_RAW_MAX_LAG_DAYS = 7
+
+
+def _payer_raw_is_current() -> bool:
+    import datetime as dt
+
+    try:
+        gen = dt.datetime.fromisoformat(_summary()["generated_at"].replace("Z", "+00:00"))
+    except (KeyError, ValueError, TypeError):
+        return False  # cannot date the canonical data -> cannot vouch for the file
+    mtime = dt.datetime.fromtimestamp(PAYER_RAW.stat().st_mtime, dt.timezone.utc)
+    return mtime >= gen - dt.timedelta(days=PAYER_RAW_MAX_LAG_DAYS)
+
+
 def _payer_stats() -> dict:
     """Payer truth: R2 /data/payer-stats.json, else a FULL local raw file.
 
@@ -106,7 +124,7 @@ def _payer_stats() -> dict:
             return {"rows": int(s["rows"]), "ccns": int(s["ccns"]), "rates": int(s["rates"])}
         except Exception:
             pass  # not published yet / unreachable — try local
-    if PAYER_RAW.exists():
+    if PAYER_RAW.exists() and _payer_raw_is_current():
         rows = 0
         ccns: set[str] = set()
         rates = 0
@@ -123,7 +141,8 @@ def _payer_stats() -> dict:
         if rows >= 10_000:  # full dataset only; stubs/stale extracts skip
             return {"rows": rows, "ccns": len(ccns), "rates": rates}
     raise SkipClaim(
-        "payer truth unavailable (no R2 payer-stats.json, no full local _payer_raw.jsonl)"
+        "payer truth unavailable (no R2 payer-stats.json; local _payer_raw.jsonl "
+        f"missing, partial, or >{PAYER_RAW_MAX_LAG_DAYS}d older than summary generated_at)"
     )
 
 
