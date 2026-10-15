@@ -1,5 +1,5 @@
 {
-  "committed_at": "2026-10-14T10:32:58.348143+00:00",
+  "committed_at": "2026-10-15T10:20:32.430547+00:00",
   "manifest": {
     "artifacts": {
       "meta/hospitals.json": {
@@ -8,43 +8,41 @@
       },
       "meta/summary.json": {
         "bytes": 6487,
-        "sha256": "e496d7f6377cd5b1c53e6a78ef60793392401b96fb8fc48a8013d77039102fa4"
+        "sha256": "ad02fa612d9d8cc641076bb207b3335f0ce4196bdb4b47c14e3cfc9d8f99e31a"
       },
       "prices/index.json": {
-        "bytes": 1391409,
-        "sha256": "086d1f0cd56847ecd98e024bca0aeb5a81dd9f154957849b87a151be26218046"
+        "bytes": 1392465,
+        "sha256": "95f75ee249e19c3f8aa13ed6fa662e787ad7c89a835b18f507342f62ee53fec3"
       }
     },
     "contract_version": "1",
-    "generated_at": "2026-10-14T10:19:43Z",
-    "git_commit": "83ac091de70f11c70f785630fdb1b40a82dcea26",
+    "generated_at": "2026-10-15T10:16:28Z",
+    "git_commit": "1d5c34bbef1ffc035ef8904f8e7d0671b3f279e2",
     "git_repo": "https://github.com/barkleesanders/hospital-ledger",
-    "note": "wave 36 pricing updated_ccns=232024,232029,232031,232035,232033",
+    "note": "wave 37 pricing updated_ccns=264024,320089,323033",
     "producer": "muse.ai nova (wave-loop)",
     "refresh_tier": "counts",
     "summary": {
       "cms_required_total": 4625,
       "compliance_pct": 86.2,
       "compliant": 3986,
-      "standardized_price_hospitals": 3725,
-      "standardized_price_rows": 67785458,
+      "standardized_price_hospitals": 3728,
+      "standardized_price_rows": 67792181,
       "total_facilities": 5426
     },
     "unhashed_counts": {
       "cpt_detail_files": 0,
       "payer_files": 0,
-      "prices_files": 5
+      "prices_files": 3
     }
   },
   "wave": {
-    "generated_at": "2026-10-14T10:19:43Z",
+    "generated_at": "2026-10-15T10:16:28Z",
     "published_ccns": [
-      "232024",
-      "232029",
-      "232031",
-      "232035",
-      "232033"
+      "264024",
+      "320089",
+      "323033"
     ],
-    "wave": 36
+    "wave": 37
   }
 }
