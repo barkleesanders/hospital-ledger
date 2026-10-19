@@ -34,7 +34,7 @@ Handles common variations:
  - XLSX (.xlsx, .xls)
  - ZIP archives (auto-extract + recurse)
 """
-import argparse, sys, os, json, re, csv, io, gzip, zipfile, datetime, subprocess, tempfile, html as html_lib, codecs, itertools
+import argparse, sys, os, json, re, csv, io, gzip, zipfile, datetime, subprocess, tempfile, html as html_lib, codecs, itertools, hashlib, difflib
 from urllib.parse import urlparse, urljoin
 from pathlib import Path
 
@@ -74,6 +74,13 @@ except ImportError:
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PARSED_DIR = os.path.join(ROOT, 'data', 'parsed')
 RAW_DIR = os.path.join(ROOT, 'data', 'raw')
+# Auto-learn registry: header-fingerprint -> resolved column mapping.
+# Grows with every wave; lets the parser recognize header layouts it has
+# handled before without re-deriving them (learned 2026-10-18).
+HEADER_ALIASES_PATH = os.path.join(ROOT, 'data', 'header_aliases.json')
+MAX_HEADER_ALIASES = 2000
+# Evidence trail for the most recent column-resolution (read by ingest_one).
+COLUMN_MAP_NOTES = []
 os.makedirs(PARSED_DIR, exist_ok=True)
 os.makedirs(RAW_DIR, exist_ok=True)
 
@@ -345,10 +352,181 @@ def first_gross_col(cols):
     exact = next((i for i, c in enumerate(cols) if kw_match(c, ['gross', 'charge_master', 'cdm_price', 'list_price', 'price', 'amount'])), None)
     if exact is not None:
         return exact
+    # Bare "Charge" column = gross charge (learned 2026-10-18 from Red River
+    # 354005: headers "Service Code,Service Descrption,Charge"). Whole-name
+    # match only — avoids misfiring on wide-format payer columns like
+    # "Aetna Charge".
+    bare = next((
+        i for i, c in enumerate(cols)
+        if norm_col_name(c) in ('charge', 'charges', 'total_charge', 'total_charges')
+        and not kw_match(c, CASH_COL_HINTS + MIN_COL_HINTS + MAX_COL_HINTS + NEGOTIATED_DOLLAR_HINTS + RATE_EXCLUDE_HINTS)
+    ), None)
+    if bare is not None:
+        return bare
     return next((
         i for i, c in enumerate(cols)
         if kw_match(c, ['standard_charge', 'standard charge']) and not kw_match(c, CASH_COL_HINTS + MIN_COL_HINTS + MAX_COL_HINTS + NEGOTIATED_DOLLAR_HINTS)
     ), None)
+
+
+def norm_col_name(c):
+    """Canonical header form for comparison: lowercase, underscore-joined."""
+    return str(c or '').strip().lower().replace(' ', '_').replace('-', '_')
+
+
+def first_col_excluding(cols, hints, exclude=()):
+    """First hint-matching column, skipping already-claimed indices.
+
+    A column must not serve two canonical roles (learned 2026-10-18: the
+    'service' desc hint matched 'Service Code' before 'Service Descrption'
+    was considered, so every description came out as the code value and all
+    47 rows were later dropped as unpriced)."""
+    excl = {e for e in exclude if e is not None}
+    return next((i for i, c in enumerate(cols) if i not in excl and kw_match(c, hints)), None)
+
+
+def header_fingerprint(cols):
+    """Stable id for an exact header layout (order-sensitive)."""
+    return hashlib.sha256('|'.join(norm_col_name(c) for c in cols).encode()).hexdigest()[:16]
+
+
+def load_header_aliases():
+    try:
+        with open(HEADER_ALIASES_PATH) as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_header_alias(fp, mapping, evidence):
+    """Persist a resolved header layout. Bounded; evicts oldest on overflow."""
+    aliases = load_header_aliases()
+    if fp in aliases:
+        return
+    aliases[fp] = {
+        'mapping': {k: v for k, v in mapping.items()},
+        'learned_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds') + 'Z',
+        **evidence,
+    }
+    while len(aliases) > MAX_HEADER_ALIASES:
+        oldest = min(aliases, key=lambda k: aliases[k].get('learned_at', ''))
+        del aliases[oldest]
+    tmp = HEADER_ALIASES_PATH + '.tmp'
+    with open(tmp, 'w') as f:
+        json.dump(aliases, f, indent=1)
+    os.replace(tmp, HEADER_ALIASES_PATH)
+
+
+def adaptive_column_recovery(cols, sample_rows, missing, claimed):
+    """Conservative last-resort mapping for unrecognized header variants.
+
+    Only attempts 'desc' and 'gross'. Never invents data: returns {} when
+    nothing matches confidently. Every successful recovery is persisted via
+    save_header_alias by the caller, so the next wave hits the alias directly.
+    """
+    recovered = {}
+    normed = [norm_col_name(c) for c in cols]
+
+    def token_close(header_norm, hint_tokens, cutoff=0.82):
+        toks = [t for t in header_norm.split('_') if t]
+        best = 0.0
+        for t in toks:
+            for h in hint_tokens:
+                r = difflib.SequenceMatcher(None, t, h).ratio()
+                if r > best:
+                    best = r
+        return best >= cutoff
+
+    def looks_like_money(i):
+        vals = [r[i] for r in sample_rows[:200] if i < len(r) and str(r[i]).strip()]
+        if not vals:
+            return False
+        return sum(1 for v in vals if to_float(v) is not None) / len(vals) >= 0.7
+
+    if 'desc' in missing:
+        for i, n in enumerate(normed):
+            if i in claimed:
+                continue
+            if token_close(n, {'description', 'desc', 'descr', 'service', 'procedure', 'item', 'name'}):
+                recovered['desc'] = i
+                claimed.add(i)
+                break
+    if 'gross' in missing:
+        for i, n in enumerate(normed):
+            if i in claimed:
+                continue
+            if token_close(n, {'gross', 'charge', 'charges', 'price', 'prices', 'amount', 'rate'}) and looks_like_money(i):
+                recovered['gross'] = i
+                claimed.add(i)
+                break
+        if 'gross' not in recovered:
+            # Last resort: exactly one unclaimed mostly-numeric column.
+            cands = [i for i in range(len(cols))
+                     if i not in claimed and looks_like_money(i)
+                     and sum(1 for r in sample_rows[:200] if i < len(r) and str(r[i]).strip()) > 0]
+            # require >=80% numeric for the fallback (stricter than the 70% probe)
+            def _numeric_frac(i):
+                vals = [r[i] for r in sample_rows[:200] if i < len(r) and str(r[i]).strip()]
+                if not vals:
+                    return 0.0
+                return sum(1 for v in vals if to_float(v) is not None) / len(vals)
+            strict = [i for i in cands if _numeric_frac(i) >= 0.8]
+            if len(strict) == 1:
+                recovered['gross'] = strict[0]
+    return recovered
+
+
+def resolve_csv_columns(cols, sample_rows):
+    """Map CSV headers to canonical fields, with alias learning + recovery.
+
+    Order: (1) alias hit for this exact header layout; (2) strict hint
+    mapping; (3) adaptive recovery for fields strict mapping missed.
+    Successful resolutions are persisted to header_aliases.json so the next
+    wave recognizes the layout immediately. Returns (mapping, notes).
+    """
+    global COLUMN_MAP_NOTES
+    notes = []
+    fp = header_fingerprint(cols)
+    aliases = load_header_aliases()
+    if fp in aliases:
+        notes.append('header-alias hit %s' % fp)
+        COLUMN_MAP_NOTES = notes
+        return dict(aliases[fp]['mapping']), notes
+    code_col = first_code_col(cols)
+    mapping = {
+        'code': code_col,
+        'code_type': first_col(cols, CODE_TYPE_HINTS),
+        'desc': first_col_excluding(cols, DESC_COL_HINTS, exclude=(code_col,)),
+        'gross': first_gross_col(cols),
+        'cash': first_col(cols, CASH_COL_HINTS),
+        'min': first_col(cols, MIN_COL_HINTS),
+        'max': first_col(cols, MAX_COL_HINTS),
+        'setting': first_col(cols, SETTING_HINTS),
+        'billing': first_col(cols, BILLING_HINTS),
+        'payer': first_col(cols, PAYER_HINTS),
+        'plan': first_col(cols, PLAN_HINTS),
+    }
+    missing = [f for f in ('desc', 'gross') if mapping[f] is None]
+    if missing:
+        claimed = {v for v in mapping.values() if v is not None}
+        rec = adaptive_column_recovery(cols, sample_rows, missing, claimed)
+        for f, idx in rec.items():
+            mapping[f] = idx
+            notes.append('adaptive-recovery:%s=%r' % (f, cols[idx]))
+    save_header_alias(fp, mapping, {'note': '; '.join(notes) if notes else 'strict'})
+    # Drift diagnosis: strict + adaptive both failed to find the price
+    # columns. Never invent data — but record the new header shape so the
+    # wave log shows exactly what drifted instead of a silent 0-item
+    # quarantine. (learned 2026-10-18: header drift should be visible.)
+    if mapping['desc'] is None and mapping['gross'] is None:
+        print('HEADER-DRIFT fp=%s headers=%s strict=%s notes=%s'
+              % (fp, [str(c)[:60] for c in cols],
+                 {k: (None if v is None else cols[v]) for k, v in mapping.items()},
+                 notes),
+              file=sys.stderr, flush=True)
+    COLUMN_MAP_NOTES = notes
+    return mapping, notes
 
 
 def is_excluded_rate_col(col):
@@ -536,17 +714,18 @@ def parse_csv_tall(content_bytes, max_rows=200_000):
         return []
     header = data_rows[0]
     cols = [h.strip() for h in header]
-    code_col = first_code_col(cols)
-    code_type_col = first_col(cols, CODE_TYPE_HINTS)
-    desc_col = first_col(cols, DESC_COL_HINTS)
-    gross_col = first_gross_col(cols)
-    cash_col = first_col(cols, CASH_COL_HINTS)
-    min_col = first_col(cols, MIN_COL_HINTS)
-    max_col = first_col(cols, MAX_COL_HINTS)
-    setting_col = first_col(cols, SETTING_HINTS)
-    billing_col = first_col(cols, BILLING_HINTS)
-    payer_col = first_col(cols, PAYER_HINTS)
-    plan_col = first_col(cols, PLAN_HINTS)
+    mapping, _col_notes = resolve_csv_columns(cols, data_rows[1:201])
+    code_col = mapping['code']
+    code_type_col = mapping['code_type']
+    desc_col = mapping['desc']
+    gross_col = mapping['gross']
+    cash_col = mapping['cash']
+    min_col = mapping['min']
+    max_col = mapping['max']
+    setting_col = mapping['setting']
+    billing_col = mapping['billing']
+    payer_col = mapping['payer']
+    plan_col = mapping['plan']
     rate_col = next((i for i, c in enumerate(cols) if is_negotiated_dollar_col(c)), None)
     items = {}
     row_count = 0
@@ -594,15 +773,16 @@ def parse_csv_wide(content_bytes, max_rows=200_000):
         return []
     header = data_rows[0]
     cols = [h.strip() for h in header]
-    code_col = first_code_col(cols)
-    code_type_col = first_col(cols, CODE_TYPE_HINTS)
-    desc_col = first_col(cols, DESC_COL_HINTS)
-    gross_col = first_gross_col(cols)
-    cash_col = first_col(cols, CASH_COL_HINTS)
-    min_col = first_col(cols, MIN_COL_HINTS)
-    max_col = first_col(cols, MAX_COL_HINTS)
-    setting_col = first_col(cols, SETTING_HINTS)
-    billing_col = first_col(cols, BILLING_HINTS)
+    mapping, _col_notes = resolve_csv_columns(cols, data_rows[1:201])
+    code_col = mapping['code']
+    code_type_col = mapping['code_type']
+    desc_col = mapping['desc']
+    gross_col = mapping['gross']
+    cash_col = mapping['cash']
+    min_col = mapping['min']
+    max_col = mapping['max']
+    setting_col = mapping['setting']
+    billing_col = mapping['billing']
     canonical_indices = {
         x for x in (
             code_col, desc_col, gross_col, cash_col, min_col, max_col,
@@ -2065,6 +2245,7 @@ def ingest_one(ccn, name, url, save_raw=False):
         'ccn': ccn, 'hospital_name': name, 'source_url': resolved_url,
         'fetched_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds') + 'Z',
         'format_detected': fmt, 'row_count': len(items),
+        'column_notes': list(COLUMN_MAP_NOTES),
         'items': items,
     }
     with open(out_path, 'w') as f:
