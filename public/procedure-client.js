@@ -39,21 +39,18 @@
 		const sortSelect = $("sort-by");
 
 		if (stateSelect) {
-			stateSelect.value = appliedFilters.state;
 			stateSelect.addEventListener("change", () => {
 				stagedFilters.state = stateSelect.value;
 			});
 		}
 
 		if (payerSelect) {
-			payerSelect.value = appliedFilters.payer;
 			payerSelect.addEventListener("change", () => {
 				stagedFilters.payer = payerSelect.value;
 			});
 		}
 
 		if (sortSelect) {
-			sortSelect.value = appliedFilters.sort;
 			sortSelect.addEventListener("change", () => {
 				stagedFilters.sort = sortSelect.value;
 			});
@@ -73,9 +70,24 @@
 				});
 			}
 		});
+		renderAppliedFilters();
+		window.addEventListener("popstate", () => {
+			readUrlParams();
+			renderAppliedFilters();
+		});
 	}
 
 	function parseHospitalData() {
+		// The SSR page renders both layouts. Match each table row to its card,
+		// retaining duplicate CCNs in the same order rather than dropping cards.
+		const mobileCards = new Map();
+		for (const card of document.querySelectorAll(
+			'#results-mobile a[href^="/hospital/"]',
+		)) {
+			const ccn = card.getAttribute("href").split("/").pop();
+			if (!mobileCards.has(ccn)) mobileCards.set(ccn, []);
+			mobileCards.get(ccn).push(card);
+		}
 		// Parse hospital data from SSR table rows
 		const tbody = $("results");
 		if (tbody) {
@@ -123,6 +135,7 @@
 						payers,
 						quality,
 						element: row,
+						mobileElement: mobileCards.get(ccn)?.shift(),
 					});
 				}
 			});
@@ -177,6 +190,14 @@
 
 		// Copy to staged
 		stagedFilters = { ...appliedFilters };
+		for (const [id, value] of [
+			["filter-state", appliedFilters.state],
+			["filter-payer", appliedFilters.payer],
+			["sort-by", appliedFilters.sort],
+		]) {
+			const control = $(id);
+			if (control) control.value = value;
+		}
 	}
 
 	function addUpdateButton() {
@@ -184,15 +205,15 @@
 		if (!filterSection) return;
 
 		const btnContainer = document.createElement("div");
-		btnContainer.className = "mt-3 flex items-center gap-3";
+		btnContainer.className = "mt-3 flex flex-wrap items-center gap-3";
 		btnContainer.innerHTML = `
-      <button id="apply-filters-btn" class="rounded-md bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium transition">
+      <button id="apply-filters-btn" class="rounded-md bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300">
         Update search
       </button>
-      <button id="clear-filters-btn" class="rounded-md border border-zinc-700 hover:bg-zinc-800 px-4 py-2 text-sm transition">
+      <button id="clear-filters-btn" class="rounded-md border border-zinc-500 text-zinc-100 hover:bg-zinc-800 px-4 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300">
         Clear filters
       </button>
-      <span id="filter-status" class="text-xs text-zinc-500"></span>
+      <span id="filter-status" class="text-xs text-zinc-400"></span>
     `;
 
 		filterSection.appendChild(btnContainer);
@@ -207,7 +228,10 @@
 
 		// Update URL
 		updateUrl();
+		renderAppliedFilters();
+	}
 
+	function renderAppliedFilters() {
 		// Filter and sort
 		renderFilteredResults();
 
@@ -241,26 +265,25 @@
 		// Update URL
 		updateUrl();
 
-		// Re-render
-		renderFilteredResults();
-
-		const status = $("filter-status");
-		if (status) status.textContent = "";
+		renderAppliedFilters();
 	}
 
 	function updateUrl() {
-		const params = new URLSearchParams();
+		const params = new URLSearchParams(location.search);
+		for (const key of ["state", "payer", "sort"]) params.delete(key);
 		if (appliedFilters.state) params.set("state", appliedFilters.state);
 		if (appliedFilters.payer) params.set("payer", appliedFilters.payer);
 		if (appliedFilters.sort && appliedFilters.sort !== "median-first") {
 			params.set("sort", appliedFilters.sort);
 		}
 
-		const newUrl = params.toString()
+		const path = params.toString()
 			? `${location.pathname}?${params.toString()}`
 			: location.pathname;
-
-		history.replaceState(null, "", newUrl);
+		const newUrl = path + location.hash;
+		if (newUrl !== location.pathname + location.search + location.hash) {
+			history.pushState(null, "", newUrl);
+		}
 	}
 
 	function renderFilteredResults() {
@@ -297,6 +320,7 @@
 			if (h.element) {
 				h.element.style.display = "none";
 			}
+			if (h.mobileElement) h.mobileElement.style.display = "none";
 		});
 
 		// Re-append in sorted order
@@ -314,9 +338,11 @@
 
 		if (mobileCont) {
 			filtered.forEach((h) => {
-				if (h.element && h.element.tagName === "A") {
-					h.element.style.display = "";
-					mobileCont.appendChild(h.element);
+				const card =
+					h.mobileElement ?? (h.element?.tagName === "A" ? h.element : null);
+				if (card) {
+					card.style.display = "";
+					mobileCont.appendChild(card);
 				}
 			});
 		}

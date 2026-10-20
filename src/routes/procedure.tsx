@@ -413,14 +413,14 @@ function procedurePage(data: ProcedureData, url: string) {
 					<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
 						<div>
 							<label
-								class="text-xs uppercase tracking-wider text-zinc-500"
+								class="text-xs uppercase tracking-wider text-zinc-400"
 								for="filter-state"
 							>
 								Filter by state
 							</label>
 							<select
 								id="filter-state"
-								class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+								class="mt-1 w-full rounded-md border border-zinc-500 bg-zinc-950 text-zinc-100 [color-scheme:dark] px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
 							>
 								<option value="">All states</option>
 								{[...states].sort().map((s) => (
@@ -430,14 +430,14 @@ function procedurePage(data: ProcedureData, url: string) {
 						</div>
 						<div>
 							<label
-								class="text-xs uppercase tracking-wider text-zinc-500"
+								class="text-xs uppercase tracking-wider text-zinc-400"
 								for="filter-payer"
 							>
 								Filter by your insurance
 							</label>
 							<select
 								id="filter-payer"
-								class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+								class="mt-1 w-full rounded-md border border-zinc-500 bg-zinc-950 text-zinc-100 [color-scheme:dark] px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
 							>
 								<option value="">All insurers</option>
 								{[...payers.entries()]
@@ -449,14 +449,14 @@ function procedurePage(data: ProcedureData, url: string) {
 						</div>
 						<div>
 							<label
-								class="text-xs uppercase tracking-wider text-zinc-500"
+								class="text-xs uppercase tracking-wider text-zinc-400"
 								for="sort-by"
 							>
 								Sort
 							</label>
 							<select
 								id="sort-by"
-								class="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+								class="mt-1 w-full rounded-md border border-zinc-500 bg-zinc-950 text-zinc-100 [color-scheme:dark] px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
 							>
 								<option value="median-first">
 									Most representative (near median)
