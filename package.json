@@ -12,7 +12,7 @@
 		"refresh": "bash scripts/refresh.sh",
 		"refresh:dry": "bash scripts/refresh.sh --dry-run",
 		"refresh:quick": "bash scripts/refresh.sh --quick",
-		"predeploy": "python3 scripts/predeploy_audit.py && python3 scripts/csp_audit.py && npm run typecheck && npm run test:faq && npm run build:faq-island",
+		"predeploy": "python3 scripts/predeploy_audit.py && python3 scripts/csp_audit.py && npm run typecheck && npm run test:site-data && npm run test:faq && npm run build:faq-island",
 		"deploy": "bash scripts/deploy.sh",
 		"typecheck": "tsc --noEmit && tsc -p tsconfig.island.json && tsc -p tsconfig.test.json",
 		"audit:csp": "python3 scripts/csp_audit.py",
@@ -23,7 +23,7 @@
 		"probe:constrained": "node tests/probe-constrained.mjs probe"
 	},
 	"dependencies": {
-		"hono": "^4.13.3",
+		"hono": "^4.13.13",
 		"zod": "^4.6.5"
 	},
 	"devDependencies": {
@@ -34,7 +34,7 @@
 		"esbuild": "^0.25.12",
 		"jsdom": "^30.0.1",
 		"typescript": "^5.7.2",
-		"vite": "^6.0.7",
+		"vite": "^6.4.4",
 		"vitest": "^4.1.11",
 		"wrangler": "^4.124.0"
 	},

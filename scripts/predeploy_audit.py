@@ -238,7 +238,7 @@ CLAIMS: list[Claim] = [
     Claim(
         "README: Stage 4 coverage line",
         "README.md",
-        r"live \((\d[\d,]*) / 3,986 = ",
+        r"live \((\d[\d,]*) standardized on-site price previews;",
         lambda: f"{_summary()['standardized_price_index_hospitals']:,}",
     ),
     Claim(

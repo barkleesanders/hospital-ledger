@@ -18,7 +18,7 @@ import { readR2Json } from "../lib/r2";
 
 type HospitalEntry = { ccn: string; name: string; city: string; state: string };
 
-const GEO = HOSPITAL_GEO as unknown as Record<string, [string, string]>;
+const GEO: Record<string, string[]> = HOSPITAL_GEO;
 const VALID_STATE = /^[A-Z]{2}$/;
 
 async function loadEntries(

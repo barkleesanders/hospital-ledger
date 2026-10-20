@@ -9,12 +9,43 @@ export type R2Result = {
 	contentType: string;
 };
 
+async function getWithRetry(bucket: R2Bucket, key: string) {
+	for (let attempt = 0; ; attempt++) {
+		try {
+			return await bucket.get(key);
+		} catch (error) {
+			// Observed on a real procedure request: R2 explicitly asks us to retry.
+			// Only the idempotent read is retried; missing objects and other errors
+			// keep their existing semantics. Do not turn storage outages into 404s.
+			if (
+				attempt >= 2 ||
+				!(error instanceof Error) ||
+				error.message !==
+					"get: We encountered an internal error. Please try again. (10001)"
+			) {
+				throw error;
+			}
+			console.warn({
+				event: "r2-read-retry",
+				code: 10001,
+				attempt: attempt + 1,
+			});
+			await new Promise((resolve) =>
+				setTimeout(
+					resolve,
+					100 * 2 ** attempt + Math.floor(Math.random() * 25),
+				),
+			);
+		}
+	}
+}
+
 export async function readR2Text(
 	bucket: R2Bucket | undefined,
 	key: string,
 ): Promise<R2Result | null> {
 	if (!bucket || typeof bucket.get !== "function") return null;
-	const obj = await bucket.get(key);
+	const obj = await getWithRetry(bucket, key);
 	if (!obj) return null;
 	return {
 		text: await obj.text(),
@@ -53,7 +84,7 @@ export async function r2Passthrough(
 	opts: R2PassthroughOptions = {},
 ): Promise<Response | null> {
 	if (!bucket || typeof bucket.get !== "function") return null;
-	const obj = await bucket.get(key);
+	const obj = await getWithRetry(bucket, key);
 	if (!obj) return null;
 	const headers: Record<string, string> = {
 		"content-type":

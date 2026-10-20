@@ -18,7 +18,7 @@ import { fmtMoney } from "../lib/format";
 const VALID_CCN = /^\d{6}$/;
 
 /** "City, ST" for a CCN, or null when the CCN is not in the CMS snapshot. */
-const GEO = HOSPITAL_GEO as unknown as Record<string, [string, string]>;
+const GEO: Record<string, string[]> = HOSPITAL_GEO;
 function geoFor(ccn: string): string | null {
 	const g = GEO[ccn];
 	return g ? `${titleWords(g[0])}, ${g[1]}` : null;

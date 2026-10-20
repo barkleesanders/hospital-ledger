@@ -20,17 +20,17 @@ and queryable via JSON API.
 
 ## What's in the data right now
 
-Numbers below are verified from the deployed site (`public/data/summary.json`,
-`public/data/prices/index.json`, and the R2-backed `/api/cpt-index`) on
-2026-05-19. Re-derive them anytime with the queries in [Verify](#verify).
+The price-preview hospital count and standardized row count below were checked
+against the live R2-backed `/data/summary.json` on 2026-10-20. Other figures retain
+their 2026-05-19 snapshot; re-derive them with the queries in [Verify](#verify).
 
 | Metric | Value | Source |
 |---|---|---|
 | Hospitals in the CMS universe | **5,426** | `hospitals` table |
 | CMS-required hospitals (the denominator for compliance) | **4,625** | `summary.json#cms_required_total` |
 | CMS-required hospitals with a verified live MRF | **3,986 (86.2%)** | `summary.json#compliant` / `#compliance_pct` |
-| Hospitals with a standardized on-site price preview | **3,831** | `public/data/prices/index.json` |
-| Standardized price rows across those hospitals | **67.5 M** | sum of `n` in prices index |
+| Hospitals with a standardized on-site price preview | **3,839** | live `/data/summary.json#standardized_price_index_hospitals` |
+| Standardized price rows across those hospitals | **67.8 M** | live `/data/summary.json` |
 | CPT- / HCPCS-coded rows (patient-comparable) | **14.2 M** | sum of `cpt_indexed` in prices index |
 | Distinct CPT / HCPCS codes in the cross-hospital index | **5,000** | `/api/cpt-index` keys |
 | Payer-negotiated rate cells | **147.1 M** | sum of `n_rates` in `data/_payer_raw.jsonl` |
@@ -53,7 +53,7 @@ under `public/data/`.
 | 1 | Seed CMS hospital universe (5,426 facilities) | done |
 | 2 | Load MRF URL seeds (7,191 from TPAFS) + probe liveness | done (in `mrf_probe`) |
 | 3 | URL rediscovery crawler for dead URLs | done (in `mrf_rediscovered`) |
-| 4 | Fetch + parse alive MRFs (CSV-tall/wide, JSON v2/v3, XLSX) | live (3,831 / 3,986 = 94.5% of required+live hospitals parsed; 163 terminal exceptions) |
+| 4 | Fetch + parse alive MRFs (CSV-tall/wide, JSON v2/v3, XLSX) | live (3,839 standardized on-site price previews; R2 summary checked 2026-10-20) |
 | 5 | Public API + UI (SSR on Cloudflare Workers + R2) | live at hospitalledger.com |
 | 6 | Compliance watchdog + CMS enforcement ingestion | live (`cms_enforcement` + `cms_enforcement_match`) |
 | 7 | Cross-hospital CPT / HCPCS price index | live (5,000 codes, R2-backed `/api/cpt-index`) |
@@ -190,5 +190,5 @@ curl -sS https://hospitalledger.com/api/payers-index | python3 -c \
 - Not affiliated with CMS, HHS, or any commercial transparency vendor.
 
 > Previously this section also said "Not a chargemaster aggregator (yet — Stage
-> 4)." That is now false: Stage 4 is live, and 3,831 hospitals' MRFs have been
+> 4)." That is now false: Stage 4 is live, and 3,839 hospitals' MRFs have been
 > parsed into a unified schema and indexed by CPT / HCPCS.

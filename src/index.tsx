@@ -287,8 +287,7 @@ app.get("/sitemap.xml", async (c) => {
 
 	// States present in the hospital directory (for /hospitals/:state URLs).
 	const states = new Set<string>();
-	const geo = HOSPITAL_GEO as unknown as Record<string, [string, string]>;
-	for (const g of Object.values(geo)) {
+	for (const g of Object.values(HOSPITAL_GEO)) {
 		if (g?.[1]) states.add(g[1]);
 	}
 
