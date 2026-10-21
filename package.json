@@ -20,7 +20,8 @@
 		"test:fetch-proxy": "vitest run --config vitest.fetch-proxy.config.mjs",
 		"test:site-data": "vitest run --config vitest.site-data.config.mjs",
 		"build:faq-island": "node tools/build-faq-island.mjs",
-		"probe:constrained": "node tests/probe-constrained.mjs probe"
+		"probe:constrained": "node tests/probe-constrained.mjs probe",
+		"verify": "bash scripts/verify.sh"
 	},
 	"dependencies": {
 		"hono": "^4.13.13",
@@ -35,7 +36,7 @@
 		"jsdom": "^30.0.1",
 		"typescript": "^5.7.2",
 		"vite": "^6.4.4",
-		"vitest": "^4.1.11",
+		"vitest": "^5.0.5",
 		"wrangler": "^4.124.0"
 	},
 	"overrides": {
@@ -45,5 +46,8 @@
 		"jsdom": {
 			"undici": "^8.10.2"
 		}
+	},
+	"engines": {
+		"node": ">=22.22.0"
 	}
 }

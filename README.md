@@ -172,6 +172,30 @@ curl -sS https://hospitalledger.com/api/payers-index | python3 -c \
   "import json,sys; d=json.load(sys.stdin); print('payers total/featured:', d['total'], len(d['featured']))"
 ```
 
+## Cloud closeout speed tuning
+
+For standardized-price closeout runs, ingestion defaults remain four workers
+and retries three. CPU count alone does not establish parser memory capacity.
+`HL_INGEST_WORKERS`, `HL_RETRY_WORKERS` and `HL_MAX_WORKERS` are explicit operator
+overrides. Full-standardization workers are a total budget divided across shards,
+not a per-shard multiplier. Closeout and full-standardization reject workers above
+the configured ceiling (four by default).
+
+To benchmark the current runner and automatically choose the fastest stable
+worker count before a full pass, run:
+
+```bash
+bash scripts/mem_guard.sh python3 scripts/full_standardize.py --auto-workers --max-workers 4 --tune-sample-size 48 --resume
+```
+
+The tuner performs real ingest work on live-MRF gaps under the memory/disk guard.
+It stops on an unstable step and refuses a recommendation when no sample is stable;
+guard termination is never accepted as a parser failure. Ties prefer fewer workers.
+Results describe the sampled hospitals, whose file sizes and formats can differ;
+they do not establish a universal throughput optimum. Raise the explicit ceiling
+only after measuring capacity, and retain the outer process-tree guard across shards.
+Neither this command nor the tuner is a read-only check. No scheduler is activated.
+
 ## License
 
 - **Code:** AGPLv3 (forces commercial aggregators who fork to publish back).
