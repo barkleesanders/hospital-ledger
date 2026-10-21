@@ -1,0 +1,7 @@
+# Per-hospital priced JSONs are served from R2 (HL_MRF_PARSED/prices/{ccn}.json)
+# via the /api/prices/:ccn route. The Worker assets fallback is intentionally
+# skipped — these files routinely exceed Cloudflare's 25 MiB per-asset limit
+# (current largest: 020006.json at 85 MiB). Keep index.json which is the
+# small registry the homepage + about-the-numbers build into the bundle.
+data/prices/*.json
+!data/prices/index.json

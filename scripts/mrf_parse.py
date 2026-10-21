@@ -34,7 +34,7 @@ Handles common variations:
  - XLSX (.xlsx, .xls)
  - ZIP archives (auto-extract + recurse)
 """
-import argparse, sys, os, json, re, csv, io, gzip, zipfile, datetime, subprocess, tempfile, html as html_lib, codecs, itertools
+import argparse, sys, os, json, re, csv, io, gzip, zipfile, datetime, subprocess, tempfile, html as html_lib, codecs, itertools, hashlib, difflib
 from urllib.parse import urlparse, urljoin
 from pathlib import Path
 
@@ -42,6 +42,9 @@ try:
     import httpx
 except ImportError:
     sys.exit("Install: pip install httpx openpyxl pandas tqdm")
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import hl_edge  # noqa: E402  (HL_FETCH_PROXY set = fetch via hospitalledger.com/api/fetch)
 
 try:
     import ijson
@@ -63,9 +66,21 @@ try:
 except ImportError:
     pl = None
 
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PARSED_DIR = os.path.join(ROOT, 'data', 'parsed')
 RAW_DIR = os.path.join(ROOT, 'data', 'raw')
+# Auto-learn registry: header-fingerprint -> resolved column mapping.
+# Grows with every wave; lets the parser recognize header layouts it has
+# handled before without re-deriving them (learned 2026-10-18).
+HEADER_ALIASES_PATH = os.path.join(ROOT, 'data', 'header_aliases.json')
+MAX_HEADER_ALIASES = 2000
+# Evidence trail for the most recent column-resolution (read by ingest_one).
+COLUMN_MAP_NOTES = []
 os.makedirs(PARSED_DIR, exist_ok=True)
 os.makedirs(RAW_DIR, exist_ok=True)
 
@@ -79,14 +94,14 @@ SIMDJSON_PARSER = simdjson.Parser() if simdjson is not None else None
 CODE_COL_HINTS = [
     'cpt', 'hcpcs', 'code', 'procedure code', 'service_code', 'item_code',
     'cdm', 'drg', 'ms_drg', 'msdrg', 'rev_code', 'ndc', 'internal id',
-    'charge #', 'px code', 'item no', 'erx id',
+    'charge #', 'px code', 'item no', 'erx id', 'service id', 'service_id',
 ]
 DESC_COL_HINTS = [
     'description', 'desc', 'service', 'procedure_name', 'procedure name',
     'item_name', 'item name', 'svc_description', 'service name', 'svc_name',
     'bill description', 'billing description', 'medication',
 ]
-GROSS_COL_HINTS = ['gross', 'standard charge', 'standard_charge', 'list_price', 'charge_master', 'cdm_price', 'price', 'amount']
+GROSS_COL_HINTS = ['gross', 'standard charge', 'standard_charge', 'list_price', 'charge_master', 'cdm_price', 'price', 'amount', 'eff rate', 'rate amt', 'charge amt']
 CASH_COL_HINTS = ['cash', 'self_pay', 'self-pay', 'discounted_cash', 'discount_cash_price']
 MIN_COL_HINTS = ['min_negotiated', 'minimum_negotiated', 'min_charge', 'minimum']
 MAX_COL_HINTS = ['max_negotiated', 'maximum_negotiated', 'max_charge', 'maximum']
@@ -128,6 +143,11 @@ FILE_HINT_RE = re.compile(
 )
 GDRIVE_VIEW_RE = re.compile(r'drive\.google\.com/file/d/([A-Za-z0-9_-]+)', re.IGNORECASE)
 URLDEFENSE_V3_RE = re.compile(r'urldefense\.com/v3/__(.+?)__;', re.IGNORECASE)
+GENERIC_NAME_TOKENS = {
+    'hospital', 'hosp', 'medical', 'center', 'centre', 'health', 'system',
+    'memorial', 'regional', 'community', 'county', 'district', 'saint',
+    'clinic', 'clinics', 'city', 'the', 'and', 'for', 'of', 'llc', 'inc',
+}
 
 
 def kw_match(col, kws):
@@ -194,8 +214,18 @@ def find_header_row(rows, max_scan=30):
 
 def delimited_rows(text):
     delimiter = sniff_delimiter(text)
-    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
-    rows = [row for row in reader]
+    # newline='' lets csv.reader handle \r, \n and \r\n itself. Some legacy
+    # hospital CDM exports use a bare \r as the line separator AND embed stray
+    # \r inside unquoted fields, which trips csv.reader ("new-line character
+    # seen in unquoted field"). On that failure, normalize line endings to \n
+    # and retry — a bare \r is then treated as a plain character.
+    try:
+        reader = csv.reader(io.StringIO(text, newline=''), delimiter=delimiter)
+        rows = [row for row in reader]
+    except csv.Error:
+        normalized = text.replace('\r\n', '\n').replace('\r', '\n')
+        reader = csv.reader(io.StringIO(normalized, newline=''), delimiter=delimiter)
+        rows = [row for row in reader]
     return delimiter, rows
 
 
@@ -297,6 +327,18 @@ def first_col(cols, hints):
 
 
 def first_code_col(cols):
+    priority_hints = [
+        'cpt hcpcs', 'cpt_hcpcs', 'hcpcs cpt', 'hcpcs_cpt',
+        'hcpcs', 'cpt', 'ms_drg', 'msdrg', 'drg', 'rev_code',
+        'revenue code', 'ndc',
+    ]
+    for hint in priority_hints:
+        for i, col in enumerate(cols):
+            lower = str(col).strip().lower()
+            if 'code type' in lower:
+                continue
+            if kw_match(col, [hint]):
+                return i
     for i, col in enumerate(cols):
         lower = str(col).strip().lower()
         if 'code type' in lower:
@@ -310,10 +352,181 @@ def first_gross_col(cols):
     exact = next((i for i, c in enumerate(cols) if kw_match(c, ['gross', 'charge_master', 'cdm_price', 'list_price', 'price', 'amount'])), None)
     if exact is not None:
         return exact
+    # Bare "Charge" column = gross charge (learned 2026-10-18 from Red River
+    # 354005: headers "Service Code,Service Descrption,Charge"). Whole-name
+    # match only — avoids misfiring on wide-format payer columns like
+    # "Aetna Charge".
+    bare = next((
+        i for i, c in enumerate(cols)
+        if norm_col_name(c) in ('charge', 'charges', 'total_charge', 'total_charges')
+        and not kw_match(c, CASH_COL_HINTS + MIN_COL_HINTS + MAX_COL_HINTS + NEGOTIATED_DOLLAR_HINTS + RATE_EXCLUDE_HINTS)
+    ), None)
+    if bare is not None:
+        return bare
     return next((
         i for i, c in enumerate(cols)
         if kw_match(c, ['standard_charge', 'standard charge']) and not kw_match(c, CASH_COL_HINTS + MIN_COL_HINTS + MAX_COL_HINTS + NEGOTIATED_DOLLAR_HINTS)
     ), None)
+
+
+def norm_col_name(c):
+    """Canonical header form for comparison: lowercase, underscore-joined."""
+    return str(c or '').strip().lower().replace(' ', '_').replace('-', '_')
+
+
+def first_col_excluding(cols, hints, exclude=()):
+    """First hint-matching column, skipping already-claimed indices.
+
+    A column must not serve two canonical roles (learned 2026-10-18: the
+    'service' desc hint matched 'Service Code' before 'Service Descrption'
+    was considered, so every description came out as the code value and all
+    47 rows were later dropped as unpriced)."""
+    excl = {e for e in exclude if e is not None}
+    return next((i for i, c in enumerate(cols) if i not in excl and kw_match(c, hints)), None)
+
+
+def header_fingerprint(cols):
+    """Stable id for an exact header layout (order-sensitive)."""
+    return hashlib.sha256('|'.join(norm_col_name(c) for c in cols).encode()).hexdigest()[:16]
+
+
+def load_header_aliases():
+    try:
+        with open(HEADER_ALIASES_PATH) as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_header_alias(fp, mapping, evidence):
+    """Persist a resolved header layout. Bounded; evicts oldest on overflow."""
+    aliases = load_header_aliases()
+    if fp in aliases:
+        return
+    aliases[fp] = {
+        'mapping': {k: v for k, v in mapping.items()},
+        'learned_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds') + 'Z',
+        **evidence,
+    }
+    while len(aliases) > MAX_HEADER_ALIASES:
+        oldest = min(aliases, key=lambda k: aliases[k].get('learned_at', ''))
+        del aliases[oldest]
+    tmp = HEADER_ALIASES_PATH + '.tmp'
+    with open(tmp, 'w') as f:
+        json.dump(aliases, f, indent=1)
+    os.replace(tmp, HEADER_ALIASES_PATH)
+
+
+def adaptive_column_recovery(cols, sample_rows, missing, claimed):
+    """Conservative last-resort mapping for unrecognized header variants.
+
+    Only attempts 'desc' and 'gross'. Never invents data: returns {} when
+    nothing matches confidently. Every successful recovery is persisted via
+    save_header_alias by the caller, so the next wave hits the alias directly.
+    """
+    recovered = {}
+    normed = [norm_col_name(c) for c in cols]
+
+    def token_close(header_norm, hint_tokens, cutoff=0.82):
+        toks = [t for t in header_norm.split('_') if t]
+        best = 0.0
+        for t in toks:
+            for h in hint_tokens:
+                r = difflib.SequenceMatcher(None, t, h).ratio()
+                if r > best:
+                    best = r
+        return best >= cutoff
+
+    def looks_like_money(i):
+        vals = [r[i] for r in sample_rows[:200] if i < len(r) and str(r[i]).strip()]
+        if not vals:
+            return False
+        return sum(1 for v in vals if to_float(v) is not None) / len(vals) >= 0.7
+
+    if 'desc' in missing:
+        for i, n in enumerate(normed):
+            if i in claimed:
+                continue
+            if token_close(n, {'description', 'desc', 'descr', 'service', 'procedure', 'item', 'name'}):
+                recovered['desc'] = i
+                claimed.add(i)
+                break
+    if 'gross' in missing:
+        for i, n in enumerate(normed):
+            if i in claimed:
+                continue
+            if token_close(n, {'gross', 'charge', 'charges', 'price', 'prices', 'amount', 'rate'}) and looks_like_money(i):
+                recovered['gross'] = i
+                claimed.add(i)
+                break
+        if 'gross' not in recovered:
+            # Last resort: exactly one unclaimed mostly-numeric column.
+            cands = [i for i in range(len(cols))
+                     if i not in claimed and looks_like_money(i)
+                     and sum(1 for r in sample_rows[:200] if i < len(r) and str(r[i]).strip()) > 0]
+            # require >=80% numeric for the fallback (stricter than the 70% probe)
+            def _numeric_frac(i):
+                vals = [r[i] for r in sample_rows[:200] if i < len(r) and str(r[i]).strip()]
+                if not vals:
+                    return 0.0
+                return sum(1 for v in vals if to_float(v) is not None) / len(vals)
+            strict = [i for i in cands if _numeric_frac(i) >= 0.8]
+            if len(strict) == 1:
+                recovered['gross'] = strict[0]
+    return recovered
+
+
+def resolve_csv_columns(cols, sample_rows):
+    """Map CSV headers to canonical fields, with alias learning + recovery.
+
+    Order: (1) alias hit for this exact header layout; (2) strict hint
+    mapping; (3) adaptive recovery for fields strict mapping missed.
+    Successful resolutions are persisted to header_aliases.json so the next
+    wave recognizes the layout immediately. Returns (mapping, notes).
+    """
+    global COLUMN_MAP_NOTES
+    notes = []
+    fp = header_fingerprint(cols)
+    aliases = load_header_aliases()
+    if fp in aliases:
+        notes.append('header-alias hit %s' % fp)
+        COLUMN_MAP_NOTES = notes
+        return dict(aliases[fp]['mapping']), notes
+    code_col = first_code_col(cols)
+    mapping = {
+        'code': code_col,
+        'code_type': first_col(cols, CODE_TYPE_HINTS),
+        'desc': first_col_excluding(cols, DESC_COL_HINTS, exclude=(code_col,)),
+        'gross': first_gross_col(cols),
+        'cash': first_col(cols, CASH_COL_HINTS),
+        'min': first_col(cols, MIN_COL_HINTS),
+        'max': first_col(cols, MAX_COL_HINTS),
+        'setting': first_col(cols, SETTING_HINTS),
+        'billing': first_col(cols, BILLING_HINTS),
+        'payer': first_col(cols, PAYER_HINTS),
+        'plan': first_col(cols, PLAN_HINTS),
+    }
+    missing = [f for f in ('desc', 'gross') if mapping[f] is None]
+    if missing:
+        claimed = {v for v in mapping.values() if v is not None}
+        rec = adaptive_column_recovery(cols, sample_rows, missing, claimed)
+        for f, idx in rec.items():
+            mapping[f] = idx
+            notes.append('adaptive-recovery:%s=%r' % (f, cols[idx]))
+    save_header_alias(fp, mapping, {'note': '; '.join(notes) if notes else 'strict'})
+    # Drift diagnosis: strict + adaptive both failed to find the price
+    # columns. Never invent data — but record the new header shape so the
+    # wave log shows exactly what drifted instead of a silent 0-item
+    # quarantine. (learned 2026-10-18: header drift should be visible.)
+    if mapping['desc'] is None and mapping['gross'] is None:
+        print('HEADER-DRIFT fp=%s headers=%s strict=%s notes=%s'
+              % (fp, [str(c)[:60] for c in cols],
+                 {k: (None if v is None else cols[v]) for k, v in mapping.items()},
+                 notes),
+              file=sys.stderr, flush=True)
+    COLUMN_MAP_NOTES = notes
+    return mapping, notes
 
 
 def is_excluded_rate_col(col):
@@ -395,6 +608,11 @@ def canonicalize_code_type(label):
         'ICD-10': 'ICD-10',
         'CDM': 'CDM',
         'CHARGECODE': 'CDM',
+        'PROCEDURECODE': '',
+        'BILLINGCODE': '',
+        'CODE': '',
+        'CPTHCPCS': '',
+        'CPTHCPCSCODE': '',
     }
     return mapping.get(text, text)
 
@@ -496,17 +714,18 @@ def parse_csv_tall(content_bytes, max_rows=200_000):
         return []
     header = data_rows[0]
     cols = [h.strip() for h in header]
-    code_col = first_code_col(cols)
-    code_type_col = first_col(cols, CODE_TYPE_HINTS)
-    desc_col = first_col(cols, DESC_COL_HINTS)
-    gross_col = first_gross_col(cols)
-    cash_col = first_col(cols, CASH_COL_HINTS)
-    min_col = first_col(cols, MIN_COL_HINTS)
-    max_col = first_col(cols, MAX_COL_HINTS)
-    setting_col = first_col(cols, SETTING_HINTS)
-    billing_col = first_col(cols, BILLING_HINTS)
-    payer_col = first_col(cols, PAYER_HINTS)
-    plan_col = first_col(cols, PLAN_HINTS)
+    mapping, _col_notes = resolve_csv_columns(cols, data_rows[1:201])
+    code_col = mapping['code']
+    code_type_col = mapping['code_type']
+    desc_col = mapping['desc']
+    gross_col = mapping['gross']
+    cash_col = mapping['cash']
+    min_col = mapping['min']
+    max_col = mapping['max']
+    setting_col = mapping['setting']
+    billing_col = mapping['billing']
+    payer_col = mapping['payer']
+    plan_col = mapping['plan']
     rate_col = next((i for i, c in enumerate(cols) if is_negotiated_dollar_col(c)), None)
     items = {}
     row_count = 0
@@ -554,15 +773,16 @@ def parse_csv_wide(content_bytes, max_rows=200_000):
         return []
     header = data_rows[0]
     cols = [h.strip() for h in header]
-    code_col = first_code_col(cols)
-    code_type_col = first_col(cols, CODE_TYPE_HINTS)
-    desc_col = first_col(cols, DESC_COL_HINTS)
-    gross_col = first_gross_col(cols)
-    cash_col = first_col(cols, CASH_COL_HINTS)
-    min_col = first_col(cols, MIN_COL_HINTS)
-    max_col = first_col(cols, MAX_COL_HINTS)
-    setting_col = first_col(cols, SETTING_HINTS)
-    billing_col = first_col(cols, BILLING_HINTS)
+    mapping, _col_notes = resolve_csv_columns(cols, data_rows[1:201])
+    code_col = mapping['code']
+    code_type_col = mapping['code_type']
+    desc_col = mapping['desc']
+    gross_col = mapping['gross']
+    cash_col = mapping['cash']
+    min_col = mapping['min']
+    max_col = mapping['max']
+    setting_col = mapping['setting']
+    billing_col = mapping['billing']
     canonical_indices = {
         x for x in (
             code_col, desc_col, gross_col, cash_col, min_col, max_col,
@@ -891,6 +1111,144 @@ def parse_xlsx(content_bytes, max_rows=200_000):
         return []
 
 
+def parse_xls_legacy(content_bytes, max_rows=200_000):
+    """Parse legacy BIFF .xls workbooks when xlrd is available."""
+    if xlrd is None:
+        return []
+    items = []
+    try:
+        wb = xlrd.open_workbook(file_contents=content_bytes)
+        for sheet in wb.sheets():
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            row_cap = min(sheet.nrows, max_rows)
+            for row_idx in range(row_cap):
+                row = []
+                for cell in sheet.row_values(row_idx):
+                    if cell is None:
+                        row.append('')
+                    else:
+                        row.append(str(cell))
+                writer.writerow(row)
+            csv_bytes = buf.getvalue().encode('utf-8')
+            preview = buf.getvalue()[:8192].lower()
+            if 'payer_name' in preview or 'payer ' in preview or 'negotiated_rate' in preview:
+                items.extend(parse_csv_tall(csv_bytes, max_rows=max_rows))
+            else:
+                items.extend(parse_csv_wide(csv_bytes, max_rows=max_rows))
+            if len(items) > max_rows:
+                break
+        items = [item for item in items if item.get('code') or (item.get('gross_charge') is not None)]
+        return items
+    except Exception:
+        return []
+
+
+# SpreadsheetML 2003 ("Excel XML") namespace. Henry Ford and Intermountain ship
+# their MRFs as a SpreadsheetML .xml file (often inside a .zip / .ashx). It is
+# NOT an OOXML .xlsx — openpyxl cannot read it — and the Intermountain file is
+# ~650 MB, so it must be streamed with iterparse rather than loaded as a tree.
+_SSML_NS = '{urn:schemas-microsoft-com:office:spreadsheet}'
+
+
+def looks_like_spreadsheetml(content_bytes):
+    head = content_bytes[:4096]
+    if head.startswith(b'\xef\xbb\xbf'):
+        head = head[3:]
+    head = head.lstrip()
+    if not head.startswith(b'<?xml') and not head.startswith(b'<Workbook'):
+        return False
+    probe = content_bytes[:8192]
+    return (b'urn:schemas-microsoft-com:office:spreadsheet' in probe
+            or b'mso-application' in probe)
+
+
+def parse_spreadsheetml(content_bytes, max_rows=200_000):
+    """Parse a SpreadsheetML 2003 (.xml) workbook by streaming rows.
+
+    Each <Worksheet> is converted to CSV (honoring sparse <Cell ss:Index="N">)
+    and routed through parse_csv_wide / parse_csv_tall, mirroring parse_xlsx.
+    """
+    try:
+        import xml.etree.ElementTree as ET
+    except ImportError:
+        return []
+    cell_tag = _SSML_NS + 'Cell'
+    row_tag = _SSML_NS + 'Row'
+    data_tag = _SSML_NS + 'Data'
+    ws_tag = _SSML_NS + 'Worksheet'
+    index_attr = _SSML_NS + 'Index'
+
+    items = []
+    try:
+        sheets = []  # list of list-of-rows
+        current_rows = None
+        col = 0
+        cur_row = None
+        source = io.BytesIO(content_bytes)
+        for event, elem in ET.iterparse(source, events=('start', 'end')):
+            if event == 'start':
+                if elem.tag == ws_tag:
+                    current_rows = []
+                elif elem.tag == row_tag and current_rows is not None:
+                    cur_row = []
+                    col = 0
+                elif elem.tag == cell_tag and cur_row is not None:
+                    idx = elem.get(index_attr)
+                    if idx:
+                        try:
+                            target = int(idx) - 1
+                            while col < target:
+                                cur_row.append('')
+                                col += 1
+                        except ValueError:
+                            pass
+                continue
+            # end events
+            if elem.tag == data_tag and cur_row is not None:
+                cur_row.append(elem.text or '')
+                col += 1
+            elif elem.tag == cell_tag and cur_row is not None:
+                # a <Cell/> with no <Data> child still occupies a column
+                # (handled: Data appends; empty cell appends nothing here but
+                # the next indexed cell pads). Pad bare empty cells.
+                pass
+            elif elem.tag == row_tag and current_rows is not None and cur_row is not None:
+                current_rows.append(cur_row)
+                cur_row = None
+                if len(current_rows) > max_rows:
+                    elem.clear()
+                    break
+                elem.clear()
+            elif elem.tag == ws_tag and current_rows is not None:
+                if current_rows:
+                    sheets.append(current_rows)
+                current_rows = None
+                elem.clear()
+            else:
+                elem.clear()
+
+        for rows in sheets:
+            if not rows:
+                continue
+            buf = io.StringIO()
+            w = csv.writer(buf)
+            for r in rows[:max_rows]:
+                w.writerow(r)
+            csv_bytes = buf.getvalue().encode('utf-8')
+            preview = buf.getvalue()[:8192].lower()
+            if 'payer_name' in preview or 'payer ' in preview or 'negotiated_rate' in preview:
+                items.extend(parse_csv_tall(csv_bytes, max_rows=max_rows))
+            else:
+                items.extend(parse_csv_wide(csv_bytes, max_rows=max_rows))
+            if len(items) > max_rows:
+                break
+        items = [i for i in items if i.get('code') or (i.get('gross_charge') is not None)]
+        return items
+    except Exception:
+        return []
+
+
 def detect_format(content_bytes, url):
     """Return (format_str, normalized_bytes_or_inner_zip)."""
     # Strip leading whitespace / BOM. Some hospital JSON files are served behind
@@ -901,9 +1259,6 @@ def detect_format(content_bytes, url):
         head = head[3:]
     head = head.lstrip()
     url_lower = normalize_source_url(url).lower()
-    # URL hint takes priority for XLSX (which has ZIP magic but is NOT a zip archive)
-    if '.xlsx' in url_lower or '.xls' in url_lower:
-        return 'xlsx', content_bytes
     # JSON detection
     if head.startswith(b'{') or head.startswith(b'['):
         return 'json', content_bytes
@@ -923,10 +1278,20 @@ def detect_format(content_bytes, url):
     # XLS legacy
     if content_bytes[:4] == b'\xd0\xcf\x11\xe0':
         return 'xls-legacy', content_bytes
+    # SpreadsheetML 2003 (.xml) — must be checked before the HTML heuristic,
+    # since an XML document trips looks_like_html's tag detection.
+    if looks_like_spreadsheetml(content_bytes):
+        return 'spreadsheetml', content_bytes
+    if looks_like_html(content_bytes):
+        return 'html', content_bytes
     # Some hospitals serve CSV/TSV from a .json URL; prefer the content shape
     # over the path suffix when the bytes clearly look tabular.
     if looks_like_delimited_text(content_bytes):
         return 'csv', content_bytes
+    # Fall back to the URL hint only after content sniffing. Some hospitals
+    # serve real CSV bodies from .xlsx/.xls-looking URLs.
+    if '.xlsx' in url_lower or '.xls' in url_lower:
+        return 'xlsx', content_bytes
     # JSON hint by URL
     if '.json' in url_lower:
         return 'json', content_bytes
@@ -934,18 +1299,34 @@ def detect_format(content_bytes, url):
     return 'csv', content_bytes
 
 
-def parse(content_bytes, url):
+def parse(content_bytes, url, hospital_name='', ccn=''):
     fmt, content = detect_format(content_bytes, url)
     if fmt == 'zip':
         try:
             zf = zipfile.ZipFile(io.BytesIO(content))
-            # Pick the largest non-directory member
             members = [m for m in zf.namelist() if not m.endswith('/')]
-            members.sort(key=lambda m: zf.getinfo(m).file_size, reverse=True)
-            for m in members[:3]:
+            scored = []
+            for member in members:
+                try:
+                    file_size = zf.getinfo(member).file_size
+                except KeyError:
+                    continue
+                member_score = score_zip_member(member, file_size, hospital_name=hospital_name, ccn=ccn)
+                if member_score is None:
+                    continue
+                token_hits, score = member_score
+                scored.append((token_hits, score, file_size, member))
+            scored.sort(key=lambda item: (-item[0], -item[1], -item[2], item[3]))
+            if len(members) > 10 and scored and scored[0][0] == 0:
+                return 'zip', []
+            selected = [member for _, _, _, member in scored[:12]] if scored else []
+            if not selected:
+                members.sort(key=lambda m: zf.getinfo(m).file_size, reverse=True)
+                selected = members[:3]
+            for m in selected:
                 inner = zf.read(m)
                 inner_fmt, inner_b = detect_format(inner, m)
-                if inner_fmt in ('csv', 'json', 'xlsx'):
+                if inner_fmt in ('csv', 'json', 'xlsx', 'spreadsheetml', 'xls-legacy'):
                     return inner_fmt, parse_inner(inner_fmt, inner_b)
             return 'zip', []
         except Exception:
@@ -958,6 +1339,10 @@ def parse_inner(fmt, content_bytes):
         return parse_json_v2(content_bytes)
     if fmt == 'xlsx':
         return parse_xlsx(content_bytes)
+    if fmt == 'xls-legacy':
+        return parse_xls_legacy(content_bytes)
+    if fmt == 'spreadsheetml':
+        return parse_spreadsheetml(content_bytes)
     if fmt == 'csv':
         # Decide tall vs wide: tall has "payer" or "negotiated_rate" column, wide doesn't
         try:
@@ -967,6 +1352,8 @@ def parse_inner(fmt, content_bytes):
         except Exception:
             pass
         return parse_csv_wide(content_bytes)
+    if fmt == 'html':
+        return []
     return []
 
 
@@ -979,6 +1366,16 @@ def looks_like_html(raw, content_type=''):
         or head.startswith(b'<html')
         or b'<html' in head[:512]
     )
+
+
+def hospital_hint_tokens(name):
+    tokens = []
+    for raw in str(name or '').lower().replace("'", ' ').replace('-', ' ').split():
+        token = ''.join(ch for ch in raw if ch.isalnum())
+        if len(token) < 4 or token in GENERIC_NAME_TOKENS:
+            continue
+        tokens.append(token)
+    return tokens
 
 
 def score_candidate_url(url):
@@ -995,6 +1392,32 @@ def score_candidate_url(url):
     if '/view' in lower and 'drive.google.com/file/d/' in lower:
         score -= 2
     return score
+
+
+def score_zip_member(member_name, file_size, hospital_name='', ccn=''):
+    lower = normalize_source_url(member_name).lower()
+    filename = lower.rsplit('/', 1)[-1]
+    if filename.endswith(('.pdf', '.xml', '.txt', '.doc', '.docx')):
+        return None
+    if not DIRECT_FILE_RE.search(lower):
+        return None
+    score = 0
+    if FILE_HINT_RE.search(lower):
+        score += 20
+    if filename.endswith(('.csv', '.json', '.xlsx', '.xls')):
+        score += 12
+    if filename.endswith('.zip'):
+        score += 4
+    token_hits = 0
+    for token in hospital_hint_tokens(hospital_name):
+        if token in lower:
+            token_hits += 1
+    score += token_hits * 15
+    if ccn and ccn in lower:
+        score += 20
+    if file_size > 0:
+        score += min(file_size / (1024 * 1024), 40)
+    return (token_hits, score)
 
 
 def extract_hub_candidates(raw, base_url):
@@ -1026,7 +1449,7 @@ def curl_fetch(url, max_bytes):
         body_path = body_file.name
     try:
         proc = subprocess.run(
-            [
+            hl_edge.curl_argv([
                 'curl',
                 '-fsSL',
                 '--max-filesize',
@@ -1036,7 +1459,7 @@ def curl_fetch(url, max_bytes):
                 '-w',
                 '%{url_effective}\n%{content_type}',
                 url,
-            ],
+            ], url),
             text=True,
             capture_output=True,
             check=False,
@@ -1045,7 +1468,7 @@ def curl_fetch(url, max_bytes):
             detail = (proc.stderr or proc.stdout or '').strip()
             raise RuntimeError(f'curl:{proc.returncode}:{detail[:120]}')
         meta = (proc.stdout or '').splitlines()
-        final_url = meta[0].strip() if meta else url
+        final_url = (meta[0].strip() if meta else '') or url
         content_type = meta[1].strip() if len(meta) > 1 else ''
         with open(body_path, 'rb') as f:
             raw = f.read()
@@ -1057,27 +1480,138 @@ def curl_fetch(url, max_bytes):
             pass
 
 
-def fetch(url, max_bytes=500 * 1024 * 1024):
-    """Stream-download MRF, cap at 500MB."""
+# Large JSON MRFs are parsed incrementally with ijson rather than buffered
+# into memory and handed to json.load(). json.load() of a 280MB-1GB document
+# OOMs or gets OOM-killed; the streaming path holds only one entry at a time.
+# Files at or below this size still take the fast in-memory path.
+JSON_STREAM_THRESHOLD = 50 * 1024 * 1024
+# CSV files larger than this are parsed row-by-row over a streamed download
+# instead of being buffered+decoded in memory (the buffered path would OOM on a
+# multi-GB file). CSV_STREAM_HARD_CAP bounds the streamed read so a runaway /
+# mislabelled file cannot hang the ingest indefinitely.
+CSV_STREAM_THRESHOLD = 100 * 1024 * 1024
+CSV_STREAM_HARD_CAP = 2560 * 1024 * 1024  # 2.5 GB
+
+
+def _curl_head_size(url):
+    """Return the Content-Length of a URL via a curl HEAD, or None.
+
+    Used when httpx is WAF-blocked: curl's TLS fingerprint is often allowed
+    where httpx's is not, so a curl HEAD can still reveal the file size and
+    let fetch() decide whether to route to the streaming CSV parser.
+    """
     url = normalize_source_url(url)
     try:
-        with httpx.Client(headers={'User-Agent': UA}, follow_redirects=True, timeout=60.0, verify=False) as client:
+        proc = subprocess.run(
+            hl_edge.curl_argv(['curl', '-fsSLI', '-A', UA, url], url),
+            text=True, capture_output=True, check=False, timeout=60,
+        )
+        if proc.returncode != 0:
+            return None
+        # With -L there may be several header blocks (redirects); the last
+        # Content-Length wins.
+        size = None
+        for line in (proc.stdout or '').splitlines():
+            low = line.lower()
+            if low.startswith(('content-length:', 'x-hl-upstream-content-length:')):
+                try:
+                    size = int(line.split(':', 1)[1].strip())
+                except ValueError:
+                    pass
+        return size
+    except Exception:
+        return None
+
+
+def fetch(url, max_bytes=500 * 1024 * 1024):
+    """Stream-download MRF, cap at 500MB.
+
+    For JSON files larger than JSON_STREAM_THRESHOLD (50MB) the body is NOT
+    buffered — fetch() returns (b'', final_url, content_type, True) so that
+    ingest_one() routes to stream_parse_large_json(), which re-opens the URL
+    and parses it incrementally with ijson. This avoids OOM on 280MB-1GB MRFs.
+    """
+    url = normalize_source_url(url)
+    try:
+        with httpx.Client(headers={'User-Agent': UA}, follow_redirects=True, timeout=60.0, verify=False,
+                          **hl_edge.httpx_kwargs()) as client:
             with client.stream('GET', url) as r:
                 r.raise_for_status()
                 content_type = r.headers.get('content-type', '')
                 content_length = int(r.headers.get('content-length') or 0)
                 final_url = str(r.url)
-                if (
-                    content_length > max_bytes
-                    and ('.json' in final_url.lower() or 'json' in content_type.lower())
-                ):
+                is_json = '.json' in final_url.lower() or 'json' in content_type.lower()
+                ct_lower = content_type.lower()
+                is_csv = (
+                    not is_json
+                    and ('.csv' in final_url.lower()
+                         or 'text/csv' in ct_lower
+                         or 'application/csv' in ct_lower)
+                )
+                # Peek the body's first bytes: some hospital MRFs are served
+                # with a generic content-type (application/octet-stream) from
+                # an extension-less URL, so neither the URL nor the header
+                # reveals that it is JSON. A leading '{' / '[' upgrades the
+                # routing so a large JSON file goes to the streaming parser
+                # instead of being truncated at max_bytes.
+                chunk_iter = r.iter_bytes()
+                first_chunk = b''
+                if not is_json:
+                    for first_chunk in chunk_iter:
+                        if first_chunk.strip():
+                            break
+                    head = first_chunk.lstrip()[:1]
+                    if head in (b'{', b'['):
+                        is_json = True
+                        is_csv = False
+                        # Ensure downstream routing (ingest_one) recognizes
+                        # this as JSON even though the server's content-type
+                        # was generic — append a json marker.
+                        if 'json' not in content_type.lower():
+                            content_type = (content_type + '; x-detected=json').strip('; ')
+                # Route hard-over-cap JSON, or merely-large JSON, to the
+                # streaming parser. ijson is required for the streaming path;
+                # without it, only the >max_bytes case can be skipped (a
+                # too-large file would OOM anyway), and 50-500MB JSON falls
+                # through to the buffered path as before.
+                if is_json and content_length > max_bytes:
+                    return b'', final_url, content_type, True
+                if is_json and ijson is not None and content_length > JSON_STREAM_THRESHOLD:
+                    return b'', final_url, content_type, True
+                # Large CSV: a multi-hundred-MB / multi-GB CSV (e.g. the 1.99 GB
+                # Munson v3 file) cannot be buffered + decoded in memory. Route
+                # it to stream_parse_large_csv(), which re-opens the URL and
+                # parses it row-by-row with csv.reader over a streamed body.
+                if is_csv and content_length > CSV_STREAM_THRESHOLD:
                     return b'', final_url, content_type, True
                 buf = io.BytesIO()
                 total = 0
                 truncated = False
-                for chunk in r.iter_bytes():
+                if first_chunk:
+                    buf.write(first_chunk)
+                    total += len(first_chunk)
+                for chunk in chunk_iter:
                     buf.write(chunk)
                     total += len(chunk)
+                    # No-Content-Length fallback: a JSON body that crosses the
+                    # streaming threshold mid-download is abandoned and routed
+                    # to the streaming parser instead of being json.load()'d.
+                    if (
+                        is_json
+                        and ijson is not None
+                        and content_length <= JSON_STREAM_THRESHOLD
+                        and total > JSON_STREAM_THRESHOLD
+                    ):
+                        return b'', final_url, content_type, True
+                    # No-Content-Length CSV that grows past the streaming
+                    # threshold mid-download: abandon the buffer and route to
+                    # the streaming CSV parser.
+                    if (
+                        is_csv
+                        and content_length <= CSV_STREAM_THRESHOLD
+                        and total > CSV_STREAM_THRESHOLD
+                    ):
+                        return b'', final_url, content_type, True
                     if total > max_bytes:
                         truncated = True
                         break
@@ -1088,7 +1622,17 @@ def fetch(url, max_bytes=500 * 1024 * 1024):
                     except Exception:
                         pass
                 return raw, final_url, content_type, truncated
+    except hl_edge.EdgeConfigError:
+        raise
     except Exception as httpx_error:
+        # httpx WAF-blocked on a CSV (some hospital CDNs 403 httpx's TLS/HTTP2
+        # fingerprint but allow curl). If a curl HEAD shows the file is large,
+        # route to the streaming CSV parser instead of curl_fetch — curl_fetch
+        # buffers the whole body and would reject / OOM a multi-GB file.
+        if '.csv' in url.lower():
+            size = _curl_head_size(url)
+            if size is not None and size > CSV_STREAM_THRESHOLD:
+                return b'', url, 'text/csv', True
         if DIRECT_FILE_RE.search(url) or '.ashx' in url.lower():
             try:
                 return curl_fetch(url, max_bytes)
@@ -1132,12 +1676,61 @@ def sanitize_utf8_chunks(chunks):
         yield tail.encode('utf-8')
 
 
+# Bytes that are legal JSON whitespace OUTSIDE a string token.
+_JSON_WS = frozenset(b' \t\n\r')
+
+
+def sanitize_json_control_chars(chunks):
+    """Escape raw control characters (0x00-0x1F) that appear inside JSON string
+    values. Strict JSON forbids unescaped control chars inside strings, but
+    several hospital MRF exports embed raw TAB/CR/LF (and occasionally NUL) in
+    description fields — strict parsers (and ijson) reject the whole file.
+
+    A single boolean tracks string state across the entire byte stream by
+    toggling on each unescaped double-quote. Control chars seen inside a string
+    are replaced with their \\uXXXX escape; outside a string they are left as-is
+    (structural whitespace). Operates on UTF-8 bytes already normalized by
+    sanitize_utf8_chunks, so multi-byte sequences are intact.
+    """
+    in_string = False
+    escaped = False
+    for chunk in chunks:
+        out = bytearray()
+        for b in chunk:
+            if in_string:
+                if escaped:
+                    out.append(b)
+                    escaped = False
+                    continue
+                if b == 0x5C:  # backslash
+                    out.append(b)
+                    escaped = True
+                    continue
+                if b == 0x22:  # closing quote
+                    out.append(b)
+                    in_string = False
+                    continue
+                if b < 0x20:  # raw control char inside string -> escape
+                    out.extend(b'\\u%04x' % b)
+                    continue
+                out.append(b)
+            else:
+                if b == 0x22:  # opening quote
+                    out.append(b)
+                    in_string = True
+                    continue
+                out.append(b)
+        if out:
+            yield bytes(out)
+
+
 def stream_parse_large_json(url, max_items=200_000):
     """Incrementally parse huge v2/v3 JSON files without loading them fully."""
     if ijson is None:
         return None
     url = normalize_source_url(url)
-    with httpx.Client(headers={'User-Agent': UA}, follow_redirects=True, timeout=120.0, verify=False) as client:
+    with httpx.Client(headers={'User-Agent': UA}, follow_redirects=True, timeout=120.0, verify=False,
+                      **hl_edge.httpx_kwargs()) as client:
         with client.stream('GET', url) as r:
             r.raise_for_status()
             chunks = r.iter_bytes()
@@ -1152,37 +1745,430 @@ def stream_parse_large_json(url, max_items=200_000):
                 preview_size += len(chunk)
             preview = b''.join(preview_parts)
             compact = re.sub(rb'\s+', b'', preview[:256])
+            # Prefix selection for ijson.items():
+            #   '[['               -> nested array of rows               -> item.item
+            #   '[{...},[...'      -> [metadata-obj, [rows]] (AdventHealth) -> item.item
+            #   '[{"Code"...'      -> flat array of row objects           -> item
+            #   '{"standard_..."'  -> CMS HPT v2.0 object                 -> standard_charge_information.item
+            # The AdventHealth v3-style export wraps the row array behind one or
+            # more leading objects: [ {}, [ {row}, {row}, ... ] ]. ijson with the
+            # 'item' prefix would try to materialize that whole nested array as a
+            # single Python object (OOM) and raises UnexpectedSymbol; 'item.item'
+            # descends one level and streams the rows.
+            # NDJSON / object-stream detection: some vendor exports (e.g. the
+            # 'moad-outputs' template) are a stream of flat row objects, one
+            # per line, NOT wrapped in an array and NOT a CMS HPT object. They
+            # begin with '{' but carry no standard_charge_information /
+            # standard_charges / hospital_name key in the first 4 KB. Parsed
+            # with multiple_values=True at the root prefix '', each top-level
+            # object becomes one row.
+            head_keys = preview[:4096].lower()
+            looks_like_hpt_object = (
+                b'standard_charge_information' in head_keys
+                or b'standard_charges' in head_keys
+                or b'hospital_name' in head_keys
+            )
+            # Some vendor wrappers (e.g. Panacea's HHSC export) put the row
+            # array under a non-standard top-level key:
+            #   {"TitleBlock":[...], "MRF":[ {row}, {row}, ... ]}
+            # Detect a known row-array key and stream rows from it. Match
+            # against the whitespace-stripped first 4 KB so pretty-printed
+            # JSON ('"MRF": [') is still recognized.
+            compact_head = re.sub(rb'\s+', b'', preview[:4096]).lower()
+            wrapper_key = None
+            wrapper_map = {
+                b'"mrf":[{': 'MRF', b'"charges":[{': 'charges',
+                b'"items":[{': 'items', b'"data":[{': 'data',
+                b'"rows":[{': 'rows', b'"records":[{': 'records',
+            }
+            for cand, key in wrapper_map.items():
+                if cand in compact_head:
+                    wrapper_key = key
+                    break
+            nested_after_obj = re.match(rb'\[\{.*?\},\[', compact, re.DOTALL) is not None
             if compact.startswith(b'[['):
+                prefix = 'item.item'
+            elif nested_after_obj:
                 prefix = 'item.item'
             elif compact.startswith(b'[{'):
                 prefix = 'item'
+            elif compact.startswith(b'{') and not looks_like_hpt_object and wrapper_key:
+                prefix = f'{wrapper_key}.item'
+            elif compact.startswith(b'{') and not looks_like_hpt_object:
+                prefix = ''
             else:
                 prefix = 'standard_charge_information.item'
 
             combined_chunks = itertools.chain([preview], chunks)
-            stream = IterStream(sanitize_utf8_chunks(combined_chunks))
+            stream = IterStream(
+                sanitize_json_control_chars(sanitize_utf8_chunks(combined_chunks))
+            )
             seen_entries = 0
+            # ijson raises JSONError ("Additional data found") or
+            # IncompleteJSONError once the root value ends but trailing bytes
+            # remain (a stray second object, a duplicated newline, etc). When
+            # that happens AFTER we have already streamed real entries, the
+            # parse is effectively complete — keep what we collected instead of
+            # discarding the whole file.
+            # multiple_values=True lets ijson stream a sequence of concatenated
+            # JSON documents (a handful of hospital MRFs duplicate the whole
+            # file, or append a second per-location document) instead of
+            # raising "trailing garbage" / "Additional data found" after the
+            # first root. For a normal single-document file it is a no-op.
             if prefix == 'standard_charge_information.item':
                 items = []
-                for entry in ijson.items(stream, prefix):
-                    seen_entries += 1
-                    items.extend(expand_json_v2_entry(entry))
-                    if seen_entries >= max_items:
-                        break
+                try:
+                    for entry in ijson.items(stream, prefix, multiple_values=True):
+                        seen_entries += 1
+                        items.extend(expand_json_v2_entry(entry))
+                        if seen_entries >= max_items:
+                            break
+                except (ijson.JSONError, ijson.IncompleteJSONError):
+                    if not seen_entries:
+                        raise
                 if seen_entries:
                     return items, str(r.url), r.headers.get('content-type', '')
                 return None
 
             grouped = {}
-            for entry in ijson.items(stream, prefix):
-                if not isinstance(entry, dict):
-                    continue
-                seen_entries += 1
-                merge_json_list_row(grouped, entry)
-                if seen_entries >= max_items:
-                    break
+            try:
+                for entry in ijson.items(stream, prefix, multiple_values=True):
+                    if not isinstance(entry, dict):
+                        continue
+                    seen_entries += 1
+                    merge_json_list_row(grouped, entry)
+                    if seen_entries >= max_items:
+                        break
+            except (ijson.JSONError, ijson.IncompleteJSONError):
+                if not seen_entries:
+                    raise
             if seen_entries:
                 return list(grouped.values()), str(r.url), r.headers.get('content-type', '')
+    return None
+
+
+def _curl_range_download(url, tmp_path, total_size, slice_bytes=48 * 1024 * 1024):
+    """Download a URL to tmp_path in HTTP Range slices via curl.
+
+    Some hospital WAFs allow short Range requests but 403 a sustained full-file
+    GET. Requires the server to honour `accept-ranges: bytes`. Each slice is
+    appended to tmp_path; a slice failure aborts the whole download.
+    """
+    written = 0
+    with open(tmp_path, 'wb') as fh:
+        start = 0
+        while start < total_size:
+            end = min(start + slice_bytes - 1, total_size - 1)
+            proc = subprocess.run(
+                hl_edge.curl_argv(['curl', '-fsS', '-r', f'{start}-{end}', '-A', UA, '--', url], url),
+                capture_output=True, check=False, timeout=300,
+            )
+            if proc.returncode != 0:
+                detail = (proc.stderr or b'').decode('utf-8', 'replace').strip()
+                raise RuntimeError(f'curl-range:{proc.returncode}:{detail[:120]}')
+            fh.write(proc.stdout)
+            written += len(proc.stdout)
+            start = end + 1
+            if written > CSV_STREAM_HARD_CAP:
+                break
+    return written
+
+
+def _curl_stream_to_tempfile(url):
+    """Download a URL to a temp file with curl (streamed to disk).
+
+    Used when httpx is WAF-blocked (some hospital CDNs 403 httpx's TLS/HTTP2
+    fingerprint but allow curl). If a sustained full GET is also 403'd but the
+    server honours Range requests, falls back to a slice-by-slice download.
+    Returns the temp path and final content-type; caller deletes the file.
+    """
+    url = normalize_source_url(url)
+    with tempfile.NamedTemporaryFile(suffix='.csv', delete=False) as tf:
+        tmp_path = tf.name
+    proc = subprocess.run(
+        hl_edge.curl_argv([
+            'curl', '-fsSL',
+            '--max-filesize', str(CSV_STREAM_HARD_CAP),
+            '-A', UA,
+            '-o', tmp_path,
+            '-w', '%{content_type}',
+            url,
+        ], url),
+        text=True, capture_output=True, check=False,
+    )
+    if proc.returncode == 0:
+        return tmp_path, (proc.stdout or '').strip()
+    # Full GET failed — if the file is range-friendly, slice-download it.
+    detail = (proc.stderr or proc.stdout or '').strip()
+    size = _curl_head_size(url)
+    if size and size > 0:
+        try:
+            _curl_range_download(url, tmp_path, size)
+            return tmp_path, 'text/csv'
+        except Exception:
+            pass
+    try:
+        os.remove(tmp_path)
+    except FileNotFoundError:
+        pass
+    raise RuntimeError(f'curl:{proc.returncode}:{detail[:120]}')
+
+
+def stream_parse_large_csv(url, max_rows=200_000):
+    """Incrementally parse a very large CSV (>100 MB) without buffering it.
+
+    Streams the download, decodes UTF-8 incrementally, and feeds csv.reader a
+    line iterator. The first window of rows is scanned for the real header
+    (CMS HPT v3 CSVs prepend a hospital-metadata header+value pair); remaining
+    rows are processed one at a time. Routes to the tall or wide row builder
+    based on the detected header, mirroring parse_inner's CSV dispatch.
+
+    If httpx is WAF-blocked (HTTP 403/406/429), falls back to a curl download
+    to a temp file and parses that — curl's TLS fingerprint is often allowed
+    where httpx's is not.
+
+    Returns (items, final_url, content_type) or None.
+    """
+    url = normalize_source_url(url)
+    httpx_client = None
+    httpx_response = None
+    httpx_ctx = None
+    tmp_path = None
+    final_url = url
+    content_type = ''
+    try:
+        try:
+            httpx_client = httpx.Client(
+                headers={'User-Agent': UA}, follow_redirects=True,
+                timeout=120.0, verify=False, **hl_edge.httpx_kwargs())
+            httpx_ctx = httpx_client.stream('GET', url)
+            httpx_response = httpx_ctx.__enter__()
+            httpx_response.raise_for_status()
+            final_url = str(httpx_response.url)
+            content_type = httpx_response.headers.get('content-type', '')
+        except httpx.HTTPStatusError as e:
+            # WAF block on the httpx fingerprint — retry the download via curl.
+            if httpx_ctx is not None:
+                httpx_ctx.__exit__(None, None, None)
+                httpx_ctx = None
+            if httpx_client is not None:
+                httpx_client.close()
+                httpx_client = None
+            status = e.response.status_code if e.response is not None else 0
+            if status not in (401, 403, 406, 429):
+                raise
+            tmp_path, content_type = _curl_stream_to_tempfile(url)
+
+        # csv.reader must be fed lines with their newline endings INTACT, so it
+        # can correctly stitch back together quoted fields that span multiple
+        # physical lines (embedded newlines in description text are common).
+        if tmp_path is not None:
+            def line_iter():
+                with open(tmp_path, 'r', encoding='utf-8', errors='replace',
+                          newline='') as fh:
+                    for ln in fh:
+                        yield ln
+        else:
+            def line_iter():
+                decoder = codecs.getincrementaldecoder('utf-8')('replace')
+                pending = ''
+                total = 0
+                for chunk in httpx_response.iter_bytes():
+                    total += len(chunk)
+                    if total > CSV_STREAM_HARD_CAP:
+                        break
+                    pending += decoder.decode(chunk)
+                    # Emit complete lines, KEEPING the newline; hold the final
+                    # partial line in `pending`.
+                    if '\n' in pending:
+                        lines = pending.splitlines(keepends=True)
+                        if lines and not lines[-1].endswith(('\n', '\r')):
+                            pending = lines.pop()
+                        else:
+                            pending = ''
+                        for ln in lines:
+                            yield ln
+                pending += decoder.decode(b'', final=True)
+                if pending:
+                    yield pending
+
+        reader = csv.reader(line_iter())
+        # Buffer a header window to locate the real column header.
+        window = []
+        for row in reader:
+            window.append(row)
+            if len(window) >= 30:
+                break
+        if not window:
+            return None
+        header_idx = find_header_row(window)
+        header = window[header_idx]
+        cols = [h.strip() for h in header]
+        lower_header = ','.join(cols).lower()
+        tall = (
+            'payer_name' in lower_header
+            or 'payer ' in lower_header
+            or 'negotiated_rate' in lower_header
+            or any('payer' in c.lower() for c in cols)
+        )
+        # Rows after the header inside the window, then the live stream.
+        tail_rows = window[header_idx + 1:]
+        data_iter = itertools.chain(tail_rows, reader)
+
+        if tall:
+            code_col = first_code_col(cols)
+            code_type_col = first_col(cols, CODE_TYPE_HINTS)
+            desc_col = first_col(cols, DESC_COL_HINTS)
+            gross_col = first_gross_col(cols)
+            cash_col = first_col(cols, CASH_COL_HINTS)
+            min_col = first_col(cols, MIN_COL_HINTS)
+            max_col = first_col(cols, MAX_COL_HINTS)
+            setting_col = first_col(cols, SETTING_HINTS)
+            billing_col = first_col(cols, BILLING_HINTS)
+            payer_col = first_col(cols, PAYER_HINTS)
+            plan_col = first_col(cols, PLAN_HINTS)
+            rate_col = next(
+                (i for i, c in enumerate(cols) if is_negotiated_dollar_col(c)),
+                None,
+            )
+            items = {}
+            seen = 0
+            for row in data_iter:
+                seen += 1
+                if seen > max_rows or len(items) > max_rows:
+                    break
+                if not row:
+                    continue
+                code = row_get(row, code_col)
+                desc = row_get(row, desc_col)
+                code, code_type = normalize_code_and_type(
+                    code, row_get(row, code_type_col))
+                key = (code, desc)
+                if key not in items:
+                    items[key] = {
+                        'code': code, 'code_type': code_type,
+                        'description': desc[:300],
+                        'setting': row_get(row, setting_col),
+                        'billing_class': row_get(row, billing_col),
+                        'gross_charge': to_float(row_get(row, gross_col)),
+                        'cash_discount': to_float(row_get(row, cash_col)),
+                        'min_negotiated': to_float(row_get(row, min_col)),
+                        'max_negotiated': to_float(row_get(row, max_col)),
+                        'payer_rates': [],
+                    }
+                if payer_col is not None and rate_col is not None:
+                    payer = row_get(row, payer_col)
+                    plan = row_get(row, plan_col)
+                    rate = to_float(row_get(row, rate_col))
+                    if payer and rate is not None and rate > 0:
+                        items[key]['payer_rates'].append({
+                            'payer': payer[:100],
+                            'plan': plan[:100],
+                            'rate_dollar': rate,
+                        })
+            result = list(items.values())
+        else:
+            code_col = first_code_col(cols)
+            code_type_col = first_col(cols, CODE_TYPE_HINTS)
+            desc_col = first_col(cols, DESC_COL_HINTS)
+            gross_col = first_gross_col(cols)
+            cash_col = first_col(cols, CASH_COL_HINTS)
+            min_col = first_col(cols, MIN_COL_HINTS)
+            max_col = first_col(cols, MAX_COL_HINTS)
+            setting_col = first_col(cols, SETTING_HINTS)
+            billing_col = first_col(cols, BILLING_HINTS)
+            canonical = {
+                x for x in (code_col, desc_col, gross_col, cash_col,
+                            min_col, max_col, setting_col, billing_col)
+                if x is not None
+            }
+            payer_cols = [
+                i for i, c in enumerate(cols)
+                if i not in canonical and is_wide_payer_col(c)
+            ]
+            result = []
+            seen = 0
+            for row in data_iter:
+                seen += 1
+                if seen > max_rows:
+                    break
+                if not row or all(not c for c in row):
+                    continue
+                code = row_get(row, code_col)
+                desc = row_get(row, desc_col)
+                code, code_type = normalize_code_and_type(
+                    code, row_get(row, code_type_col))
+                if not code and not desc:
+                    continue
+                item = {
+                    'code': code, 'code_type': code_type,
+                    'description': desc[:300],
+                    'setting': row_get(row, setting_col),
+                    'billing_class': row_get(row, billing_col),
+                    'gross_charge': to_float(row_get(row, gross_col)),
+                    'cash_discount': to_float(row_get(row, cash_col)),
+                    'min_negotiated': to_float(row_get(row, min_col)),
+                    'max_negotiated': to_float(row_get(row, max_col)),
+                    'payer_rates': [],
+                }
+                for pi in payer_cols:
+                    v = to_float(row_get(row, pi))
+                    if v is not None and v > 0:
+                        item['payer_rates'].append(
+                            {'payer': cols[pi][:100], 'rate_dollar': v})
+                if code or item['gross_charge'] is not None or item['payer_rates']:
+                    result.append(item)
+
+        if result:
+            return result, final_url, content_type
+        return None
+    finally:
+        if httpx_ctx is not None:
+            try:
+                httpx_ctx.__exit__(None, None, None)
+            except Exception:
+                pass
+        if httpx_client is not None:
+            try:
+                httpx_client.close()
+            except Exception:
+                pass
+        if tmp_path is not None:
+            try:
+                os.remove(tmp_path)
+            except FileNotFoundError:
+                pass
+
+
+def resolve_html_wrapper(raw, final_url, content_type, hospital_name, ccn, max_depth=2):
+    queue = [(raw, final_url, content_type, 0)]
+    visited = {normalize_source_url(final_url)}
+    while queue:
+        current_raw, current_url, current_type, depth = queue.pop(0)
+        if not looks_like_html(current_raw, current_type):
+            continue
+        for candidate in extract_hub_candidates(current_raw, current_url):
+            normalized = normalize_source_url(candidate)
+            if normalized in visited:
+                continue
+            visited.add(normalized)
+            try:
+                inner_raw, inner_final_url, inner_content_type, _ = fetch(candidate)
+            except Exception:
+                continue
+            try:
+                inner_fmt, inner_items = parse(
+                    inner_raw,
+                    inner_final_url,
+                    hospital_name=hospital_name,
+                    ccn=ccn,
+                )
+            except Exception:
+                continue
+            if inner_items:
+                return inner_raw, inner_final_url, inner_content_type, inner_fmt, inner_items, candidate
+            if depth + 1 < max_depth and looks_like_html(inner_raw, inner_content_type):
+                queue.append((inner_raw, inner_final_url, inner_content_type, depth + 1))
     return None
 
 
@@ -1206,7 +2192,7 @@ def ingest_one(ccn, name, url, save_raw=False):
             items, streamed_final_url, streamed_type = streamed
             record = {
                 'ccn': ccn, 'hospital_name': name, 'source_url': streamed_final_url,
-                'fetched_at': datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds') + 'Z',
+                'fetched_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds') + 'Z',
                 'format_detected': 'json-stream', 'row_count': len(items),
                 'items': items,
             }
@@ -1215,8 +2201,33 @@ def ingest_one(ccn, name, url, save_raw=False):
             return True, len(items), 'json-stream', ''
         if stream_err:
             return False, 0, '', stream_err
+        # streamed is None with no exception: the streaming parser found no
+        # entries under any known prefix. raw is b'' here (the body was never
+        # buffered), so do NOT fall through to parse() — report it instead.
+        return False, 0, 'json-stream', 'stream:no_entries_under_known_prefix'
+
+    if truncated and not raw:
+        # fetch() flagged a large CSV (the only other truncated+empty-body
+        # case): parse it row-by-row over a streamed download.
+        try:
+            streamed = stream_parse_large_csv(final_url)
+        except Exception as e:
+            return False, 0, '', f"stream:{type(e).__name__}:{str(e)[:80]}"
+        if streamed is not None:
+            items, streamed_final_url, _ = streamed
+            record = {
+                'ccn': ccn, 'hospital_name': name, 'source_url': streamed_final_url,
+                'fetched_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds') + 'Z',
+                'format_detected': 'csv-stream', 'row_count': len(items),
+                'items': items,
+            }
+            with open(out_path, 'w') as f:
+                json.dump(record, f, separators=(',', ':'))
+            return True, len(items), 'csv-stream', ''
+        return False, 0, 'csv-stream', 'stream:no_rows_parsed'
+
     try:
-        fmt, items = parse(raw, final_url)
+        fmt, items = parse(raw, final_url, hospital_name=name, ccn=ccn)
     except Exception as e:
         return False, 0, '', f"parse:{type(e).__name__}:{str(e)[:80]}"
     resolved_url = final_url
@@ -1224,30 +2235,17 @@ def ingest_one(ccn, name, url, save_raw=False):
     # Some hospital "MRF URLs" are actually transparency landing pages or
     # Google Drive viewer pages. Follow the best candidate file link once.
     if not items and looks_like_html(raw, content_type):
-        for candidate in extract_hub_candidates(raw, final_url):
-            try:
-                inner_raw, inner_final_url, inner_content_type, _ = fetch(candidate)
-            except Exception:
-                continue
-            try:
-                inner_fmt, inner_items = parse(inner_raw, inner_final_url)
-            except Exception:
-                continue
-            if inner_items:
-                raw = inner_raw
-                final_url = inner_final_url
-                content_type = inner_content_type
-                fmt = inner_fmt
-                items = inner_items
-                resolved_url = candidate
-                break
+        resolved = resolve_html_wrapper(raw, final_url, content_type, name, ccn)
+        if resolved is not None:
+            raw, final_url, content_type, fmt, items, resolved_url = resolved
     if save_raw:
         with open(os.path.join(RAW_DIR, f"{ccn}.bin"), 'wb') as f:
             f.write(raw)
     record = {
         'ccn': ccn, 'hospital_name': name, 'source_url': resolved_url,
-        'fetched_at': datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds') + 'Z',
+        'fetched_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds') + 'Z',
         'format_detected': fmt, 'row_count': len(items),
+        'column_notes': list(COLUMN_MAP_NOTES),
         'items': items,
     }
     with open(out_path, 'w') as f:

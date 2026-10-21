@@ -4,7 +4,7 @@
 Picks BEST live MRF URL per CCN (preferring direct file URLs over hub pages).
 Supports resumable full-corpus runs by skipping already-parsed CCNs.
 """
-import sqlite3, os, sys, time, json, argparse, concurrent.futures, datetime, subprocess, re
+import sqlite3, os, sys, time, json, argparse, concurrent.futures, datetime, subprocess, re, urllib.request, urllib.error
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mrf_parse import ingest_one, normalize_source_url
 
@@ -13,8 +13,11 @@ SCRIPTS_DIR = os.path.join(ROOT, 'scripts')
 DB = os.path.join(ROOT, 'db', 'hospital_ledger.db')
 PARSED_DIR = os.path.join(ROOT, 'data', 'parsed')
 SITE_PRICE_DIR = os.path.join(ROOT, 'site', 'data', 'prices')
+PRICED_INDEX = os.path.join(ROOT, 'public', 'data', 'prices', 'index.json')
+TERMINAL_EXCEPTIONS = os.path.join(ROOT, 'data', 'coverage_terminal_exceptions.json')
 STATUS_FILE = os.path.join(ROOT, 'data', 'full_standardize_status.json')
 FAILURES_FILE = os.path.join(ROOT, 'data', 'full_standardize_failures.jsonl')
+PARSE_ERRORS_DIR = os.path.join(ROOT, 'data', 'parse_errors')
 
 
 DIRECTISH_URL_HINTS = (
@@ -35,6 +38,8 @@ EXPLICIT_FILE_SUFFIXES = ('.csv', '.json', '.xlsx', '.xls', '.zip')
 
 MAX_CANDIDATE_TRIES = 6
 ROW_COUNT_RE = re.compile(rb'"row_count":(\d+)')
+LIVE_PROBE_BYTES = 2048
+LIVE_PROBE_TIMEOUT_SECONDS = 20
 
 GENERIC_NAME_TOKENS = {
     'hospital', 'hosp', 'medical', 'center', 'centre', 'health', 'system',
@@ -128,6 +133,8 @@ def filelike_content_type(content_type):
 def reject_candidate(url, content_type):
     lower_url = normalize_source_url(url).lower()
     lower_type = (content_type or '').lower()
+    if 'cms.gov/hospital-price-transparency' in lower_url:
+        return True
     if '.pdf' in lower_url or 'application/pdf' in lower_type:
         return True
     if '/innetwork/' in lower_url or 'cms_in-network-rates' in lower_url or 'in-network-rates' in lower_url:
@@ -150,6 +157,42 @@ def reject_candidate(url, content_type):
     if 'search.hospitalpriceindex.com/hpi2/machinereadable/' in lower_url and 'text/html' in lower_type:
         return True
     return False
+
+
+def probe_candidate_url(url):
+    request = urllib.request.Request(
+        url,
+        headers={
+            'User-Agent': 'HospitalLedgerBot/0.1 (+https://hospitalledger.com)',
+            'Range': f'bytes=0-{LIVE_PROBE_BYTES - 1}',
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=LIVE_PROBE_TIMEOUT_SECONDS) as response:
+            final_url = response.geturl()
+            content_type = response.headers.get('Content-Type', '')
+            status = getattr(response, 'status', 200) or 200
+            body = response.read(LIVE_PROBE_BYTES)
+    except urllib.error.HTTPError as exc:
+        return False, f'probe_http:{exc.code}'
+    except Exception as exc:
+        return False, f'probe:{type(exc).__name__}'
+
+    if reject_candidate(final_url, content_type):
+        return False, f'probe_reject:{status}:{content_type[:40]}'
+
+    lower_type = (content_type or '').lower()
+    body_prefix = body[:512].lstrip().lower()
+    if 'text/html' in lower_type and not (is_html_wrapper_url(final_url) or is_protected_wrapper_url(final_url)):
+        return False, f'probe_html:{status}:{content_type[:40]}'
+    if (
+        b'<html' in body_prefix
+        or b'<!doctype html' in body_prefix
+        or b'<meta http-equiv="refresh"' in body_prefix
+    ) and not (is_html_wrapper_url(final_url) or is_protected_wrapper_url(final_url)):
+        return False, f'probe_html_body:{status}:{content_type[:40]}'
+
+    return True, f'probe_ok:{status}:{content_type[:40]}'
 
 
 def candidate_priority(candidate):
@@ -336,10 +379,44 @@ def parsed_source_candidate(ccn):
 
 
 def clear_parsed_record(ccn):
+    """Remove both .json and .json.gz so a re-ingest can't be shadowed by a stale .gz."""
+    for path in (parsed_path(ccn), parsed_path(ccn) + '.gz'):
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            continue
+
+
+def write_parse_error_log(ccn, candidate, returncode, stderr, stdout, note=''):
+    """Persist the FULL stderr+stdout of a failed parse subprocess.
+
+    The inline progress UI / failures jsonl only keep an ~80-char summary, which
+    is undiagnosable. This writes everything to data/parse_errors/{ccn}.log so a
+    later pass can read the real traceback. Returns the log path on success, or
+    a short fallback string if the write itself fails (logging must never crash
+    the ingest worker).
+    """
     try:
-        os.remove(parsed_path(ccn))
-    except FileNotFoundError:
-        return
+        os.makedirs(PARSE_ERRORS_DIR, exist_ok=True)
+        log_path = os.path.join(PARSE_ERRORS_DIR, f'{ccn}.log')
+        url = (candidate or {}).get('url') or ''
+        source = (candidate or {}).get('source') or ''
+        ts = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+        with open(log_path, 'w') as f:
+            f.write(f"# parse failure log for CCN {ccn}\n")
+            f.write(f"# timestamp:  {ts}\n")
+            f.write(f"# returncode: {returncode}\n")
+            if note:
+                f.write(f"# note:       {note}\n")
+            f.write(f"# source:     {source}\n")
+            f.write(f"# url:        {url}\n")
+            f.write("\n===== STDERR =====\n")
+            f.write(stderr or '(empty)\n')
+            f.write("\n===== STDOUT =====\n")
+            f.write(stdout or '(empty)\n')
+        return log_path
+    except OSError as exc:
+        return f'(log_write_failed:{exc})'
 
 
 def ingest_candidate_subprocess(ccn, candidate, timeout_seconds):
@@ -369,10 +446,13 @@ def ingest_candidate_subprocess(ccn, candidate, timeout_seconds):
     elapsed = time.time() - t0
     record = load_parsed_record(ccn)
     if proc.returncode != 0:
+        log_path = write_parse_error_log(ccn, candidate, proc.returncode, proc.stderr, proc.stdout)
         detail = (proc.stderr or proc.stdout or '').strip().replace('\n', ' ')
-        return False, 0, '', f"subprocess:{proc.returncode}:{detail[:80] or f'{elapsed:.1f}s'}"
+        summary = detail[:80] or f'{elapsed:.1f}s'
+        return False, 0, '', f"subprocess:{proc.returncode}:{summary} [log:{log_path}]"
     if not record:
-        return False, 0, '', f'no_output:{elapsed:.1f}s'
+        log_path = write_parse_error_log(ccn, candidate, 0, proc.stderr, proc.stdout, note='no_output')
+        return False, 0, '', f'no_output:{elapsed:.1f}s [log:{log_path}]'
 
     items = record.get('items') or []
     row_count = int(record.get('row_count') or len(items) or 0)
@@ -411,6 +491,10 @@ def ingest_ccn(ccn, timeout_seconds=0):
     attempts = []
     max_tries = min(len(candidates), MAX_CANDIDATE_TRIES)
     for index, candidate in enumerate(candidates[:MAX_CANDIDATE_TRIES], start=1):
+        live_ok, probe_detail = probe_candidate_url(candidate['url'])
+        if not live_ok:
+            attempts.append(f"{candidate.get('source') or 'candidate'}:-:{probe_detail}")
+            continue
         if timeout_seconds and timeout_seconds > 0:
             ok, n, fmt, detail = ingest_candidate_subprocess(ccn, candidate, timeout_seconds)
         else:
@@ -431,6 +515,39 @@ def parsed_path(ccn):
 
 def parsed_ok(ccn):
     return parsed_row_count(ccn) > 0
+
+
+def load_done_set():
+    """CCNs that should be skipped on --resume.
+
+    Sources (both survive a `rm -rf data/parsed/`):
+      - public/data/prices/index.json : every successfully-slimmed hospital
+      - data/coverage_terminal_exceptions.json : known-dead, don't re-fetch
+
+    This replaces the old `parsed_ok()` check, which used the existence of
+    data/parsed/{ccn}.json as a resume marker — that file is now a transient
+    gzipped scratch artifact, not the source of truth.
+    """
+    done = set()
+    try:
+        with open(PRICED_INDEX) as f:
+            idx = json.load(f)
+        for h in idx.get('hospitals', []):
+            ccn = h.get('ccn')
+            if ccn:
+                done.add(ccn)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    try:
+        with open(TERMINAL_EXCEPTIONS) as f:
+            exc = json.load(f)
+        for e in exc.get('exceptions', []):
+            ccn = e.get('ccn')
+            if ccn:
+                done.add(ccn)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    return done
 
 
 def load_ccns_file(path):
@@ -483,7 +600,7 @@ def main():
     p.add_argument('--state', help='Process all live-MRF hospitals in a state')
     p.add_argument('--limit', type=int, default=10)
     p.add_argument('--all', action='store_true', help='Ignore --limit and target every live-MRF hospital')
-    p.add_argument('--resume', action='store_true', help='Skip CCNs with an existing non-empty parsed JSON')
+    p.add_argument('--resume', action='store_true', help='Skip CCNs already in public/data/prices/index.json or data/coverage_terminal_exceptions.json')
     p.add_argument('--offset', type=int, default=0, help='Skip the first N eligible CCNs after ordering')
     p.add_argument('--workers', type=int, default=int(os.environ.get('HL_INGEST_WORKERS', '16')), help='Parallel ingestion workers (default: HL_INGEST_WORKERS or 16; mind RAM — each parser holds the whole MRF in memory)')
     p.add_argument('--progress-every', type=int, default=25)
@@ -518,16 +635,18 @@ def main():
 
     eligible = len(ccns)
     if args.resume:
+        done = load_done_set()
         before = len(ccns)
-        ccns = [c for c in ccns if not parsed_ok(c)]
+        ccns = [c for c in ccns if c not in done]
         skipped = before - len(ccns)
+        print(f"resume skip: priced+exceptions={len(done)} → skipped {skipped} of {before} eligible", flush=True)
     else:
         skipped = 0
 
     print(f"ingesting {len(ccns)} hospitals (workers={args.workers}, eligible={eligible}, skipped_existing={skipped})...", flush=True)
     os.makedirs(os.path.dirname(args.status_file), exist_ok=True)
     os.makedirs(os.path.dirname(args.failures_file), exist_ok=True)
-    start_iso = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
+    start_iso = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
     started = time.time()
     last_status_write = started
     done = succ = fail = total_items = 0
@@ -584,7 +703,7 @@ def main():
             if should_write_status:
                 write_status(args.status_file, {
                     'started_at': start_iso,
-                    'updated_at': datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds'),
+                    'updated_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'),
                     'state': args.state or '',
                     'all': args.all,
                     'resume': args.resume,

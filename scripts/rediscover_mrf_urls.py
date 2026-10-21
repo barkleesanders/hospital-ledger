@@ -51,6 +51,12 @@ PATH_KEYWORDS_RE = re.compile(
     r'machine[\-_]?readable|standard[\-_]?charges?|chargemaster|transparency',
     re.IGNORECASE,
 )
+DIRECT_DOWNLOAD_HINTS = (
+    'download',
+    'mrfdownload',
+    'export=download',
+    '.ashx',
+)
 # Sitemap parsing — <loc> only (works for both regular and index sitemaps)
 LOC_RE = re.compile(r'<loc>\s*([^<\s]+)\s*</loc>', re.IGNORECASE)
 SITEMAP_CANDIDATES = (
@@ -102,6 +108,22 @@ def score_candidate(href, anchor_text):
     return score, clean_text[:80]
 
 
+def looks_like_cross_host_download(candidate_url, base_url):
+    candidate = urlparse(candidate_url)
+    base = urlparse(base_url)
+    same_host = candidate.netloc.lower() == base.netloc.lower()
+    if same_host:
+        return True
+    path = candidate.path.lower()
+    filename = path.rsplit('/', 1)[-1]
+    if FILE_EXT_RE.search(path):
+        return True
+    if CMS_NAMING_RE.search(filename):
+        return True
+    lower_url = candidate_url.lower()
+    return any(hint in lower_url for hint in DIRECT_DOWNLOAD_HINTS)
+
+
 def extract_candidates(html, base_url):
     candidates = []
     for m in ANCHOR_RE.finditer(html):
@@ -116,6 +138,8 @@ def extract_candidates(html, base_url):
             continue
         score, text = score_candidate(full, anchor_text)
         if score >= 3:
+            if not looks_like_cross_host_download(full, base_url):
+                continue
             candidates.append({'url': full, 'text': text, 'score': score})
 
     # dedupe by URL, keep highest score

@@ -1,18 +1,15 @@
 {
-  "all": false,
-  "done": 1,
-  "eligible": 1,
-  "eta_seconds": 0,
+  "all": true,
+  "done": 0,
+  "eligible": 3986,
+  "eta_seconds": null,
   "failed": 0,
   "pending": 0,
-  "rate_per_second": 0.121,
-  "recent_failures": [],
-  "resume": false,
-  "skipped_existing": 0,
-  "started_at": "2026-05-11T16:33:03+00:00",
+  "resume": true,
+  "skipped_existing": 3986,
+  "started_at": "2026-06-14T11:00:10+00:00",
   "state": "",
-  "success": 1,
-  "total_items": 21614,
-  "updated_at": "2026-05-11T16:33:11+00:00",
-  "workers": 1
+  "success": 0,
+  "total_items": 0,
+  "workers": 2
 }

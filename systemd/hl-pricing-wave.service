@@ -1,0 +1,17 @@
+[Unit]
+Description=Hospital Ledger daily pricing wave (oneshot, started by cron)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Environment=HOME=/home/hatch
+EnvironmentFile=/home/hatch/hospital-ledger.env
+EnvironmentFile=/home/hatch/hl-proxy.env
+WorkingDirectory=/home/hatch/workspace/goals/hospital-ledger-weekly-refresh-counts-tier/hidden_files
+ExecStart=/home/hatch/hospital-ledger/.venv/bin/python3 /home/hatch/workspace/goals/hospital-ledger-weekly-refresh-counts-tier/hidden_files/hl_wave.py --wave-size 50 --max-reparse 8
+StandardOutput=append:/home/hatch/workspace/goals/hospital-ledger-weekly-refresh-counts-tier/hidden_files/hl-pricing-wave-stdout.log
+StandardError=append:/home/hatch/workspace/goals/hospital-ledger-weekly-refresh-counts-tier/hidden_files/hl-pricing-wave-stderr.log
+# No Restart: the cron owns scheduling. A failed wave is recorded by the
+# cron body polling this unit's result.

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import gzip
 import json
 import os
 import re
@@ -103,10 +104,15 @@ def load_cloudflare_env() -> None:
 
 
 def parsed_row_count(path: Path) -> int:
+    """Return parsed row count. Reads .json or .json.gz transparently."""
     try:
-        with path.open("rb") as handle:
-            head = handle.read(512)
-    except OSError:
+        if path.suffix == ".gz":
+            with gzip.open(path, "rb") as handle:
+                head = handle.read(512)
+        else:
+            with path.open("rb") as handle:
+                head = handle.read(512)
+    except (OSError, gzip.BadGzipFile):
         return 0
     match = ROW_COUNT_RE.search(head)
     return int(match.group(1)) if match else 0
@@ -114,7 +120,10 @@ def parsed_row_count(path: Path) -> int:
 
 def count_good_parsed_files() -> int:
     parsed_dir = DATA_DIR / "parsed"
-    return sum(1 for path in parsed_dir.glob("*.json") if parsed_row_count(path) > 0)
+    return sum(
+        1 for path in list(parsed_dir.glob("*.json")) + list(parsed_dir.glob("*.json.gz"))
+        if parsed_row_count(path) > 0
+    )
 
 
 def count_local_price_index() -> dict[str, int]:
@@ -330,7 +339,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--retry-workers", type=int, default=3)
     parser.add_argument("--retry-item-timeout-seconds", type=int, default=600)
     parser.add_argument("--project-name", default="hospital-ledger")
-    parser.add_argument("--verify-url", default="https://hospital-ledger.pages.dev")
+    parser.add_argument("--verify-url", default="https://hospitalledger.com")
     parser.add_argument("--sample-ccns", nargs="*", default=["050334", "110121", "310064"])
     return parser.parse_args(argv)
 

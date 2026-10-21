@@ -321,7 +321,7 @@ def write_handoff(args: argparse.Namespace) -> None:
                 "do not use CMS validation output for extraction. "
                 "If the runner phase is error, use /carmack to fix the failing script or API call. "
                 "If upload completed and deploy is still pending, use /ship for the hospital-ledger Pages site, "
-                "then verify https://hospital-ledger.pages.dev/data/summary.json and /api/prices-index.",
+                "then verify https://hospitalledger.com/data/summary.json and /api/prices-index.",
                 "```",
                 "",
             ]
