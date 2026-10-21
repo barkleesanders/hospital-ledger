@@ -5,6 +5,7 @@ Picks BEST live MRF URL per CCN (preferring direct file URLs over hub pages).
 Supports resumable full-corpus runs by skipping already-parsed CCNs.
 """
 import sqlite3, os, sys, time, json, argparse, concurrent.futures, datetime, subprocess, re, urllib.request, urllib.error
+import urllib.parse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mrf_parse import ingest_one, normalize_source_url
 
@@ -72,8 +73,14 @@ def has_explicit_file_suffix(url):
 
 
 def is_protected_wrapper_url(url):
-    lower = (url or '').lower()
-    return 'urldefense.com/' in lower
+    try:
+        parsed = urllib.parse.urlsplit(url or '')
+        host = (parsed.hostname or '').lower().rstrip('.')
+    except ValueError:
+        return False
+    return parsed.scheme in ('http', 'https') and (
+        host == 'urldefense.com' or host.endswith('.urldefense.com')
+    )
 
 
 def hospital_specific_tokens(name):

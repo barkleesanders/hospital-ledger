@@ -86,6 +86,7 @@ def _tunnel_socket_inner(host, port=443, timeout=CONNECT_TIMEOUT):
     if not proxy:
         # No proxy configured: direct TLS.
         ctx = ssl.create_default_context()
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         return ctx.wrap_socket(
             socket.create_connection((host, port), timeout=timeout),
             server_hostname=host)
@@ -111,6 +112,7 @@ def _tunnel_socket_inner(host, port=443, timeout=CONNECT_TIMEOUT):
     if " 200" not in status_line.split(" ", 2)[1:2].__str__() and not status_line.startswith("HTTP/1.1 200") and not status_line.startswith("HTTP/1.0 200"):
         raise ConnectionError(f"proxy CONNECT rejected: {status_line}")
     ctx = ssl.create_default_context()
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     return ctx.wrap_socket(sock, server_hostname=host)
 
 
