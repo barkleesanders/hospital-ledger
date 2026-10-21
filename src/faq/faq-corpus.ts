@@ -21,6 +21,7 @@
  * last character missing on 3 of 3 live runs (improvecortland, 2026-09-18). The
  * visitor is already on the record's page, so the document says so instead.
  */
+import { parseDocument } from "htmlparser2";
 import type {
 	Bindings,
 	HospitalData,
@@ -43,27 +44,49 @@ export const SITE_NAME = "Hospital Ledger";
  * Visible text of a server-rendered page: <head>, scripts, styles, the veteran-resource
  * <aside> and the <footer> (src/components/Layout.tsx chrome) are dropped; the home
  * page's hero lives in <header>, so header + main are kept. Block boundaries become
- * newlines, tags are stripped, the entities hono/jsx emits are decoded. Good enough for
- * a prompt; not an HTML parser.
+ * newlines. Parse HTML and decode entities once while producing plain prompt text.
  */
 export function pageText(html: string): string {
-	let s = html.replace(/<head[\s>][\s\S]*?<\/head>/, "");
-	s = s.replace(
-		/<(script|style|aside|footer|select|datalist)[\s>][\s\S]*?<\/\1>/g,
-		"",
-	);
-	s = s.replace(
-		/<\/(p|li|h[1-6]|div|section|summary|details|tr|blockquote|dd|dt|pre|header|main)>/g,
-		"\n",
-	);
-	s = s.replace(/<br\s*\/?>/g, "\n");
-	s = s.replace(/<[^>]+>/g, "");
-	s = s
-		.replace(/&amp;/g, "&")
-		.replace(/&quot;/g, '"')
-		.replace(/&#39;/g, "'")
-		.replace(/&lt;/g, "<")
-		.replace(/&gt;/g, ">");
+	const document = parseDocument(html, { decodeEntities: true });
+	const omitted = new Set([
+		"head",
+		"script",
+		"style",
+		"aside",
+		"footer",
+		"select",
+		"datalist",
+	]);
+	const blocks = new Set([
+		"p",
+		"li",
+		"h1",
+		"h2",
+		"h3",
+		"h4",
+		"h5",
+		"h6",
+		"div",
+		"section",
+		"summary",
+		"details",
+		"tr",
+		"blockquote",
+		"dd",
+		"dt",
+		"pre",
+		"header",
+		"main",
+		"br",
+	]);
+	function visible(node: (typeof document.children)[number]): string {
+		if (node.type === "text") return node.data;
+		if ("name" in node && omitted.has(node.name)) return "";
+		if (!("children" in node)) return "";
+		const text = node.children.map(visible).join("");
+		return "name" in node && blocks.has(node.name) ? `${text}\n` : text;
+	}
+	const s = document.children.map(visible).join("");
 
 	return s
 		.replace(/[ \t]+/g, " ")

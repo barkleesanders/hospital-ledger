@@ -236,6 +236,13 @@ describe("buildSiteCorpus / budget", () => {
 });
 
 describe("pageText", () => {
+	it("uses HTML tag boundaries and decodes each entity exactly once", () => {
+		expect(
+			pageText(
+				"<HEAD><title>hidden</title></HEAD><MAIN><SCRIPT>hidden</SCRIPT\t\n bar><p>Visible &amp;lt;literal&amp;gt; &#x41;</p></MAIN>",
+			),
+		).toBe("Visible &lt;literal&gt; A");
+	});
 	it("keeps header+main, drops head/scripts/styles/aside/footer, decodes entities and normalises whitespace", () => {
 		const html =
 			"<html><head><title>T</title><style>x{}</style></head><body><header><h1>Hi &amp; bye</h1></header><main><script>evil()</script><p>one  two</p><ul><li>x</li></ul><select><option>AL</option></select></main><aside>Veteran resource</aside><footer>f</footer></body></html>";
