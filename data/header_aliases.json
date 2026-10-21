@@ -1,0 +1,19 @@
+{
+ "d3bc7169571d6f63": {
+  "mapping": {
+   "code": 0,
+   "code_type": null,
+   "desc": 1,
+   "gross": 2,
+   "cash": null,
+   "min": null,
+   "max": null,
+   "setting": null,
+   "billing": null,
+   "payer": null,
+   "plan": null
+  },
+  "learned_at": "2026-10-19T01:50:00+00:00Z",
+  "note": "strict"
+ }
+}

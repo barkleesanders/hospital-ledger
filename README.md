@@ -20,22 +20,22 @@ and queryable via JSON API.
 
 ## What's in the data right now
 
-Numbers below are verified from the deployed site (`public/data/summary.json`,
-`public/data/prices/index.json`, and the R2-backed `/api/cpt-index`) on
-2026-05-19. Re-derive them anytime with the queries in [Verify](#verify).
+The price-preview hospital count and standardized row count below were checked
+against the live R2-backed `/data/summary.json` on 2026-10-20. Other figures retain
+their 2026-05-19 snapshot; re-derive them with the queries in [Verify](#verify).
 
 | Metric | Value | Source |
 |---|---|---|
 | Hospitals in the CMS universe | **5,426** | `hospitals` table |
 | CMS-required hospitals (the denominator for compliance) | **4,625** | `summary.json#cms_required_total` |
 | CMS-required hospitals with a verified live MRF | **3,986 (86.2%)** | `summary.json#compliant` / `#compliance_pct` |
-| Hospitals with a standardized on-site price preview | **3,800** | `public/data/prices/index.json` |
-| Standardized price rows across those hospitals | **67.6 M** | sum of `n` in prices index |
-| CPT- / HCPCS-coded rows (patient-comparable) | **14.7 M** | sum of `cpt_indexed` in prices index |
+| Hospitals with a standardized on-site price preview | **3,839** | live `/data/summary.json#standardized_price_index_hospitals` |
+| Standardized price rows across those hospitals | **67.8 M** | live `/data/summary.json` |
+| CPT- / HCPCS-coded rows (patient-comparable) | **14.2 M** | sum of `cpt_indexed` in prices index |
 | Distinct CPT / HCPCS codes in the cross-hospital index | **5,000** | `/api/cpt-index` keys |
-| Payer-negotiated rate cells | **168.0 M** | sum of `n_rates` in `data/_payer_raw.jsonl` |
-| Hospitals with at least one payer-rate row | **3,138** | distinct CCN in `_payer_raw.jsonl` |
-| CCN × raw-payer-string rows | **76,645** | line count of `_payer_raw.jsonl` |
+| Payer-negotiated rate cells | **147.1 M** | sum of `n_rates` in `data/_payer_raw.jsonl` |
+| Hospitals with at least one payer-rate row | **2,923** | distinct CCN in `_payer_raw.jsonl` |
+| CCN × raw-payer-string rows | **72,951** | line count of `_payer_raw.jsonl` |
 | Canonical payer brands surfaced on site | **200 featured** (21,803 raw) | `/api/payers-index` |
 | CMS enforcement records loaded | **11,440** | `cms_enforcement` table |
 | Enforcement actions linked to required hospitals | **8,642** | `summary.json#enforcement_actions_total` |
@@ -55,7 +55,7 @@ layout, rollback behavior, and recovery commands are documented in
 | 1 | Seed CMS hospital universe (5,426 facilities) | done |
 | 2 | Load MRF URL seeds (7,191 from TPAFS) + probe liveness | done (in `mrf_probe`) |
 | 3 | URL rediscovery crawler for dead URLs | done (in `mrf_rediscovered`) |
-| 4 | Fetch + parse alive MRFs (CSV-tall/wide, JSON v2/v3, XLSX) | live (3,800 / 3,986 = 94.5% of required+live hospitals parsed; 163 terminal exceptions) |
+| 4 | Fetch + parse alive MRFs (CSV-tall/wide, JSON v2/v3, XLSX) | live (3,839 standardized on-site price previews; R2 summary checked 2026-10-20) |
 | 5 | Public API + UI (SSR on Cloudflare Workers + R2) | live at hospitalledger.com |
 | 6 | Compliance watchdog + CMS enforcement ingestion | live (`cms_enforcement` + `cms_enforcement_match`) |
 | 7 | Cross-hospital CPT / HCPCS price index | live (5,000 codes, R2-backed `/api/cpt-index`) |
@@ -68,6 +68,35 @@ Coverage gap as of 2026-05-19 closeout snapshot: 218 preview-gap hospitals
 remaining (out of 3,986 CMS-required+live targets); 163 terminal exceptions
 documented in `data/coverage_terminal_exceptions.json`; full failure cluster
 breakdown in `data/coverage_closeout_status.json`.
+
+## Keeping the data current
+
+A daily wave keeps the published data fresh: it probes the MRF seed set,
+reparses what changed, validates, and publishes `meta/*` +
+`prices/index.json` to R2 — the live manifest is the receipt. All
+hospital fetches go through an edge proxy on hospitalledger.com, and
+publishing is guarded by canonical-base verification and a hardened
+publish lock. The full current setup — architecture, invariants, and the
+failure modes that shaped them — is documented in
+[ops/current-pipeline.md](ops/current-pipeline.md) and
+[ops/edge-fetch.md](ops/edge-fetch.md). The agent skills that operate
+the pipeline live in [skills/](skills/) and are kept current by the
+waves themselves: lessons learned in a run are written back the same
+day.
+
+## Ask anything (site FAQ)
+
+Every page except the methodology page carries an "Ask anything" row: the home
+page directly under the hero's lead paragraph, and each hospital, procedure and
+insurance page under its headline card. It POSTs to `/api/faq/ask` (a real form
+with JavaScript off; a streaming island with it) and answers from the site's own
+rendered pages — the home page, `/about-the-numbers`, the procedure-page price
+caveats and the hospital-page grade key — plus, on a detail page, the record on
+screen re-read from R2 by id. Workers AI (`AI` binding, llama-3.3-70b), 20
+questions per minute per IP (`FAQ_RATE_LIMITER`), 8 KB body cap. The model is
+told to copy numbers whole or say they are not listed, and that prices are as
+published, never a quote. Code: `src/faq/`; tests: `npm run test:faq`; island
+bundle: `npm run build:faq-island` (committed to `public/faq-island.js`).
 
 ## Files
 
@@ -163,5 +192,5 @@ curl -sS https://hospitalledger.com/api/payers-index | python3 -c \
 - Not affiliated with CMS, HHS, or any commercial transparency vendor.
 
 > Previously this section also said "Not a chargemaster aggregator (yet — Stage
-> 4)." That is now false: Stage 4 is live, and 3,800 hospitals' MRFs have been
+> 4)." That is now false: Stage 4 is live, and 3,839 hospitals' MRFs have been
 > parsed into a unified schema and indexed by CPT / HCPCS.

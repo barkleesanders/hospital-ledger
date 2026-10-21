@@ -233,6 +233,7 @@ ALLOW=(
   data/full_standardize_failures.jsonl
   data/full_standardize_status.json
   data/r2_upload_manifest.json
+  data/publish-state.json
 )
 if [ "$DRY_RUN" != 1 ] && [ "$NO_GIT" != 1 ]; then
   git add "${ALLOW[@]}" 2>/dev/null || true
@@ -264,6 +265,14 @@ run "Step 9: audit:copy:live (must pass)" npm run audit:copy:live || {
   echo "ABORT: live audit failed — deploy may need rollback or R2 file may be missing"
   exit 3
 }
+
+# Large generated assets are only needed through deployment and the live audit.
+# Keep them when debugging is requested; otherwise remove them after success so
+# a healthy weekly run cannot leave the Mac mini's internal disk full.
+if [ "$DRY_RUN" != 1 ] && [ "${HOSPITAL_LEDGER_KEEP_GENERATED:-0}" != 1 ]; then
+  run "Step 10: remove generated local deployment output" \
+    bash scripts/cleanup_generated_artifacts.sh "$ROOT"
+fi
 
 echo ""
 echo "✅ hl-refresh complete $TS"

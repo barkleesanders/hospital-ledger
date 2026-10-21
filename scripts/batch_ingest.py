@@ -163,7 +163,7 @@ def probe_candidate_url(url):
     request = urllib.request.Request(
         url,
         headers={
-            'User-Agent': 'HospitalLedgerBot/0.1 (+https://hospital-ledger.pages.dev)',
+            'User-Agent': 'HospitalLedgerBot/0.1 (+https://hospitalledger.com)',
             'Range': f'bytes=0-{LIVE_PROBE_BYTES - 1}',
         },
     )

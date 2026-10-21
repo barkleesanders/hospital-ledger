@@ -2,14 +2,28 @@
 """Pre-deploy copy-truth audit for hospitalledger.com.
 
 Catches stale numeric claims drifting between README.md / src/routes/ and the
-actual ground-truth values derived from public/data/summary.json, the SQLite
-db, and the side-car JSONLs. Runs in two modes:
+canonical ground truth. Ground truth is R2, not local files (2026-10-13 fix —
+local copies go stale: the laptop's payer data was 2026-09-11 vintage and the
+VM bundle ships a stub _payer_raw.jsonl, so local-truth mode false-failed):
 
-  python3 scripts/predeploy_audit.py              # source vs local truth (pre-deploy)
-  python3 scripts/predeploy_audit.py --check-live # source vs live site (post-deploy)
+  * Summary claims read R2 meta/summary.json via the public route
+    https://hospitalledger.com/data/summary.json (local public/data/summary.json
+    is only an offline fallback; force it with --offline).
+  * Payer claims read R2 /data/payer-stats.json (shape
+    {"rows": int, "ccns": int, "rates": int}) once the payer pipeline publishes
+    it. Until then they fall back to a FULL local data/_payer_raw.jsonl
+    (>=10k rows); on partial copies (VM bundle, fresh clones) they SKIP
+    instead of false-failing.
+  * DB claims (CMS enforcement / hospital universe) read the local SQLite db
+    and SKIP when no db is present.
+
+  python3 scripts/predeploy_audit.py              # source vs canonical truth (pre-deploy)
+  python3 scripts/predeploy_audit.py --check-live # + live serving layer vs R2 (post-deploy)
   python3 scripts/predeploy_audit.py --fix        # auto-apply proposed edits
+  python3 scripts/predeploy_audit.py --offline    # force local-file truth (no network)
 
-Exit 0 = all claims match ground truth. Exit 1 = stale claims found.
+Exit 0 = all verifiable claims match ground truth. Exit 1 = stale claims found.
+Skipped claims are reported as SKIP lines and never fail the audit.
 
 Adding a new claim:
   1. Add a Claim(...) entry to CLAIMS below.
@@ -38,29 +52,103 @@ PARSED_DIR = ROOT / "data" / "parsed"
 DB = ROOT / "db" / "hospital_ledger.db"
 LIVE_BASE = "https://hospitalledger.com"
 
+OFFLINE = False  # set by main() from --offline
+_SUMMARY_CACHE: dict | None = None
+
+
+class SkipClaim(Exception):
+    """Ground truth for this claim is unavailable here; skip, never fail."""
+
+
+def _fetch_json(url: str):
+    # CF bot-blocks the default Python-urllib UA; use a real one.
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Cache-Control": "no-cache",
+            "User-Agent": "hospital-ledger-predeploy-audit/1.0 (curl-compatible)",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.load(r)
+
 
 def _summary() -> dict:
-    return json.load(open(SUMMARY))
+    """Canonical summary: R2 meta/summary.json via the public route.
+
+    The local public/data/summary.json is only an offline fallback — on any
+    deployed/partial copy it lags the live R2 object (the "old bundled file"
+    failure this replaced).
+    """
+    global _SUMMARY_CACHE
+    if _SUMMARY_CACHE is not None:
+        return _SUMMARY_CACHE
+    if not OFFLINE:
+        try:
+            _SUMMARY_CACHE = _fetch_json(f"{LIVE_BASE}/data/summary.json")
+            return _SUMMARY_CACHE
+        except Exception:
+            pass  # fall through to the local copy
+    _SUMMARY_CACHE = json.load(open(SUMMARY))
+    return _SUMMARY_CACHE
+
+
+# A full-sized local file can still be stale: the laptop's 2026-09-11 extract
+# has 68,528 rows (past the 10k floor) while the README's 72,951 came from the
+# 2026-09-27 VM run. Trust it only if it is no older than the canonical
+# summary's generated_at minus this window.
+PAYER_RAW_MAX_LAG_DAYS = 7
+
+
+def _payer_raw_is_current() -> bool:
+    import datetime as dt
+
+    try:
+        gen = dt.datetime.fromisoformat(_summary()["generated_at"].replace("Z", "+00:00"))
+    except (KeyError, ValueError, TypeError):
+        return False  # cannot date the canonical data -> cannot vouch for the file
+    mtime = dt.datetime.fromtimestamp(PAYER_RAW.stat().st_mtime, dt.timezone.utc)
+    return mtime >= gen - dt.timedelta(days=PAYER_RAW_MAX_LAG_DAYS)
 
 
 def _payer_stats() -> dict:
-    rows = 0
-    ccns: set[str] = set()
-    rates = 0
-    with open(PAYER_RAW) as f:
-        for line in f:
-            rows += 1
-            try:
-                r = json.loads(line)
-                if r.get("ccn"):
-                    ccns.add(r["ccn"])
-                rates += r.get("n_rates", 0)
-            except json.JSONDecodeError:
-                continue
-    return {"rows": rows, "ccns": len(ccns), "rates": rates}
+    """Payer truth: R2 /data/payer-stats.json, else a FULL local raw file.
+
+    A partial local _payer_raw.jsonl (VM bundle stub, stale laptop snapshot)
+    must never fail the audit — with no canonical source the claim SKIPs.
+    """
+    if not OFFLINE:
+        try:
+            s = _fetch_json(f"{LIVE_BASE}/data/payer-stats.json")
+            return {"rows": int(s["rows"]), "ccns": int(s["ccns"]), "rates": int(s["rates"])}
+        except Exception:
+            pass  # not published yet / unreachable — try local
+    if PAYER_RAW.exists() and _payer_raw_is_current():
+        rows = 0
+        ccns: set[str] = set()
+        rates = 0
+        with open(PAYER_RAW) as f:
+            for line in f:
+                rows += 1
+                try:
+                    r = json.loads(line)
+                    if r.get("ccn"):
+                        ccns.add(r["ccn"])
+                    rates += r.get("n_rates", 0)
+                except json.JSONDecodeError:
+                    continue
+        if rows >= 10_000:  # full dataset only; stubs/stale extracts skip
+            return {"rows": rows, "ccns": len(ccns), "rates": rates}
+    raise SkipClaim(
+        "payer truth unavailable (no R2 payer-stats.json; local _payer_raw.jsonl "
+        f"missing, partial, or >{PAYER_RAW_MAX_LAG_DAYS}d older than summary generated_at)"
+    )
 
 
 def _db_count(table: str) -> int:
+    if not DB.exists():
+        raise SkipClaim(f"no local db at {DB}")
     with sqlite3.connect(DB) as c:
         return c.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
@@ -150,7 +238,7 @@ CLAIMS: list[Claim] = [
     Claim(
         "README: Stage 4 coverage line",
         "README.md",
-        r"live \((\d[\d,]*) / 3,986 = ",
+        r"live \((\d[\d,]*) standardized on-site price previews;",
         lambda: f"{_summary()['standardized_price_index_hospitals']:,}",
     ),
     Claim(
@@ -168,9 +256,17 @@ CLAIMS: list[Claim] = [
 ]
 
 
+SKIPPED: list[tuple[Claim, str]] = []
+
+
 def audit_source() -> list[tuple[Claim, str, str, int]]:
-    """Return list of (claim, claimed, expected, line_no) for STALE entries."""
+    """Return list of (claim, claimed, expected, line_no) for STALE entries.
+
+    Claims whose ground truth is unavailable here land in SKIPPED instead —
+    a partial copy must never false-fail the gate.
+    """
     stale = []
+    SKIPPED.clear()
     for claim in CLAIMS:
         path = ROOT / claim.where
         if not path.exists():
@@ -178,11 +274,15 @@ def audit_source() -> list[tuple[Claim, str, str, int]]:
             continue
         text = path.read_text()
         m = re.search(claim.pattern, text)
+        try:
+            expected = claim.truth()
+        except SkipClaim as e:
+            SKIPPED.append((claim, str(e)))
+            continue
         if not m:
-            stale.append((claim, "(pattern not matched)", claim.truth(), -1))
+            stale.append((claim, "(pattern not matched)", expected, -1))
             continue
         claimed = m.group(1)
-        expected = claim.truth()
         if claimed != expected:
             line_no = text[: m.start()].count("\n") + 1
             stale.append((claim, claimed, expected, line_no))
@@ -190,41 +290,37 @@ def audit_source() -> list[tuple[Claim, str, str, int]]:
 
 
 def audit_live() -> list[str]:
-    """Verify live site numbers match local summary.json. Returns failure messages."""
+    """Verify the live serving layer against the canonical R2 summary.
+
+    _summary() IS the R2 object, so this checks that the site's routes serve
+    the R2 truth (the old version compared the live site to a possibly-stale
+    local bundled summary.json — the check that could not pass off the
+    full-data machine).
+    """
     failures = []
     s = _summary()
     expected_priced = s["standardized_price_index_hospitals"]
 
     def fetch_json(path: str):
-        url = f"{LIVE_BASE}{path}?cb={int(__import__('time').time())}"
-        # CF bot-blocks the default Python-urllib UA; use a real one.
-        req = urllib.request.Request(
-            url,
-            headers={
-                "Cache-Control": "no-cache",
-                "User-Agent": "hospital-ledger-predeploy-audit/1.0 (curl-compatible)",
-                "Accept": "application/json",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            return json.load(r)
+        return _fetch_json(f"{LIVE_BASE}{path}?cb={int(__import__('time').time())}")
 
     try:
         live_summary = fetch_json("/data/summary.json")
         if live_summary["standardized_price_index_hospitals"] != expected_priced:
             failures.append(
                 f"live summary.json shows {live_summary['standardized_price_index_hospitals']}, "
-                f"local says {expected_priced}"
+                f"R2 canonical says {expected_priced}"
             )
     except Exception as e:
         failures.append(f"failed to fetch /data/summary.json: {e}")
 
+    prices_idx = None
     try:
         prices_idx = fetch_json("/api/prices-index")
         live_n = len(prices_idx.get("hospitals", prices_idx))
         if live_n != expected_priced:
             failures.append(
-                f"/api/prices-index returns {live_n} hospitals, summary says {expected_priced}"
+                f"/api/prices-index returns {live_n} hospitals, R2 summary says {expected_priced}"
             )
     except Exception as e:
         failures.append(f"failed to fetch /api/prices-index: {e}")
@@ -236,13 +332,18 @@ def audit_live() -> list[str]:
     except Exception as e:
         failures.append(f"failed to fetch /api/cpt-index: {e}")
 
-    # Random-priced-CCN smoke: pick 3 priced CCNs from the local index, curl each
-    # /api/prices/{ccn}, assert 200 + n_slim > 0. Catches the "R2 missing file"
-    # regression class we hit twice (Tier 1 + Phase B forgot stage4_refresh.py).
+    # Random-priced-CCN smoke: pick 3 priced CCNs from the LIVE prices index,
+    # curl each /api/prices/{ccn}, assert 200 + n_slim > 0. Catches the "R2
+    # missing file" regression class we hit twice (Tier 1 + Phase B forgot
+    # stage4_refresh.py). (Was: sampled from the local bundled index.json.)
     import random
     try:
-        idx = json.load(open(SUMMARY.parent / "prices" / "index.json"))
-        priced = [h["ccn"] for h in idx.get("hospitals", []) if h.get("n", 0) > 0]
+        priced = []
+        if isinstance(prices_idx, dict):
+            priced = [h["ccn"] for h in prices_idx.get("hospitals", []) if h.get("n", 0) > 0]
+        if not priced:
+            idx = json.load(open(SUMMARY.parent / "prices" / "index.json"))
+            priced = [h["ccn"] for h in idx.get("hospitals", []) if h.get("n", 0) > 0]
         sample = random.sample(priced, min(3, len(priced))) if priced else []
         for ccn in sample:
             try:
@@ -274,10 +375,14 @@ def apply_fix(claim: Claim, claimed: str, expected: str) -> bool:
 
 
 def main() -> int:
+    global OFFLINE
     p = argparse.ArgumentParser(description="hospital-ledger copy-truth audit")
     p.add_argument("--fix", action="store_true", help="auto-apply proposed edits")
     p.add_argument("--check-live", action="store_true", help="also verify against live site")
+    p.add_argument("--offline", action="store_true",
+                   help="force local-file ground truth (default: R2 canonical via public routes)")
     args = p.parse_args()
+    OFFLINE = args.offline
 
     stale = audit_source()
     if stale and args.fix:
@@ -293,6 +398,9 @@ def main() -> int:
         stale = audit_source()
         print(f"applied {applied} fixes")
 
+    for claim, why in SKIPPED:
+        print(f"SKIP {claim.label}: {why}")
+
     if stale:
         print(f"FAIL: {len(stale)} stale claim(s) found:")
         for claim, claimed, expected, line_no in stale:
@@ -300,7 +408,8 @@ def main() -> int:
             print(f"  {loc} | {claim.label}: {claimed} → {expected}")
         return 1
 
-    print(f"PASS: {len(CLAIMS)} claim(s) verified against ground truth")
+    print(f"PASS: {len(CLAIMS) - len(SKIPPED)} claim(s) verified against ground truth"
+          f" ({len(SKIPPED)} skipped)")
 
     if args.check_live:
         live_failures = audit_live()
@@ -309,7 +418,7 @@ def main() -> int:
             for f in live_failures:
                 print(f"  {f}")
             return 1
-        print("PASS (live): live site numbers match local summary.json")
+        print("PASS (live): live site numbers match the R2 canonical summary")
 
     return 0
 
