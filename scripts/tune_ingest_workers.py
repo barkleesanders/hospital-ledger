@@ -28,8 +28,8 @@ FAILURES_FILE = os.path.join(DATA_DIR, "worker_tune.failures.jsonl")
 
 
 def cpu_default_max():
-    cpus = os.cpu_count() or 4
-    return max(16, min(128, cpus * 8))
+    # A CPU count does not measure the memory held by concurrent MRF parsers.
+    return 4
 
 
 def parse_worker_steps(raw, max_workers):
@@ -44,9 +44,11 @@ def parse_worker_steps(raw, max_workers):
                 raise argparse.ArgumentTypeError("worker steps must be >= 1")
             if value <= max_workers:
                 steps.append(value)
+        if not steps:
+            raise argparse.ArgumentTypeError("no worker steps fit --max-workers")
         return sorted(set(steps))
 
-    base = [4, 8, 12, 16, 24, 32, 48, 64, 96, 128]
+    base = [1, 2, 4, 8, 12, 16, 24, 32, 48, 64, 96, 128]
     steps = [value for value in base if value <= max_workers]
     if max_workers not in steps:
         steps.append(max_workers)
@@ -118,7 +120,10 @@ def run_probe(worker_count, ccns, args):
         "--failures-file",
         FAILURES_FILE,
     ]
-    proc = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
+    proc = subprocess.run(
+        ["bash", os.path.join(ROOT, "scripts", "mem_guard.sh"), *cmd],
+        cwd=ROOT, text=True, capture_output=True,
+    )
     elapsed = max(time.time() - started, 0.001)
     status = read_json(STATUS_FILE)
     attempted = status.get("done", 0) or 0
@@ -149,10 +154,13 @@ def run_probe(worker_count, ccns, args):
 
 
 def is_stable(result, args):
+    # Resource guards and timeouts are never acceptable parser failures.
+    if result["returncode"] not in (0, 1):
+        return False
     if result["returncode"] != 0 and not args.allow_parser_failures:
         return False
     attempted = result["attempted"]
-    if attempted <= 0:
+    if attempted <= 0 or result["succeeded"] <= 0:
         return False
     fail_rate = result["failed"] / attempted
     return fail_rate <= args.max_failure_rate
@@ -160,10 +168,9 @@ def is_stable(result, args):
 
 def choose_recommendation(results, args):
     stable = [result for result in results if is_stable(result, args)]
-    pool = stable or [result for result in results if result["attempted"] > 0]
-    if not pool:
-        return args.fallback_workers
-    best = max(pool, key=lambda item: (item["rate_per_second"], item["workers"]))
+    if not stable:
+        raise RuntimeError("no stable ingest sample; refusing to recommend concurrency")
+    best = max(stable, key=lambda item: (item["rate_per_second"], -item["workers"]))
     return best["workers"]
 
 
@@ -178,7 +185,7 @@ def main(argv=None):
     parser.add_argument("--worker-steps", help="Comma-delimited worker counts to test; defaults to 4,8,12,16,24,32,48,64,96,128 up to --max-workers")
     parser.add_argument("--item-timeout-seconds", type=int, default=600, help="Per-CCN timeout passed through to batch_ingest")
     parser.add_argument("--max-failure-rate", type=float, default=0.35, help="Highest acceptable failure rate for a worker step")
-    parser.add_argument("--fallback-workers", type=int, default=int(os.environ.get("HL_INGEST_WORKERS", "16")))
+    parser.add_argument("--fallback-workers", type=int, default=int(os.environ.get("HL_INGEST_WORKERS", "4")))
     parser.add_argument("--resume", action="store_true", default=True, help="Skip already parsed CCNs during tuning")
     parser.add_argument("--allow-parser-failures", action="store_true", help="Treat parser failure return codes as benchmark data instead of instability")
     parser.add_argument("--output", default=RESULTS_FILE)
@@ -188,6 +195,8 @@ def main(argv=None):
         parser.error("--sample-size must be >= 1")
     if args.max_workers < 1:
         parser.error("--max-workers must be >= 1")
+    if not 1 <= args.fallback_workers <= args.max_workers:
+        parser.error("--fallback-workers must fit --max-workers")
     if not 0 <= args.max_failure_rate <= 1:
         parser.error("--max-failure-rate must be between 0 and 1")
 
@@ -226,7 +235,7 @@ def main(argv=None):
             "results": results,
         }
         write_json(args.output, payload)
-        if not is_stable(result, args) and workers >= 16:
+        if not is_stable(result, args):
             print(f"stopping benchmark after unstable workers={workers}", flush=True)
             break
 

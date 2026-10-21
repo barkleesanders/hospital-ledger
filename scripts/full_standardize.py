@@ -27,6 +27,7 @@ import sqlite3
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from batch_ingest import DB, get_target_ccns
+from ingest_capacity import validate_workers, workers_per_shard
 
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -39,7 +40,7 @@ WORKER_TUNE_FILE = os.path.join(DATA_DIR, 'worker_tune_results.json')
 
 def run(cmd):
     print("$ " + " ".join(cmd), flush=True)
-    subprocess.run(cmd, cwd=ROOT, check=True)
+    subprocess.run(['bash', os.path.join(SCRIPTS, 'mem_guard.sh'), *cmd], cwd=ROOT, check=True)
 
 
 def read_status(path):
@@ -153,9 +154,9 @@ def auto_tune_workers(args):
     subprocess.run(cmd, cwd=ROOT, check=True)
     with open(WORKER_TUNE_FILE) as handle:
         result = json.load(handle)
-    recommended = int(result.get('recommended_workers') or args.workers or 16)
+    recommended = int(result['recommended_workers'])
     print(f"auto-tuned ingest workers={recommended} (results={WORKER_TUNE_FILE})", flush=True)
-    return max(1, recommended)
+    return validate_workers(recommended, args.max_workers)
 
 
 def run_sharded_ingest(args):
@@ -231,8 +232,8 @@ def run_sharded_ingest(args):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--workers', type=int, default=int(os.environ.get('HL_INGEST_WORKERS', '16')),
-                   help='Batch workers per shard (default: HL_INGEST_WORKERS or 16; use --auto-workers to benchmark first)')
+    p.add_argument('--workers', type=int, default=int(os.environ.get('HL_INGEST_WORKERS', '4')),
+                   help='Total ingestion worker budget across all shards (default 4)')
     p.add_argument('--shards', type=int, default=1,
                    help='Process-level shards; each shard runs batch_ingest.py over a disjoint CCN slice')
     p.add_argument('--progress-every', type=int, default=25)
@@ -245,16 +246,26 @@ def main():
     p.add_argument('--upload-r2', action='store_true')
     p.add_argument('--auto-workers', action='store_true',
                    help='Run scripts/tune_ingest_workers.py first and use the fastest stable worker count')
-    p.add_argument('--max-workers', type=int, default=int(os.environ.get('HL_MAX_WORKERS', str(max(16, min(128, (os.cpu_count() or 4) * 8))))),
-                   help='Upper bound for --auto-workers (default: HL_MAX_WORKERS or cpu_count*8 capped at 128)')
+    p.add_argument('--max-workers', type=int, default=int(os.environ.get('HL_MAX_WORKERS', '4')),
+                   help='Total worker ceiling, including all shards (default 4; higher values require measured capacity)')
     p.add_argument('--tune-sample-size', type=int, default=48,
                    help='CCNs per worker step for --auto-workers')
     args = p.parse_args()
+
+    try:
+        workers_per_shard(args.max_workers, args.shards)
+    except ValueError as exc:
+        p.error(str(exc))
 
     if args.workers < 1:
         args.auto_workers = True
     if args.auto_workers:
         args.workers = auto_tune_workers(args)
+    try:
+        validate_workers(args.workers, args.max_workers)
+        args.workers = workers_per_shard(args.workers, args.shards)
+    except ValueError as exc:
+        p.error(str(exc))
 
     started = time.time()
     if args.shards > 1:

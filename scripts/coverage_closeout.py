@@ -16,6 +16,7 @@ import sys
 import time
 from pathlib import Path
 from urllib.parse import urlparse
+from ingest_capacity import validate_workers
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -537,7 +538,7 @@ def write_closeout_artifacts(
         "preview_gap_file": display_path(preview_gap_file),
         "terminal_exceptions_file": display_path(exceptions_file),
         "failure_clusters": closeout["failure_clusters"],
-        "last_cluster_attacked": (closeout["failure_clusters"][0] if closeout["failure_clusters"] else None),
+        "next_failure_cluster": (closeout["failure_clusters"][0] if closeout["failure_clusters"] else None),
         "sample_preview_ccns": closeout["sample_preview_ccns"],
     }
     write_json(status_file, status_payload)
@@ -588,9 +589,9 @@ def auto_tune_batch_workers(batch_file: Path, args: argparse.Namespace) -> int:
     run(cmd)
     result = read_json(WORKER_TUNE_FILE)
     if not isinstance(result, dict):
-        return args.batch_workers
-    recommended = int(result.get("recommended_workers") or args.batch_workers)
-    return max(1, recommended)
+        raise RuntimeError("tuner did not produce a recommendation")
+    recommended = int(result["recommended_workers"])
+    return validate_workers(recommended, args.max_workers)
 
 
 def run_batch_ingest(batch_file: Path, workers: int, timeout_seconds: int) -> None:
@@ -669,19 +670,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--loop-until-complete", action="store_true")
     parser.add_argument("--max-loops", type=int, default=1)
     parser.add_argument("--sleep-seconds", type=int, default=0)
-    parser.add_argument("--batch-workers", type=int, default=int(os.environ.get("HL_INGEST_WORKERS", "16")))
+    parser.add_argument("--batch-workers", type=int, default=int(os.environ.get("HL_INGEST_WORKERS", "4")))
     parser.add_argument("--batch-item-timeout-seconds", type=int, default=2400)
     parser.add_argument("--retry-passes", type=int, default=0)
-    parser.add_argument("--retry-workers", type=int, default=int(os.environ.get("HL_RETRY_WORKERS", "12")))
+    parser.add_argument("--retry-workers", type=int, default=int(os.environ.get("HL_RETRY_WORKERS", "3")))
     parser.add_argument("--retry-item-timeout-seconds", type=int, default=1200)
     parser.add_argument("--rediscover-limit", type=int, default=0)
     parser.add_argument("--rediscover-top-n", type=int, default=5)
     parser.add_argument("--publish-each-loop", action="store_true")
     parser.add_argument("--auto-workers", action="store_true", help="Benchmark the current parse gap and use the fastest stable batch worker count")
-    parser.add_argument("--max-workers", type=int, default=int(os.environ.get("HL_MAX_WORKERS", str(max(16, min(128, (os.cpu_count() or 4) * 8))))))
+    parser.add_argument("--max-workers", type=int, default=int(os.environ.get("HL_MAX_WORKERS", "4")))
     parser.add_argument("--tune-sample-size", type=int, default=48)
     parser.add_argument("--tune-max-failure-rate", type=float, default=0.35)
-    return parser.parse_args()
+    args = parser.parse_args()
+    try:
+        validate_workers(args.batch_workers, args.max_workers)
+        validate_workers(args.retry_workers, args.max_workers)
+    except ValueError as exc:
+        parser.error(str(exc))
+    return args
 
 
 def main() -> int:
