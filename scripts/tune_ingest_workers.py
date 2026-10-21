@@ -182,10 +182,11 @@ def main(argv=None):
     parser.add_argument("--limit", type=int, default=0, help="Maximum discovered targets to consider before sampling; 0 means no cap")
     parser.add_argument("--sample-size", type=int, default=48, help="CCNs tested per worker step")
     parser.add_argument("--max-workers", type=int, default=int(os.environ.get("HL_MAX_WORKERS", cpu_default_max())))
-    parser.add_argument("--worker-steps", help="Comma-delimited worker counts to test; defaults to 4,8,12,16,24,32,48,64,96,128 up to --max-workers")
+    parser.add_argument("--worker-steps", help="Comma-delimited worker counts to test; defaults to 1,2,4 and larger steps only when explicitly within --max-workers")
     parser.add_argument("--item-timeout-seconds", type=int, default=600, help="Per-CCN timeout passed through to batch_ingest")
     parser.add_argument("--max-failure-rate", type=float, default=0.35, help="Highest acceptable failure rate for a worker step")
-    parser.add_argument("--fallback-workers", type=int, default=int(os.environ.get("HL_INGEST_WORKERS", "4")))
+    parser.add_argument("--fallback-workers", type=int, default=1,
+                        help="Workers when no unparsed candidates remain (default 1; must fit the ceiling)")
     parser.add_argument("--resume", action="store_true", default=True, help="Skip already parsed CCNs during tuning")
     parser.add_argument("--allow-parser-failures", action="store_true", help="Treat parser failure return codes as benchmark data instead of instability")
     parser.add_argument("--output", default=RESULTS_FILE)

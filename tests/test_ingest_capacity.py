@@ -80,6 +80,14 @@ class CapacityTests(unittest.TestCase):
         with self.assertRaises(argparse.ArgumentTypeError):
             self.tuner.parse_worker_steps("8,16", 4)
 
+    def test_one_worker_ceiling_handles_empty_candidate_set(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = str(Path(directory) / 'result.json')
+            with mock.patch.object(self.tuner, 'load_candidates', return_value=[]):
+                self.assertEqual(self.tuner.main(['--max-workers', '1', '--output', output]), 0)
+            import json
+            self.assertEqual(json.loads(Path(output).read_text())['recommended_workers'], 1)
+
     def test_probe_command_enforces_memory_disk_guard(self):
         with tempfile.TemporaryDirectory() as directory:
             with (mock.patch.object(self.tuner, "DATA_DIR", directory),
