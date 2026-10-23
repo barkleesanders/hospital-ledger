@@ -212,10 +212,21 @@ phase7_publish() {
   echo "[phase7] publish to R2"
   export R2_BUCKET="${PARSED_R2_BUCKET:-hl-mrf-parsed}"
   "$ROOT/.venv/bin/python" "$ROOT/scripts/r2_put.py" --check || { echo "[phase7] FAIL: r2 --check"; return 1; }
-  local k
+  local k attempt
   for k in prices/index.json meta/hospitals.json meta/summary.json meta/manifest.json; do
-    "$ROOT/.venv/bin/python" "$ROOT/scripts/r2_put.py" "$OUT/$k" "$k" \
-      || { echo "[phase7] FAIL: upload $k"; return 1; }
+    # Per-key bounded retry (2026-10-23): the 2026-10-18 run died here when
+    # the egress proxy dropped the meta/summary.json PUT mid-sequence --
+    # index + hospitals landed, the manifest (last) never did, and R2 was
+    # left inconsistent, deadlocking the daily pricing wave for 5 days.
+    # PUTs are idempotent (same bytes, same key), so retry the FAILED key
+    # in place; never restart the sequence, never skip ahead -- manifest
+    # stays last.
+    for attempt in 1 2 3; do
+      "$ROOT/.venv/bin/python" "$ROOT/scripts/r2_put.py" "$OUT/$k" "$k" && break
+      echo "[phase7] upload $k attempt $attempt failed"
+      [ "$attempt" = 3 ] && { echo "[phase7] FAIL: upload $k (3 attempts)"; return 1; }
+      sleep 20
+    done
   done
   echo "[phase7] gate OK (manifest last)"
 }

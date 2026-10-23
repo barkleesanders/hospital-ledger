@@ -349,5 +349,89 @@ class PublishLockedPerKey(unittest.TestCase):
         self.assertIn("prices/index.json", msg)
 
 
+class VerifySyncedBaseManifestStaleHeal(unittest.TestCase):
+    """2026-10-23: the manifest-stale discriminator. The 2026-10-18 weekly
+    publish died after PUT index+hospitals but before PUT manifest, so R2
+    held the canonical NEW index while the manifest still recorded the
+    Oct 15 one; every wave parked on base-verify-fail for 5 days. On a
+    manifest mismatch, if the synced base is confirmed byte-identical via
+    the OTHER independent leg and is sane, the base is canonical and the
+    manifest is the stale artifact -- accept and let the publish heal it.
+    Any doubt (legs disagree, alt leg unreadable, insane base) fails
+    closed exactly as before."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dest = Path(self.tmp.name) / "index.json"
+        sane = {"hospitals": [{"ccn": f"{i:06d}"} for i in range(3500)]}
+        self.data = json.dumps(sane).encode()
+        self.dest.write_bytes(self.data)
+        self.sha = hashlib.sha256(self.data).hexdigest()
+        # Manifest records a DIFFERENT (stale) object than the synced base.
+        stale = {"prices/index.json": {"bytes": 1392465,
+                                       "sha256": "95f75ee249e1" + "0" * 50}}
+        hw._fetch_live_manifest_text = lambda url: (manifest_text(stale), "t")
+        self._orig = {k: getattr(hw, k) for k in ("_s3_get_to", "_cdn_get")}
+
+    def tearDown(self):
+        for k, v in self._orig.items():
+            setattr(hw, k, v)
+        self.tmp.cleanup()
+
+    def _alt_same(self, key, tmp_path, *a):
+        Path(tmp_path).write_bytes(self.data)
+        return True
+
+    def _alt_different(self, key, tmp_path, *a):
+        other = {"hospitals": [{"ccn": f"{i:06d}"} for i in range(3400)]}
+        Path(tmp_path).write_bytes(json.dumps(other).encode())
+        return True
+
+    def _alt_dead(self, key, tmp_path, *a):
+        return False
+
+    def test_heal_when_synced_via_cdn_s3_confirms(self):
+        hw._s3_get_to = self._alt_same
+        ok, detail = hw.verify_synced_base("prices/index.json", self.dest,
+                                           via="cdn", renv={})
+        self.assertTrue(ok, detail)
+        self.assertIn("auto-heal", detail)
+
+    def test_heal_when_synced_via_s3_cdn_confirms(self):
+        hw._cdn_get = self._alt_same
+        ok, detail = hw.verify_synced_base("prices/index.json", self.dest,
+                                           via="vm-direct", renv={})
+        self.assertTrue(ok, detail)
+        self.assertIn("auto-heal", detail)
+
+    def test_legs_disagree_fails_closed(self):
+        hw._s3_get_to = self._alt_different
+        ok, _ = hw.verify_synced_base("prices/index.json", self.dest,
+                                      via="cdn", renv={})
+        self.assertFalse(ok)
+
+    def test_alt_leg_unreadable_fails_closed(self):
+        hw._s3_get_to = self._alt_dead
+        ok, _ = hw.verify_synced_base("prices/index.json", self.dest,
+                                      via="cdn", renv={})
+        self.assertFalse(ok)
+
+    def test_insane_base_fails_closed(self):
+        small = json.dumps({"hospitals": [{"ccn": "1"}] * 100}).encode()
+        self.dest.write_bytes(small)
+        hw._s3_get_to = lambda key, tmp_path, *a: (
+            Path(tmp_path).write_bytes(small), True)[1]
+        ok, _ = hw.verify_synced_base("prices/index.json", self.dest,
+                                      via="cdn", renv={})
+        self.assertFalse(ok)
+
+    def test_backoff_never_six_hours(self):
+        # Barklee 2026-10-23: "Don't do a six hour back off. Immediately
+        # always try to fix it." The retry cadence stays on the 20-minute
+        # cron tick scale, never hours.
+        self.assertLessEqual(hw.RETRY_BASE_SECS, 300)
+        self.assertLessEqual(hw.RETRY_MAX_DELAY_SECS, 1200)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
