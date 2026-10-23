@@ -1378,8 +1378,32 @@ def hospital_hint_tokens(name):
     return tokens
 
 
+# Web assets that are never MRFs (2026-10-23). A hospital hub page's
+# <link rel="manifest"> (.../icons/manifest.json), favicon, service worker,
+# robots/sitemap files must never be scored as MRF candidates: on a
+# bot-wall/interstitial page they can be the ONLY file-like hrefs, and the
+# hub extractor would otherwise "resolve" the hospital's MRF to the site's
+# web-app manifest and parse it as pricing JSON. (CCN 150042, wave 41: the
+# MedStar xlsx URL returned an HTML interstitial; the extractor picked
+# /icons/manifest.json -> 0 items -> poisoned the whole publish set.)
+WEB_ASSET_BASENAMES = {
+    'manifest.json', 'site.webmanifest', 'browserconfig.xml', 'robots.txt',
+    'sitemap.xml', 'service-worker.js', 'sw.js', 'workbox.js',
+}
+
+
+def _is_web_asset_url(lower_url):
+    path = lower_url.split('?', 1)[0]
+    filename = path.rsplit('/', 1)[-1]
+    return (filename in WEB_ASSET_BASENAMES
+            or filename.startswith('favicon')
+            or '/icons/' in path)
+
+
 def score_candidate_url(url):
     lower = normalize_source_url(url).lower()
+    if _is_web_asset_url(lower):
+        return 0
     score = 0
     if DIRECT_FILE_RE.search(lower):
         score += 10

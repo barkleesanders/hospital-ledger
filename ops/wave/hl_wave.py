@@ -73,9 +73,16 @@ PUB_HASH_PATH = ROOT / "data" / "published_price_hashes.json"  # {ccn: sha256} a
 ROUTE_HEALTH_PATH = GOAL / "hl_r2_route_health.json"     # auto-learned R2 route health
 REPARSE_PENDING_SENTINEL = "REPARSE-PENDING"              # forces re-detect next wave
 # Retry policy for the pending-publish loop (own cron, every 20 min).
-RETRY_BASE_SECS = 1200        # 20 min, doubled per attempt
-RETRY_MAX_DELAY_SECS = 21600  # 6 h cap
-RETRY_MAX_ATTEMPTS = 20       # ~3 days of retries before human escalation
+# 2026-10-23 (Barklee directive: "Don't do a six hour back off. Immediately
+# always try to fix it."): the old 20min-doubling-to-6h schedule turned a
+# one-key publish crash into a 5-day pricing stall. The retry cron ticks
+# every 20 min, so the cap is one tick: a fixable failure is retried on the
+# next tick, never parked for hours. Escalation at RETRY_MAX_ATTEMPTS is a
+# human-attention signal only -- retries continue while the loop owns
+# recovery.
+RETRY_BASE_SECS = 300         # 5 min, doubled per attempt
+RETRY_MAX_DELAY_SECS = 1200   # 20 min cap = one retry-cron tick
+RETRY_MAX_ATTEMPTS = 20       # escalation threshold (signal, not a stop)
 # Route-health cooldowns: after N consecutive R2 failures the route is assumed
 # down and attempts fail fast (no burned timeouts) until the cooldown expires.
 ROUTE_COOLDOWN_SCHEDULE = {3: 1800, 4: 3600}  # consec fails -> cooldown secs
@@ -783,8 +790,12 @@ def load_r2_env():
 
 
 def r2_get_sha256(key, penv):
+    # Caller timeout must EXCEED r2_put.py's internal retry budget (300s
+    # here): a caller cap <= the callee budget kills the callee mid-resume
+    # on a stalled proxy (2026-10-23: a 2MB GET reached ~87% in 300s and
+    # was SIGKILLed by the caller's own timeout, not by any network fault).
     p = subprocess.run([VENV_PY, "scripts/r2_put.py", "--get-sha256", key],
-                       cwd=str(ROOT), env=penv, capture_output=True, text=True, timeout=300)
+                       cwd=str(ROOT), env=penv, capture_output=True, text=True, timeout=360)
     if p.returncode == 0 and p.stdout.strip():
         return p.stdout.strip()
     # S3 read path flapping (2026-10-01): verify against the CDN-served copy.
@@ -816,7 +827,7 @@ def r2_get_file_fallback(key, dest, renv, health=None):
         try:
             p = subprocess.run([VENV_PY, "scripts/r2_put.py", "--get-file", key, dest],
                                cwd=str(ROOT), env=renv, capture_output=True, text=True,
-                               timeout=300)
+                               timeout=660)  # > r2_put get_file's internal 600s resume budget (2026-10-23)
         except subprocess.TimeoutExpired:
             if health is not None:
                 note_route(health, "r2_get", False, "get-file timeout")
@@ -881,7 +892,44 @@ def _cdn_get(key, dest):
     return False
 
 
-def verify_synced_base(key, dest):
+def _s3_get_to(key, tmp, renv):
+    """One-shot direct S3 GET of `key` to `tmp` (no fallback legs, no route-
+    health bookkeeping -- a bounded diagnostic read). True on success."""
+    try:
+        p = subprocess.run([VENV_PY, "scripts/r2_put.py", "--get-file", key, str(tmp)],
+                           cwd=str(ROOT), env=renv, capture_output=True, text=True,
+                           timeout=660)  # > r2_put get_file's internal 600s resume budget (2026-10-23)
+        return p.returncode == 0 and Path(tmp).exists() and Path(tmp).stat().st_size > 0
+    except Exception:  # noqa: BLE001 - diagnostic leg, any failure = no confirm
+        return False
+
+
+def _base_sanity(key, dest):
+    """Cheap structural sanity for a synced build base. Returns (ok, detail).
+
+    For prices/index.json this is the same floor the wave's corrupt-base
+    guard uses elsewhere: valid JSON with >= 3000 hospitals. It cannot prove
+    freshness -- that is the dual-leg check's job -- it only proves the base
+    is a structurally real index, not a placeholder or an error body."""
+    try:
+        data = Path(dest).read_bytes()
+    except OSError as e:
+        return False, f"base unreadable: {e}"
+    if not data:
+        return False, "base is empty"
+    if key == "prices/index.json":
+        try:
+            idx = json.loads(data)
+            n = len(idx.get("hospitals") or [])
+        except ValueError:
+            return False, "base index is not valid JSON"
+        if n < 3000:
+            return False, f"base index has only {n} hospitals (<3000 floor)"
+        return True, f"{n} hospitals"
+    return True, f"{len(data)}B"
+
+
+def verify_synced_base(key, dest, via=None, renv=None):
     """Verify a just-synced build base against the live manifest's artifact
     record for `key` (size + sha256). Returns (ok, detail).
 
@@ -893,7 +941,25 @@ def verify_synced_base(key, dest):
     -- the same record live-verify trusts after publish. Fail-closed: an
     unreachable manifest, a missing artifact record, or any size/sha
     mismatch is NOT ok, and the caller parks (transport class) instead of
-    building on an unverified base."""
+    building on an unverified base.
+
+    2026-10-23 manifest-stale auto-heal (Barklee: auto learn / auto fix,
+    never a long backoff): a mismatch has TWO possible causes and the old
+    code could not tell them apart, so it deadlocked for 5 days. (a) The
+    synced base is stale/corrupt (wave 35) -- block. (b) The R2 object
+    ADVANCED past the manifest: the 2026-10-18 weekly counts publish PUT a
+    new 3,842-hospital index + hospitals.json, then the egress proxy killed
+    the meta/summary.json PUT before the manifest (uploaded last) landed,
+    leaving the Oct-15 manifest describing an index R2 no longer holds.
+    Discriminator for (b): fetch the same key through the OTHER independent
+    leg (S3 direct if the sync came via CDN, CDN if it came via S3). If
+    both legs return byte-identical content AND the base passes structural
+    sanity, the base IS the canonical R2 object and the manifest record is
+    the stale artifact -- proceed; this run's publish regenerates the
+    manifest LAST and restores R2 consistency, and the downstream counts +
+    pricing validation and post-publish live-verify gates still apply in
+    full. If the legs disagree or cannot both be read, fail closed exactly
+    as before."""
     try:
         text, _via = _fetch_live_manifest_text(
             f"https://hospitalledger.com/api/manifest?cb={int(time.time())}")
@@ -913,12 +979,43 @@ def verify_synced_base(key, dest):
     except OSError as e:
         return False, f"synced base unreadable: {e}"
     sha = hashlib.sha256(data).hexdigest()
-    if len(data) != rec.get("bytes") or sha != rec.get("sha256"):
-        return False, (f"{key} base mismatch: synced {len(data)}B "
-                       f"sha={sha[:12]}..., manifest records "
-                       f"{rec.get('bytes')}B sha={str(rec.get('sha256'))[:12]}...")
-    return True, (f"{key} base verified vs live manifest "
-                  f"({len(data)}B, sha {sha[:12]}...)")
+    if len(data) == rec.get("bytes") and sha == rec.get("sha256"):
+        return True, (f"{key} base verified vs live manifest "
+                      f"({len(data)}B, sha {sha[:12]}...)")
+    mismatch = (f"{key} base mismatch: synced {len(data)}B "
+                f"sha={sha[:12]}..., manifest records "
+                f"{rec.get('bytes')}B sha={str(rec.get('sha256'))[:12]}...")
+    # --- manifest-stale discriminator: is the synced base the canonical
+    # R2 object, confirmed byte-identical through a second independent leg?
+    sane, sane_detail = _base_sanity(key, dest)
+    if not sane:
+        return False, f"{mismatch}; base also fails sanity ({sane_detail})"
+    if renv is None:
+        return False, mismatch
+    tmp = Path(f"{dest}.altleg")
+    try:
+        if via == "vm-direct":
+            alt_ok, alt_leg = _cdn_get(key, str(tmp)), "cdn"
+        else:
+            alt_ok, alt_leg = _s3_get_to(key, tmp, renv), "vm-direct"
+        if alt_ok:
+            alt_sha = hashlib.sha256(tmp.read_bytes()).hexdigest()
+            if alt_sha == sha:
+                log(f"base verify: MANIFEST-STALE auto-heal for {key}: base "
+                    f"confirmed byte-identical via {via} + {alt_leg} legs "
+                    f"and sane ({sane_detail}); the live manifest's record "
+                    f"is stale -- proceeding on the canonical R2 object; "
+                    f"this publish regenerates the manifest last")
+                return True, (f"{key} base accepted via manifest-stale "
+                              f"auto-heal (dual-leg byte-identical, "
+                              f"{sane_detail}); manifest record was "
+                              f"{rec.get('bytes')}B sha={str(rec.get('sha256'))[:12]}...")
+        return False, mismatch
+    finally:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
 
 
 LOCK_KEY = "_pipeline/publish.lock"
@@ -1129,10 +1226,12 @@ def _publish_with_retry(out, publish_ccns, penv, health, attempts=3):
 
 
 def park_for_retry(publish_ccns, wave_no, reason, detail, attempts):
-    """Park CCNs in the pending manifest with exponential backoff.
+    """Park CCNs in the pending manifest with bounded backoff.
 
     `attempts` is the count of failed publish attempts so far; the next retry
-    is due in min(20min * 2**attempts, 6h). Atomic write (tmp + replace)."""
+    is due in min(RETRY_BASE_SECS * 2**attempts, RETRY_MAX_DELAY_SECS) --
+    capped at one retry-cron tick (2026-10-23: no long backoffs; fix and
+    retry immediately). Atomic write (tmp + replace)."""
     delay = min(RETRY_BASE_SECS * (2 ** max(0, attempts)), RETRY_MAX_DELAY_SECS)
     save_pending({
         "ts": now_iso(), "wave": wave_no,
@@ -1427,8 +1526,12 @@ def run_publish_phase(args, env, state, std, updated_ccns, unpublished,
         # live manifest's artifact record for the key. The CDN fallback
         # can serve a stale site-bundled copy for this key; building on
         # it regresses the index. Mismatch -> park (transport class),
-        # never build.
-        _bok, _bdetail = verify_synced_base(_key, _dest)
+        # never build -- UNLESS verify_synced_base's 2026-10-23
+        # manifest-stale discriminator proves the base is the canonical
+        # R2 object (dual-leg byte-identical + sane) and the manifest is
+        # the stale artifact, in which case the publish below heals R2
+        # by regenerating the manifest last.
+        _bok, _bdetail = verify_synced_base(_key, _dest, via=_via, renv=_renv)
         if not _bok:
             return _park("base-verify-fail", _bdetail,
                          (load_pending() or {}).get("attempts", 0))
