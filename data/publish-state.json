@@ -1,48 +1,49 @@
 {
-  "committed_at": "2026-10-15T10:20:32.430547+00:00",
+  "committed_at": "2026-10-24T10:24:43.946188+00:00",
   "manifest": {
     "artifacts": {
       "meta/hospitals.json": {
-        "bytes": 3217766,
-        "sha256": "9b338205f99f252998926ff278f026be79f58c4fbdff6cf9820b7fa9d0044130"
+        "bytes": 3218750,
+        "sha256": "1eb6dce9b35febb4e5edcdba318cffeec7788562319de0909734add1defb8ddc"
       },
       "meta/summary.json": {
         "bytes": 6487,
-        "sha256": "ad02fa612d9d8cc641076bb207b3335f0ce4196bdb4b47c14e3cfc9d8f99e31a"
+        "sha256": "fff72b7800bc80003d543267f801d33d393e6b61197293e193cee7dbf90ba1b4"
       },
       "prices/index.json": {
-        "bytes": 1392465,
-        "sha256": "95f75ee249e19c3f8aa13ed6fa662e787ad7c89a835b18f507342f62ee53fec3"
+        "bytes": 1401483,
+        "sha256": "a5093159dba1530395d908d7fc9a9905143b3c41f601322b65d778fb45be53cb"
       }
     },
     "contract_version": "1",
-    "generated_at": "2026-10-15T10:16:28Z",
-    "git_commit": "1d5c34bbef1ffc035ef8904f8e7d0671b3f279e2",
+    "generated_at": "2026-10-24T10:16:51Z",
+    "git_commit": "8f854dc2dfb28ebbab432e2d4890ab457211d8bb",
     "git_repo": "https://github.com/barkleesanders/hospital-ledger",
-    "note": "wave 37 pricing updated_ccns=264024,320089,323033",
+    "note": "wave 42 pricing updated_ccns=154061,154063,160005,170145",
     "producer": "muse.ai nova (wave-loop)",
     "refresh_tier": "counts",
     "summary": {
       "cms_required_total": 4625,
-      "compliance_pct": 86.2,
-      "compliant": 3986,
-      "standardized_price_hospitals": 3728,
-      "standardized_price_rows": 67792181,
+      "compliance_pct": 86.3,
+      "compliant": 3990,
+      "standardized_price_hospitals": 3753,
+      "standardized_price_rows": 68061986,
       "total_facilities": 5426
     },
     "unhashed_counts": {
       "cpt_detail_files": 0,
       "payer_files": 0,
-      "prices_files": 3
+      "prices_files": 4
     }
   },
   "wave": {
-    "generated_at": "2026-10-15T10:16:28Z",
+    "generated_at": "2026-10-24T10:16:51Z",
     "published_ccns": [
-      "264024",
-      "320089",
-      "323033"
+      "154061",
+      "154063",
+      "160005",
+      "170145"
     ],
-    "wave": 37
+    "wave": 42
   }
 }
