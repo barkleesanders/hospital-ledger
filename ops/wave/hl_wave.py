@@ -1743,7 +1743,13 @@ def main():
         f"errors={len(errors)} dead={len(dead)}")
 
     # Pervasive probe failure: do not advance the watermark; fail the wave.
-    if wave_urls and resolved / len(wave_urls) < 0.5:
+    # Minimum sample 20 (2026-10-25): at tiny windows the 50% ratio is a
+    # statistical artifact - a wave-size-1 force run whose single window row
+    # returns an origin 403 trips the guard, burns a loop strike, and on
+    # 2026-10-25 stopped the standing loop (wave 48, CCN 194112, 403 via
+    # proxy) while the forced row itself never got probed. Below 20 rows a
+    # failed probe is just a row error; the wave proceeds.
+    if len(wave_urls) >= 20 and resolved / len(wave_urls) < 0.5:
         save_state(state)  # persist per-URL outcomes, but keep pos
         save_route_health(health)  # persist what the fetch legs just learned
         return record_failure("pervasive-probe-failure", 2, std,
