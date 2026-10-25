@@ -138,7 +138,7 @@ class ChunkMode(unittest.TestCase):
         pending = json.loads(hw.PENDING_PATH.read_text())
         self.assertEqual(set(pending["publish_ccns"]), set(CCNS[:3]))
         rec = self.last_record()
-        self.assertTrue(any("publish-failed-parked" in p["reason"]
+        self.assertTrue(any(p["class"] == "publish-failed-parked"
                             for p in rec["parked"]))
 
     def test_publish_deferred_parks_and_keeps_streak(self):
@@ -155,7 +155,7 @@ class ChunkMode(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(self.loop_bytes(), before)
         rec = self.last_record()
-        self.assertTrue(any("publish-deferred" in p["reason"]
+        self.assertTrue(any(p["class"] == "publish-deferred"
                             for p in rec["parked"]))
 
     def test_successful_chunk_does_not_reset_streak(self):
@@ -199,9 +199,9 @@ class ChunkMode(unittest.TestCase):
         rc = hw.run_chunk(self.args(["450001", "999999"]), {}, self.std())
         self.assertEqual(rc, 0)
         rec = self.last_record()
-        reasons = {p["ccn"]: p["reason"] for p in rec["parked"]}
-        self.assertEqual(reasons["999999"], "not-in-queue")
-        self.assertIn("450001", reasons)
+        classes = {p["ccn"]: p["class"] for p in rec["parked"]}
+        self.assertEqual(classes["999999"], "not-in-queue")
+        self.assertIn("450001", classes)
 
 
 if __name__ == "__main__":

@@ -368,6 +368,24 @@ def record_deferred(reason, std, detail="", extra=None):
     return 0
 
 
+# Whitelisted park classes for chunk evidence records. Free-text error
+# details (stderr tails, transport messages) stay in the run's stdout log;
+# the durable wave-log record carries only these fixed class tokens, so
+# the evidence trail never persists raw tool output.
+_PARK_CLASSES = ("not-in-queue", "index-unreadable", "index snapshot failed",
+                 "index-regression", "http", "transport", "parse", "slim",
+                 "too_large", "parse-failed", "publish-deferred",
+                 "publish-failed-parked", "built-not-published")
+
+
+def _park_class(reason):
+    """Map a free-text park reason to its whitelisted class token."""
+    for tok in _PARK_CLASSES:
+        if (reason or "").startswith(tok):
+            return tok
+    return "other"
+
+
 def record_chunk(ccns, updated, published, parked, std, extra=None):
     """Append a CHUNK evidence record WITHOUT touching the loop state.
 
@@ -375,12 +393,16 @@ def record_chunk(ccns, updated, published, parked, std, extra=None):
     It must be incapable of moving no_progress_streak in either direction,
     so this helper only READS the current streak (for the evidence line)
     and never calls save_std_loop / record_failure / record_success.
-    `parked` is a list of {"ccn":..., "reason":...} dicts."""
+    `parked` entries ({"ccn":..., "reason":...}) are persisted as
+    {"ccn":..., "class":...} with the class whitelisted via _park_class."""
     p = std.get("predicates", {}) or {}
     streak = int(p.get("no_progress_streak", 0) or 0)
+    parked_clean = [{"ccn": pk.get("ccn"),
+                     "class": _park_class(pk.get("reason", ""))}
+                    for pk in parked]
     rec = {"ts": now_iso(), "wave": "chunk", "result": "CHUNK",
            "ccns": list(ccns), "updated_ccns": list(updated),
-           "published_ccns": list(published), "parked": list(parked),
+           "published_ccns": list(published), "parked": parked_clean,
            "no_progress_streak": streak}
     if extra:
         rec.update(extra)
