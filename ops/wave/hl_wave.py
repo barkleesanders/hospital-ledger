@@ -1857,6 +1857,11 @@ def run_chunk(args, env, std):
         for r in rows:
             if r["ccn"] not in updated:
                 park_rows([r], err_reason.get(r["ccn"], "parse-failed"))
+        # Persist the parks NOW, before the publish phase: a publish-side
+        # failure must never be able to take the parse parks down with it
+        # (learned live 2026-10-25: an r2_put --check TimeoutExpired
+        # escaped the publish phase and the in-memory park was lost).
+        save_state(state)
 
     published_ccns, api_items, pub_reason = [], {}, None
     carry_published_count = 0
@@ -1874,9 +1879,21 @@ def run_chunk(args, env, std):
         carry = [c for c in dict.fromkeys(carry) if c not in updated]
         pub_args = argparse.Namespace(dry_run=False,
                                       no_publish=bool(args.no_publish))
-        pub = run_publish_phase(pub_args, env, state, std, updated, carry,
-                                 index_ccns, pre_count, errors, health,
-                                 wave_no)
+        try:
+            pub = run_publish_phase(pub_args, env, state, std, updated,
+                                    carry, index_ccns, pre_count, errors,
+                                    health, wave_no)
+        except Exception as exc:
+            # A chunk must never die mid-publish: an exception inside the
+            # publish phase (e.g. an r2_put subprocess timeout on a sick
+            # egress) converts to the same park a returned failure gets.
+            # The phase uploads manifest-last and its check/validation
+            # steps precede any upload, so parking the set is safe.
+            log(f"chunk: publish phase raised {type(exc).__name__}: "
+                f"{exc} -- parking the chunk set")
+            pub = {"status": "failed", "reason": "publish-exception",
+                   "detail": f"{type(exc).__name__}: {exc}"[:300],
+                   "publish_ccns": list(updated) + list(carry)}
         save_route_health(health)
         status = pub.get("status")
         if status == "published":
