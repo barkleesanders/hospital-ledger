@@ -141,6 +141,37 @@ class ChunkMode(unittest.TestCase):
         self.assertTrue(any(p["class"] == "publish-failed-parked"
                             for p in rec["parked"]))
 
+    def test_publish_exception_parks_and_keeps_streak(self):
+        # Regression (live 2026-10-25): an r2_put --check timeout escaped
+        # run_publish_phase and killed the test chunk -- no CHUNK record,
+        # and the parse park existed only in memory and was lost. A
+        # publish-phase exception must convert to the failed->park path,
+        # and parse parks must already be durable on disk.
+        def reparse_mixed(changed, bound, errors, state):
+            errors.append({"ccn": changed[-1]["ccn"], "class": "parse",
+                           "detail": "boom"})
+            return [ch["ccn"] for ch in changed[:-1]], []
+        hw.reparse_changed = reparse_mixed
+
+        def pub_raise(*a, **k):
+            raise TimeoutError("r2_put --check timed out")
+        hw.run_publish_phase = pub_raise
+        before = self.loop_bytes()
+        rc = hw.run_chunk(self.args(CCNS[:3]), {}, self.std())
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.loop_bytes(), before)
+        st = self.state()
+        deferred = {d["ccn"] for d in st["deferred"]}
+        self.assertIn(CCNS[2], deferred,
+                      "parse park must persist despite the publish crash")
+        self.assertTrue(set(CCNS[:2]) <= set(st["unpublished"]))
+        pending = json.loads(hw.PENDING_PATH.read_text())
+        self.assertTrue(set(CCNS[:2]) <= set(pending["publish_ccns"]))
+        rec = self.last_record()
+        self.assertEqual(rec["result"], "CHUNK")
+        self.assertTrue(any(p["class"] == "publish-failed-parked"
+                            for p in rec["parked"]))
+
     def test_publish_deferred_parks_and_keeps_streak(self):
         hw.reparse_changed = self.reparse_ok
 
