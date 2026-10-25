@@ -407,12 +407,12 @@ def record_chunk(ccns, updated, published, parked, std, extra=None):
     if extra:
         rec.update(extra)
     with open(WAVE_LOG, "a") as fh:
-        # codeql[py/clear-text-storage-sensitive-data] -- reviewed false
-        # positive: the record holds only public CMS hospital identifiers
-        # (CCNs), counts, and whitelisted park-class tokens -- the same
-        # fields wave records already persist to this log. No credentials
-        # or private data ever enter a wave-log record (R2 credentials
-        # live in env files and are never recorded).
+        # Reviewed false positive (CodeQL clear-text-storage): this record
+        # holds only public CMS hospital identifiers (CCNs), counts, and
+        # whitelisted park-class tokens -- the same fields wave records
+        # already persist to this log. No credentials or private data ever
+        # enter a wave-log record (R2 credentials live in env files).
+        # codeql[py/clear-text-storage-sensitive-data]
         fh.write(json.dumps(rec) + "\n")
     log(f"CHUNK: {len(ccns)} CCNs -> updated={list(updated)} "
         f"published={list(published)} parked={len(parked)} "
