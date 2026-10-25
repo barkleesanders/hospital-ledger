@@ -103,8 +103,8 @@ DESC_COL_HINTS = [
 ]
 GROSS_COL_HINTS = ['gross', 'standard charge', 'standard_charge', 'list_price', 'charge_master', 'cdm_price', 'price', 'amount', 'eff rate', 'rate amt', 'charge amt']
 CASH_COL_HINTS = ['cash', 'self_pay', 'self-pay', 'discounted_cash', 'discount_cash_price']
-MIN_COL_HINTS = ['min_negotiated', 'minimum_negotiated', 'min_charge', 'minimum']
-MAX_COL_HINTS = ['max_negotiated', 'maximum_negotiated', 'max_charge', 'maximum']
+MIN_COL_HINTS = ['min_negotiated', 'minimum_negotiated', 'min_charge', 'minimum', 'minprice', 'min_price']
+MAX_COL_HINTS = ['max_negotiated', 'maximum_negotiated', 'max_charge', 'maximum', 'maxprice', 'max_price']
 SETTING_HINTS = ['setting', 'inpatient_outpatient', 'ip_op']
 BILLING_HINTS = ['billing_class', 'professional_facility', 'class']
 CODE_TYPE_HINTS = ['code type', 'billing code type', 'procedure code type']
@@ -329,6 +329,11 @@ def first_col(cols, hints):
 def first_code_col(cols):
     priority_hints = [
         'cpt hcpcs', 'cpt_hcpcs', 'hcpcs cpt', 'hcpcs_cpt',
+        # Chargemaster extracts (Select Medical layout, 2026-10-25): the
+        # CDM/charge code is populated on every row and is the row identity;
+        # a bare CPT column in the same file is an attribute that is empty
+        # on most rows. Rank the chargemaster code above bare 'cpt'.
+        'charge_code', 'cdm_code',
         'hcpcs', 'cpt', 'ms_drg', 'msdrg', 'drg', 'rev_code',
         'revenue code', 'ndc',
     ]
@@ -507,6 +512,36 @@ def resolve_csv_columns(cols, sample_rows):
         'payer': first_col(cols, PAYER_HINTS),
         'plan': first_col(cols, PLAN_HINTS),
     }
+    # Code-column sparsity swap (2026-10-25, Select Medical decompile wave):
+    # the priority pick can be mostly empty in the data (CPT_CODE is blank
+    # on most chargemaster rows) while another code column (CHARGE_CODE /
+    # CDM code) is populated on every row. Code-keyed indexing otherwise
+    # sees a largely codeless file. Swap only on strong evidence: the pick
+    # is populated on <50% of sample rows and an unclaimed code-named
+    # column (not a code-type column) is populated on >=90%.
+    if mapping['code'] is not None and sample_rows:
+        def _pop_frac(idx):
+            rows = [r for r in sample_rows[:200] if idx < len(r)]
+            if not rows:
+                return 0.0
+            return sum(1 for r in rows if str(r[idx]).strip()) / len(rows)
+
+        picked = mapping['code']
+        if _pop_frac(picked) < 0.5:
+            claimed = {v for v in mapping.values() if v is not None}
+            best = None
+            for i, c in enumerate(cols):
+                if i in claimed or i == picked:
+                    continue
+                n = norm_col_name(c)
+                if 'code' not in n or 'type' in n:
+                    continue
+                frac = _pop_frac(i)
+                if frac >= 0.9 and (best is None or frac > best[1]):
+                    best = (i, frac)
+            if best is not None:
+                mapping['code'] = best[0]
+                notes.append('code-sparsity-swap:%r->%r' % (cols[picked], cols[best[0]]))
     missing = [f for f in ('desc', 'gross') if mapping[f] is None]
     if missing:
         claimed = {v for v in mapping.values() if v is not None}
@@ -1008,6 +1043,15 @@ def parse_json_v2(content_bytes, max_items=200_000):
         return parse_json_list_variant(data, max_items=max_items)
     if not isinstance(data, dict):
         return []
+    return parse_json_v2_data(data, max_items=max_items)
+
+
+def parse_json_v2_data(data, max_items=200_000):
+    """CMS HPT v2.0 expansion over an already-decoded document dict.
+
+    Shared by the JSON path and the XML MRF path (CMS-template-field XML
+    converts to this same dict shape).
+    """
     sci = data.get('standard_charge_information', []) or data.get('standard_charges', [])
     if sci:
         items = []
@@ -1098,7 +1142,7 @@ def parse_xlsx(content_bytes, max_rows=200_000):
             csv_bytes = buf.getvalue().encode('utf-8')
             # Prefer tall if a "payer" column is present in this sheet
             preview = buf.getvalue()[:8192].lower()
-            if 'payer_name' in preview or 'payer ' in preview or 'negotiated_rate' in preview:
+            if 'payer_name' in preview or 'payer ' in preview or 'negotiated_rate' in preview or header_has_bare_payer(csv_bytes):
                 items.extend(parse_csv_tall(csv_bytes, max_rows=max_rows))
             else:
                 items.extend(parse_csv_wide(csv_bytes, max_rows=max_rows))
@@ -1132,7 +1176,7 @@ def parse_xls_legacy(content_bytes, max_rows=200_000):
                 writer.writerow(row)
             csv_bytes = buf.getvalue().encode('utf-8')
             preview = buf.getvalue()[:8192].lower()
-            if 'payer_name' in preview or 'payer ' in preview or 'negotiated_rate' in preview:
+            if 'payer_name' in preview or 'payer ' in preview or 'negotiated_rate' in preview or header_has_bare_payer(csv_bytes):
                 items.extend(parse_csv_tall(csv_bytes, max_rows=max_rows))
             else:
                 items.extend(parse_csv_wide(csv_bytes, max_rows=max_rows))
@@ -1181,6 +1225,7 @@ def parse_spreadsheetml(content_bytes, max_rows=200_000):
 
     items = []
     try:
+        content_bytes = _fix_xml_decl_encoding(content_bytes)
         sheets = []  # list of list-of-rows
         current_rows = None
         col = 0
@@ -1237,7 +1282,7 @@ def parse_spreadsheetml(content_bytes, max_rows=200_000):
                 w.writerow(r)
             csv_bytes = buf.getvalue().encode('utf-8')
             preview = buf.getvalue()[:8192].lower()
-            if 'payer_name' in preview or 'payer ' in preview or 'negotiated_rate' in preview:
+            if 'payer_name' in preview or 'payer ' in preview or 'negotiated_rate' in preview or header_has_bare_payer(csv_bytes):
                 items.extend(parse_csv_tall(csv_bytes, max_rows=max_rows))
             else:
                 items.extend(parse_csv_wide(csv_bytes, max_rows=max_rows))
@@ -1249,8 +1294,198 @@ def parse_spreadsheetml(content_bytes, max_rows=200_000):
         return []
 
 
+def looks_like_xml_mrf(content_bytes):
+    """Non-SpreadsheetML XML that could be an MRF (2026-10-25).
+
+    Two schemas confirmed in the wild: CMS-template-field XML (root
+    <hospital>, JSON-template key names as elements) and a vendor-custom
+    <root><facility> schema. Both previously fell through detect_format
+    to the CSV default and parsed to 0 items. HTML (incl. XHTML error
+    pages) is excluded so error pages keep their existing routing.
+    """
+    head = content_bytes[:4096]
+    if head.startswith(b'\xef\xbb\xbf'):
+        head = head[3:]
+    head = head.lstrip()
+    if not (head.startswith(b'<?xml') or head.startswith(b'<hospital')
+            or head.startswith(b'<root')):
+        return False
+    probe = content_bytes[:8192].lower()
+    if b'<html' in probe or b'<!doctype html' in probe:
+        return False
+    return True
+
+
+def _xml_local_name(tag):
+    if not isinstance(tag, str):
+        return ''
+    return tag.rsplit('}', 1)[-1]
+
+
+def _xml_element_to_value(elem):
+    """Convert an XML element to plain python data using local tag names.
+
+    Mirrors the JSON document shape: leaf elements become their stripped
+    text; children group by local name (repeats become lists); a container
+    whose children all share one name collapses to that list (JSON array
+    fields such as standard_charge_information render this way); element
+    attributes merge in under their local names.
+    """
+    children = list(elem)
+    text = (elem.text or '').strip()
+    if not children:
+        if elem.attrib:
+            out = {_xml_local_name(k): v for k, v in elem.attrib.items()}
+            if text:
+                out['text'] = text
+            return out
+        return text
+    grouped = {}
+    for child in children:
+        name = _xml_local_name(child.tag)
+        val = _xml_element_to_value(child)
+        if name in grouped:
+            if not isinstance(grouped[name], list):
+                grouped[name] = [grouped[name]]
+            grouped[name].append(val)
+        else:
+            grouped[name] = val
+    if len(grouped) == 1:
+        only = next(iter(grouped.values()))
+        if isinstance(only, list):
+            return only
+    for k, v in elem.attrib.items():
+        grouped.setdefault(_xml_local_name(k), v)
+    return grouped
+
+
+def _xml_find_charge_rows(data):
+    """Largest list of row-dicts anywhere in a converted XML document
+    whose keys look like charge-row fields (vendor schemas)."""
+    best = []
+
+    def looks_like_row(d):
+        return any(
+            kw_match(str(k), CODE_COL_HINTS + DESC_COL_HINTS + GROSS_COL_HINTS)
+            for k in d.keys()
+        )
+
+    def walk(node):
+        nonlocal best
+        if isinstance(node, list):
+            dicts = [x for x in node if isinstance(x, dict)]
+            if len(dicts) >= 2:
+                hits = sum(1 for d in dicts if looks_like_row(d))
+                if hits >= max(1, len(dicts) // 2) and len(dicts) > len(best):
+                    best = dicts
+            for x in node:
+                walk(x)
+        elif isinstance(node, dict):
+            for v in node.values():
+                walk(v)
+
+    walk(data)
+    return best
+
+
+def _fix_xml_decl_encoding(content_bytes):
+    """Rewrite the XML declaration's encoding to utf-8 after transcoding.
+
+    detect_format decodes UTF-16 bodies to UTF-8 bytes, but the document
+    still declares encoding="utf-16" and ElementTree rejects bytes whose
+    declaration disagrees with their actual encoding. Only the prolog is
+    touched, and only when it names a non-UTF-8 encoding.
+    """
+    if content_bytes[:5] == b'<?xml':
+        head, sep, rest = content_bytes.partition(b'?>')
+        if sep and len(head) < 512:
+            fixed = re.sub(br'encoding\s*=\s*["\'](?!utf-8["\'])[^"\']*["\']',
+                           b'encoding="utf-8"', head, flags=re.IGNORECASE)
+            if fixed != head:
+                return fixed + sep + rest
+    return content_bytes
+
+
+def parse_xml_mrf(content_bytes, max_rows=200_000):
+    """Parse non-SpreadsheetML XML MRFs (2026-10-25).
+
+    CMS-template-field XML (Shepherd Center pattern: <hospital> root,
+    JSON-template key names, sometimes UTF-16 — detect_format decodes the
+    BOM before routing here) converts to the JSON v2 dict shape and runs
+    through the same expansion as JSON. Vendor-custom schemas
+    (Wickenburg pattern: <root><facility>...) fall back to locating the
+    repeated charge-row elements and running them through the JSON
+    list-variant row machinery.
+    """
+    try:
+        import xml.etree.ElementTree as ET
+    except ImportError:
+        return []
+    if content_bytes[:2] in (b'\xff\xfe', b'\xfe\xff'):
+        try:
+            content_bytes = content_bytes.decode('utf-16').encode('utf-8')
+        except (UnicodeDecodeError, ValueError):
+            return []
+    content_bytes = _fix_xml_decl_encoding(content_bytes)
+    try:
+        root = ET.fromstring(content_bytes)
+    except Exception:
+        return []
+    data = _xml_element_to_value(root)
+    if not isinstance(data, dict):
+        return []
+    sci = data.get('standard_charge_information') or data.get('standard_charges')
+    if sci is not None:
+        if isinstance(sci, dict):
+            sci = sci.get('item') if isinstance(sci.get('item'), list) else [sci]
+        if isinstance(sci, list) and sci:
+            # XML renders a single payer block as a dict where JSON has a
+            # one-element list; normalize so expand_json_v2_entry iterates
+            # payer records, not dict keys.
+            for entry in sci:
+                if not isinstance(entry, dict):
+                    continue
+                # <code type="CPT">99213</code> converts to
+                # {'type': 'CPT', 'text': '99213'}; give it the JSON key.
+                ci = entry.get('code_information')
+                for rec in (ci if isinstance(ci, list) else [ci]):
+                    if isinstance(rec, dict) and not rec.get('code') and rec.get('text'):
+                        rec['code'] = rec['text']
+                charges = entry.get('standard_charges')
+                if isinstance(charges, dict):
+                    charges = [charges]
+                    entry['standard_charges'] = charges
+                if isinstance(charges, list):
+                    for sc in charges:
+                        if isinstance(sc, dict) and isinstance(sc.get('payers_information'), dict):
+                            sc['payers_information'] = [sc['payers_information']]
+            items = []
+            for entry in sci[:max_rows]:
+                items.extend(expand_json_v2_entry(entry))
+            if items:
+                return items
+    rows = _xml_find_charge_rows(data)
+    if rows:
+        return parse_json_list_variant(rows, max_items=max_rows)
+    return []
+
+
 def detect_format(content_bytes, url):
     """Return (format_str, normalized_bytes_or_inner_zip)."""
+    # UTF-16/32 BOM sniff BEFORE any format detection (2026-10-25):
+    # Shepherd Center's CMS-template XML ships UTF-16LE; the raw bytes
+    # matched nothing, fell through to the CSV default, and decoded as
+    # mojibake -> 0 items. Decode and re-detect on UTF-8 bytes.
+    if content_bytes[:4] in (b'\xff\xfe\x00\x00', b'\x00\x00\xfe\xff'):
+        try:
+            return detect_format(content_bytes.decode('utf-32').encode('utf-8'), url)
+        except (UnicodeDecodeError, ValueError):
+            pass
+    elif content_bytes[:2] in (b'\xff\xfe', b'\xfe\xff'):
+        try:
+            return detect_format(content_bytes.decode('utf-16').encode('utf-8'), url)
+        except (UnicodeDecodeError, ValueError):
+            pass
     # Strip leading whitespace / BOM. Some hospital JSON files are served behind
     # redirect wrappers and arrive with a UTF-8 BOM, so raw byte-prefix checks
     # need to normalize that before falling back to CSV.
@@ -1282,6 +1517,11 @@ def detect_format(content_bytes, url):
     # since an XML document trips looks_like_html's tag detection.
     if looks_like_spreadsheetml(content_bytes):
         return 'spreadsheetml', content_bytes
+    # Other XML MRF schemas (CMS-template-field XML, vendor schemas) — must
+    # precede the delimited-text fallthrough, which "parses" XML text as
+    # CSV and yields 0 items (2026-10-25).
+    if looks_like_xml_mrf(content_bytes):
+        return 'xml-mrf', content_bytes
     if looks_like_html(content_bytes):
         return 'html', content_bytes
     # Some hospitals serve CSV/TSV from a .json URL; prefer the content shape
@@ -1326,12 +1566,36 @@ def parse(content_bytes, url, hospital_name='', ccn=''):
             for m in selected:
                 inner = zf.read(m)
                 inner_fmt, inner_b = detect_format(inner, m)
-                if inner_fmt in ('csv', 'json', 'xlsx', 'spreadsheetml', 'xls-legacy'):
+                if inner_fmt in ('csv', 'json', 'xlsx', 'spreadsheetml', 'xls-legacy', 'xml-mrf'):
                     return inner_fmt, parse_inner(inner_fmt, inner_b)
             return 'zip', []
         except Exception:
             return 'zip-error', []
     return fmt, parse_inner(fmt, content)
+
+
+def header_has_bare_payer(content_bytes):
+    """True when the header row carries a bare `Payer` column.
+
+    Some tall vendor layouts (IU Health, fingerprinted 2026-10-25) name the
+    payer column exactly 'Payer': no 'payer_name', no 'payer ' substring
+    (in the delimited header it appears as ',Payer,'), no 'negotiated_rate'
+    token. The substring probe therefore misses the tall shape and the
+    file falls into the wide parser, which treats the Payer column as a
+    wide payer column (its name values never parse as rates) and emits
+    one item per payer row, losing every payer rate. Detect it
+    structurally: run the parser's own header finder over the first rows
+    and look for a header cell that normalizes to exactly 'payer'.
+    """
+    try:
+        text = content_bytes[:262144].decode('utf-8', errors='replace')
+        _, rows = delimited_rows(text)
+        if not rows:
+            return False
+        header = rows[find_header_row(rows)]
+        return any(norm_col_name(c) == 'payer' for c in header)
+    except Exception:
+        return False
 
 
 def parse_inner(fmt, content_bytes):
@@ -1343,6 +1607,8 @@ def parse_inner(fmt, content_bytes):
         return parse_xls_legacy(content_bytes)
     if fmt == 'spreadsheetml':
         return parse_spreadsheetml(content_bytes)
+    if fmt == 'xml-mrf':
+        return parse_xml_mrf(content_bytes)
     if fmt == 'csv':
         # Decide tall vs wide: tall has "payer" or "negotiated_rate" column, wide doesn't
         try:
@@ -1351,6 +1617,8 @@ def parse_inner(fmt, content_bytes):
                 return parse_csv_tall(content_bytes)
         except Exception:
             pass
+        if header_has_bare_payer(content_bytes):
+            return parse_csv_tall(content_bytes)
         return parse_csv_wide(content_bytes)
     if fmt == 'html':
         return []
