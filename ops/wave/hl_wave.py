@@ -492,7 +492,7 @@ def detect_changes(client, wave, state, index_ccns, health=None):
     proxy_fallbacks = 0
     state_lock = threading.Lock()  # protects state/changed/errors/dead/resolved/proxy_fallbacks
     health_lock = threading.Lock()  # protects route-health counters (2026-10-01)
-    # Parallel workers: I/O-bound fetches, 25 threads on 2 CPUs is safe (2026-09-29)
+# Parallel workers: I/O-bound fetches, 3 threads (pool set at the executor below)
 
     def proxy_url(u):
         return PROXY_BASE + "/?url=" + urllib.parse.quote(u, safe="")
@@ -667,7 +667,7 @@ def detect_changes(client, wave, state, index_ccns, health=None):
             errors.append({"ccn": r["ccn"], "class": "transport",
                            "detail": " ".join(detail_parts)[:160]})
 
-    # PARALLEL EXECUTION: 25 workers for I/O-bound fetches (2026-09-29)
+# PARALLEL EXECUTION: 3 workers for I/O-bound fetches (see executor below)
     with ThreadPoolExecutor(max_workers=3) as executor:
         list(executor.map(process_one, wave))
 
@@ -1736,7 +1736,7 @@ def main():
 
     changed, errors, resolved = [], [], 0
     dead = []
-    with httpx.Client(timeout=30, follow_redirects=True, headers=UA,
+    with httpx.Client(timeout=150, follow_redirects=True, headers=UA,
                       **(edge.httpx_kwargs() if edge else {})) as c:
         changed, errors, resolved, dead = detect_changes(c, wave_urls, state, index_ccns, health)
     log(f"checked={len(wave_urls)} resolved={resolved} changed={len(changed)} "
