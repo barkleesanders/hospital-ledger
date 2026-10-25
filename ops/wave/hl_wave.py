@@ -412,8 +412,7 @@ def record_chunk(ccns, updated, published, parked, std, extra=None):
         # whitelisted park-class tokens -- the same fields wave records
         # already persist to this log. No credentials or private data ever
         # enter a wave-log record (R2 credentials live in env files).
-        # codeql[py/clear-text-storage-sensitive-data]
-        fh.write(json.dumps(rec) + "\n")
+        fh.write(json.dumps(rec) + "\n")  # codeql[py/clear-text-storage-sensitive-data]
     log(f"CHUNK: {len(ccns)} CCNs -> updated={list(updated)} "
         f"published={list(published)} parked={len(parked)} "
         f"(streak unchanged at {streak})")
@@ -1860,6 +1859,7 @@ def run_chunk(args, env, std):
                 park_rows([r], err_reason.get(r["ccn"], "parse-failed"))
 
     published_ccns, api_items, pub_reason = [], {}, None
+    carry_published_count = 0
     if updated and not args.dry_run:
         # Standard carry, exactly as a wave adopts it: previously built
         # price files (state["unpublished"] + the pending manifest) ride
@@ -1880,9 +1880,17 @@ def run_chunk(args, env, std):
         save_route_health(health)
         status = pub.get("status")
         if status == "published":
-            published_ccns = pub.get("publish_ccns", [])
-            for c in published_ccns:
+            pub_list = pub.get("publish_ccns", [])
+            for c in pub_list:
                 api_items[c] = verify_ccn_api(c)
+            # The evidence record lists this chunk's OWN published CCNs
+            # re-derived from the request list; carry landings (earlier
+            # chunks' work riding this publish) are counted, not listed --
+            # their CCNs appear in the record of the chunk that built
+            # them and in api_items above.
+            published_ccns = [c for c in ccns if c in set(pub_list)]
+            carry_published_count = len(
+                [c for c in pub_list if c not in set(ccns)])
         elif status == "deferred":
             pub_reason = pub.get("reason")
             # _park already wrote state["unpublished"] + the pending
@@ -1918,7 +1926,8 @@ def run_chunk(args, env, std):
 
     save_state(state)
     save_route_health(health)
-    extra = {"api_items": api_items}
+    extra = {"api_items": api_items,
+             "carry_published_count": carry_published_count}
     if pub_reason:
         extra["publish_reason"] = pub_reason
     if args.dry_run:
