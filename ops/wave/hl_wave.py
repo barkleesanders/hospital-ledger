@@ -41,14 +41,23 @@ Safety (standing rules, updated 2026-09-23 per Barklee's end-to-end directive):
     updated CCNs; nothing is ever deleted from R2
   - every terminal failure routes through record_failure(); 3 consecutive
     failed waves -> standard loop-stop -> stop and alert
+  - chunk mode (--chunk-ccns) is the one exception by design (2026-10-25,
+    Barklee-directed): it never routes through record_failure/record_success,
+    so a chunk run can neither burn nor reset no_progress_streak; every
+    chunk failure parks through the deferred mechanics instead.
 
 Usage:
   hl_wave.py [--wave-size 50] [--max-reparse 8] [--no-publish] [--dry-run]
-             [--force-ccn CCN]
+             [--force-ccn CCN] [--chunk-ccns CCN[,CCN...]]
   --dry-run:    detect changes only, no parse/publish (proves mechanics)
   --no-publish: full pipeline incl. parse+validate, but no R2 upload
   --force-ccn:  force one granted-host CCN through the full reparse chain
                 (exercises parse->slim->validate end to end on demand)
+  --chunk-ccns: process a small explicit chunk (max 10 CCNs): force-reparse
+                + publish just those CCNs (plus the standard unpublished /
+                pending-manifest carry, exactly as a wave would adopt).
+                Failure-isolated: a failed chunk parks only its own CCNs
+                and the run still exits 0; see run_chunk().
 """
 import argparse, hashlib, importlib.util, json, os, re, shutil, socket, sqlite3, subprocess, sys, threading, time
 import urllib.parse, urllib.request
@@ -87,6 +96,10 @@ RETRY_MAX_ATTEMPTS = 20       # escalation threshold (signal, not a stop)
 # down and attempts fail fast (no burned timeouts) until the cooldown expires.
 ROUTE_COOLDOWN_SCHEDULE = {3: 1800, 4: 3600}  # consec fails -> cooldown secs
 ROUTE_COOLDOWN_CAP = 7200                     # 2 h max
+# Chunk mode (2026-10-25): a chunk is deliberately small -- big enough to
+# amortize the per-publish base sync/verify, small enough that one chunk's
+# failure strands almost nothing. The marathon driver uses 5.
+CHUNK_MAX = 10
 INDEX_PATH = ROOT / "public/data/prices/index.json"
 MAX_BYTES = 750 * 1024 * 1024
 PRODUCER = "muse.ai nova (wave-loop)"
@@ -353,6 +366,30 @@ def record_deferred(reason, std, detail="", extra=None):
     log(f"DEFERRED: {reason} ({streak} streak unchanged) -> "
         f"pending manifest, retry owns recovery")
     return 0
+
+
+def record_chunk(ccns, updated, published, parked, std, extra=None):
+    """Append a CHUNK evidence record WITHOUT touching the loop state.
+
+    Chunk mode's streak contract (2026-10-25): a chunk run is not a wave.
+    It must be incapable of moving no_progress_streak in either direction,
+    so this helper only READS the current streak (for the evidence line)
+    and never calls save_std_loop / record_failure / record_success.
+    `parked` is a list of {"ccn":..., "reason":...} dicts."""
+    p = std.get("predicates", {}) or {}
+    streak = int(p.get("no_progress_streak", 0) or 0)
+    rec = {"ts": now_iso(), "wave": "chunk", "result": "CHUNK",
+           "ccns": list(ccns), "updated_ccns": list(updated),
+           "published_ccns": list(published), "parked": list(parked),
+           "no_progress_streak": streak}
+    if extra:
+        rec.update(extra)
+    with open(WAVE_LOG, "a") as fh:
+        fh.write(json.dumps(rec) + "\n")
+    log(f"CHUNK: {len(ccns)} CCNs -> updated={list(updated)} "
+        f"published={list(published)} parked={len(parked)} "
+        f"(streak unchanged at {streak})")
+    return rec
 
 
 def load_published_hashes():
@@ -1651,6 +1688,221 @@ def run_publish_phase(args, env, state, std, updated_ccns, unpublished,
             "validation": validation, "pricing_validation": pricing_validation}
 
 
+# ---------------------------------------------------------------- chunk mode
+
+def verify_ccn_api(ccn):
+    """Item count for one CCN from the live Worker API, or None.
+
+    Reuses the manifest fetch legs (VM-direct -> CORS proxy -> Mini) so the
+    check works in the same degraded windows the pipeline itself tolerates.
+    The price file's "items" list is the count; anything unparsable -> None
+    (a verify gap to report, never a chunk failure: the publish phase has
+    already byte-verified the object in R2)."""
+    text, _via = _fetch_live_manifest_text(
+        f"https://hospitalledger.com/api/prices/{ccn}")
+    if not text:
+        return None
+    try:
+        d = json.loads(text)
+        items = d.get("items") if isinstance(d, dict) else None
+        return len(items) if isinstance(items, list) else None
+    except ValueError:
+        return None
+
+
+def run_chunk(args, env, std):
+    """--chunk-ccns entry point: process one small explicit CCN set
+    end-to-end (force-reparse -> publish those CCNs plus the standard
+    carry), with failure isolation per chunk (2026-10-25, Barklee-directed
+    chunk mode: smaller sections, pushed per chunk, so one failure breaks
+    one chunk instead of a huge run).
+
+    Streak contract: this function NEVER calls record_failure or
+    record_success and never writes the loop state file, so a chunk run
+    cannot burn a strike in a sick window -- and cannot silently reset one
+    either. Every failure mode parks through the existing deferred
+    mechanics (state["deferred"] for unparsed CCNs; state["unpublished"]
+    + the pending manifest for built-but-unpublished CCNs) and the run
+    still exits 0. The pervasive-probe guard does not apply: there is no
+    windowed detect here at all.
+
+    Exit codes: 0 = chunk processed (landed and/or parked);
+    3 = loop stopped by the standard gate (nothing touched);
+    2 = usage error (empty/oversized CCN list; nothing touched)."""
+    ccns = list(dict.fromkeys(
+        c.strip() for c in (args.chunk_ccns or "").split(",") if c.strip()))
+    if not ccns:
+        log("--chunk-ccns: empty CCN list")
+        return 2
+    if len(ccns) > CHUNK_MAX:
+        log(f"--chunk-ccns: {len(ccns)} CCNs exceeds CHUNK_MAX={CHUNK_MAX}")
+        return 2
+    reason = check_std_gate(std)
+    if reason:
+        print(f"LOOP STOPPED by standard gate ({reason}); chunk not run.",
+              file=sys.stderr)
+        return 3
+
+    edge = load_edge()
+    if edge is not None and edge.enabled():
+        try:
+            log(edge.preflight())
+        except Exception as e:
+            # Preflight is a token/route check, not fetch health (skill
+            # lesson, 2026-10-25): log it and let the chunk's real fetches
+            # speak. Never a terminal failure in chunk mode.
+            log(f"edge preflight raised ({e}); continuing to real fetches")
+    granted = load_granted(edge)
+    # Fresh queue every chunk run: the cache can predate an intake
+    # promotion, and a stale row would reparse yesterday's URL.
+    queue = build_queue(granted)
+    by_ccn = {}
+    for r in queue:
+        by_ccn.setdefault(r["ccn"], r)  # first row wins, as --force-ccn does
+
+    state = load_state()
+    health = load_route_health()
+    index_ccns, pre_count = load_index_ccns()
+    wave_no = int(state.get("waves_done", 0) or 0) + 1
+    parked = []
+
+    def park_rows(rows, why):
+        """Park queue rows into state["deferred"] (deduped by CCN)."""
+        have = {d.get("ccn") for d in (state.get("deferred") or [])}
+        for r in rows:
+            if r["ccn"] not in have:
+                state.setdefault("deferred", []).append(r)
+                have.add(r["ccn"])
+            parked.append({"ccn": r["ccn"], "reason": why})
+
+    rows, missing = [], []
+    for c in ccns:
+        (rows.append(by_ccn[c]) if c in by_ccn else missing.append(c))
+    for c in missing:
+        parked.append({"ccn": c, "reason": "not-in-queue"})
+
+    if pre_count < 3000:
+        park_rows(rows, "index-unreadable")
+        save_state(state)
+        save_route_health(health)
+        record_chunk(ccns, [], [], parked, std,
+                     {"detail": f"local index has {pre_count} hospitals "
+                                f"(<3000); refusing to build on it"})
+        return 0
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    snapshot = GOAL / f"index_snapshot_chunk_{ts}.json"
+    try:
+        shutil.copy2(INDEX_PATH, snapshot)
+    except OSError as e:
+        park_rows(rows, f"index snapshot failed: {e}")
+        save_state(state)
+        save_route_health(health)
+        record_chunk(ccns, [], [], parked, std, {})
+        return 0
+
+    errors = []
+    updated = []
+    if rows and not args.dry_run:
+        updated, _ = reparse_changed(rows, len(rows), errors, state)
+    elif rows and args.dry_run:
+        log(f"chunk dry run: {len(rows)} reparses skipped")
+
+    if updated:
+        ok, _count = verify_index_complete(pre_count, index_ccns, updated)
+        if not ok:
+            # Fail closed on the DATA, not the loop: restore the index,
+            # park the whole chunk, publish nothing.
+            try:
+                shutil.copy2(snapshot, INDEX_PATH)
+                log("index restored from pre-chunk snapshot")
+            except OSError as e:
+                log(f"snapshot restore FAILED: {e}")
+            park_rows(rows, "index-regression")
+            save_state(state)
+            save_route_health(health)
+            record_chunk(ccns, [], [], parked, std, {})
+            return 0
+
+    if not args.dry_run:
+        err_reason = {e.get("ccn"): f"{e.get('class')}: {e.get('detail')}"
+                      for e in errors}
+        for r in rows:
+            if r["ccn"] not in updated:
+                park_rows([r], err_reason.get(r["ccn"], "parse-failed"))
+
+    published_ccns, api_items, pub_reason = [], {}, None
+    if updated and not args.dry_run:
+        # Standard carry, exactly as a wave adopts it: previously built
+        # price files (state["unpublished"] + the pending manifest) ride
+        # along, so a chunk publish can never strand or silently clear
+        # work an earlier run already paid for.
+        carry = [c for c in (state.get("unpublished") or [])
+                 if (ROOT / "public/data/prices" / f"{c}.json").exists()]
+        _pending = load_pending()
+        if _pending:
+            carry += [c for c in (_pending.get("publish_ccns") or [])
+                      if (ROOT / "public/data/prices" / f"{c}.json").exists()]
+        carry = [c for c in dict.fromkeys(carry) if c not in updated]
+        pub_args = argparse.Namespace(dry_run=False,
+                                      no_publish=bool(args.no_publish))
+        pub = run_publish_phase(pub_args, env, state, std, updated, carry,
+                                 index_ccns, pre_count, errors, health,
+                                 wave_no)
+        save_route_health(health)
+        status = pub.get("status")
+        if status == "published":
+            published_ccns = pub.get("publish_ccns", [])
+            for c in published_ccns:
+                api_items[c] = verify_ccn_api(c)
+        elif status == "deferred":
+            pub_reason = pub.get("reason")
+            # _park already wrote state["unpublished"] + the pending
+            # manifest for the whole publish set; the retry lane owns it.
+            for c in pub.get("publish_ccns", []):
+                parked.append({"ccn": c,
+                               "reason": f"publish-deferred: {pub_reason}"})
+        elif status == "failed":
+            # A logic/validation/credential failure inside the publish
+            # phase is terminal for a WAVE. For a chunk it parks instead:
+            # every _fail site in run_publish_phase returns before any R2
+            # upload, so parking the set loses nothing and the retry lane
+            # owns recovery. Convert, never strike.
+            pub_reason = pub.get("reason")
+            pset = pub.get("publish_ccns", [])
+            cur = load_pending() or {}
+            merged = list(dict.fromkeys(
+                (cur.get("publish_ccns") or []) + pset))
+            state["unpublished"] = list(dict.fromkeys(
+                (state.get("unpublished") or []) + merged))
+            save_state(state)
+            park_for_retry(merged, wave_no, f"chunk-{pub_reason}",
+                           pub.get("detail", ""),
+                           int(cur.get("attempts", 0) or 0))
+            for c in pset:
+                parked.append({"ccn": c,
+                               "reason": f"publish-failed-parked: {pub_reason}"})
+        else:  # "skipped" (--no-publish): phase parked the set as unpublished
+            pub_reason = "no-publish"
+            for c in list(updated) + carry:
+                parked.append({"ccn": c,
+                               "reason": "built-not-published (--no-publish)"})
+
+    save_state(state)
+    save_route_health(health)
+    extra = {"api_items": api_items}
+    if pub_reason:
+        extra["publish_reason"] = pub_reason
+    if args.dry_run:
+        extra["dry_run"] = True
+    record_chunk(ccns, updated, published_ccns, parked, std, extra)
+    try:
+        snapshot.unlink()
+    except OSError:
+        pass
+    return 0
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -1661,6 +1913,11 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force-ccn", default=None,
                     help="force one granted-host CCN through the full reparse chain")
+    ap.add_argument("--chunk-ccns", default=None,
+                    help="process one small chunk of comma-separated CCNs "
+                         "(max 10): force-reparse + publish just those, "
+                         "failures park via the deferred mechanics and "
+                         "never touch the loop streak; see run_chunk()")
     ap.add_argument("--retry-pending", action="store_true",
                     help="retry the pending publish manifest only (no wave); "
                          "exits 0 when nothing is due")
@@ -1674,6 +1931,11 @@ def main():
         # backlog; it must keep running even when the research loop's
         # standard gate has stopped new waves.
         return retry_pending_publish(args, dict(os.environ), std)
+    if args.chunk_ccns is not None:
+        # Chunk mode does its own gate check inside run_chunk so that a
+        # stopped loop exits 3 with no writes at all, and every other
+        # outcome is streak-neutral by construction.
+        return run_chunk(args, dict(os.environ), std)
     reason = check_std_gate(std)
     if reason:
         print(f"LOOP STOPPED by standard gate ({reason}). Manual review required.",
