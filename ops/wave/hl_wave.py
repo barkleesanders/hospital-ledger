@@ -61,6 +61,7 @@ Usage:
 """
 import argparse, hashlib, importlib.util, json, os, re, shutil, socket, sqlite3, subprocess, sys, threading, time
 import urllib.parse, urllib.request
+import tempfile
 import httpx  # fail fast at import: before any state mutation in main()
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -741,6 +742,44 @@ def detect_changes(client, wave, state, index_ccns, health=None):
 
 # ---------------------------------------------------------------- reparse + slim
 
+def slim_preview(ccn, env):
+    """Slim one row, restoring both outputs on failure without a RAM backup."""
+    price_path = ROOT / "public/data/prices" / f"{ccn}.json"
+    with tempfile.TemporaryDirectory(prefix="hl-slim-") as directory:
+        backup = Path(directory)
+        shutil.copyfile(INDEX_PATH, backup / "index.json")
+        had_price = price_path.exists()
+        if had_price:
+            shutil.copyfile(price_path, backup / "price.json")
+        accepted = False
+        try:
+            try:
+                result = subprocess.run([VENV_PY, "scripts/slim_parsed.py"],
+                                        cwd=str(ROOT), env=env,
+                                        capture_output=True, text=True, timeout=1800)
+            except subprocess.TimeoutExpired:
+                return "slim timeout"
+            if result.returncode != 0:
+                return result.stderr.strip()[-120:]
+            if not price_path.exists() or price_path.stat().st_size == 0:
+                return f"{price_path.name} missing/empty after slim"
+            try:
+                items = json.loads(price_path.read_text()).get("items")
+            except (OSError, ValueError, AttributeError):
+                items = None
+            accepted = isinstance(items, list) and bool(items)
+            if not accepted:
+                return "no priceable preview items after slim"
+            return None
+        finally:
+            if not accepted:
+                shutil.copyfile(backup / "index.json", INDEX_PATH)
+                if had_price:
+                    shutil.copyfile(backup / "price.json", price_path)
+                else:
+                    price_path.unlink(missing_ok=True)
+
+
 def reparse_changed(changed, max_reparse, errors, state):
     """Parse + targeted-slim each changed MRF. Returns (updated_ccns, deferred).
 
@@ -753,9 +792,13 @@ def reparse_changed(changed, max_reparse, errors, state):
     for ch in changed[:max_reparse]:
         ccn, name, url = ch["ccn"], ch["name"], ch["url"]
         log(f"reparse {ccn} ...")
-        p1 = subprocess.run([VENV_PY, "scripts/mrf_parse.py", "--ccn", ccn,
-                             "--name", name, "--url", url],
-                            cwd=str(ROOT), capture_output=True, text=True, timeout=1800)
+        try:
+            p1 = subprocess.run([VENV_PY, "scripts/mrf_parse.py", "--ccn", ccn,
+                                 "--name", name, "--url", url],
+                                cwd=str(ROOT), capture_output=True, text=True, timeout=1800)
+        except subprocess.TimeoutExpired:
+            errors.append({"ccn": ccn, "class": "parse", "detail": "parse timeout"})
+            continue
         if p1.returncode != 0:
             errors.append({"ccn": ccn, "class": "parse",
                            "detail": (p1.stderr or p1.stdout).strip()[-120:]})
@@ -763,17 +806,12 @@ def reparse_changed(changed, max_reparse, errors, state):
         env2 = dict(os.environ)
         env2["CCNS"] = ccn
         env2["SLIM_MERGE_INDEX"] = "1"  # merge into existing index; never truncate
-        p2 = subprocess.run([VENV_PY, "scripts/slim_parsed.py"],
-                            cwd=str(ROOT), env=env2,
-                            capture_output=True, text=True, timeout=1800)
-        if p2.returncode != 0:
-            errors.append({"ccn": ccn, "class": "slim",
-                           "detail": p2.stderr.strip()[-120:]})
-            continue
-        price_path = ROOT / "public/data/prices" / f"{ccn}.json"
-        if not price_path.exists() or price_path.stat().st_size == 0:
-            errors.append({"ccn": ccn, "class": "slim",
-                           "detail": f"{price_path.name} missing/empty after slim"})
+        # A rejected slim must not corrupt an already-pending preview. Keep
+        # rollback bytes on disk and decoded items scoped to this one call.
+        slim_error = slim_preview(ccn, env2)
+        if slim_error is not None:
+            errors.append({"ccn": ccn, "class": "slim", "detail": slim_error})
+            log(f"reparse {ccn}: slim rejected; restored pre-slim outputs")
             continue
         updated.append(ccn)
         # Consume: these MRF bytes are now reflected in the local price file.
@@ -1529,6 +1567,24 @@ def retry_pending_publish(args, env, std):
                            "extra": pub.get("extra")})
 
 
+def finish_chunk_publish(state, published_ccns, wave_no):
+    """Retire only this bounded publish; retain the rest of the retry backlog."""
+    pending = load_pending() or {}
+    completed = set(published_ccns)
+    remaining = [c for c in dict.fromkeys(
+        (state.get("unpublished") or []) + (pending.get("publish_ccns") or []))
+        if c not in completed]
+    state["unpublished"] = remaining
+    if remaining:
+        if pending:
+            save_pending(dict(pending, publish_ccns=remaining))
+        else:
+            park_for_retry(remaining, wave_no, "chunk-backlog",
+                           "unselected work retained for retry", 0)
+    else:
+        clear_pending()
+
+
 def run_publish_phase(args, env, state, std, updated_ccns, unpublished,
                       index_ccns, pre_count, errors, health, wave_no):
     """Build, validate, publish, and live-verify one pricing update.
@@ -1553,7 +1609,12 @@ def run_publish_phase(args, env, state, std, updated_ccns, unpublished,
         state["unpublished"] = list(dict.fromkeys(
             (state.get("unpublished") or []) + publish_ccns))
         save_state(state)
-        park_for_retry(publish_ccns, wave_no, reason, detail, attempts)
+        retry_ccns = publish_ccns
+        if getattr(args, "preserve_unpublished", False):
+            retry_ccns = list(dict.fromkeys(
+                state["unpublished"] +
+                ((load_pending() or {}).get("publish_ccns") or [])))
+        park_for_retry(retry_ccns, wave_no, reason, detail, attempts)
         return {"status": "deferred", "reason": reason, "detail": detail,
                 "publish_ccns": publish_ccns}
 
@@ -1657,7 +1718,9 @@ def run_publish_phase(args, env, state, std, updated_ccns, unpublished,
 
     if args.no_publish:
         log("--no-publish: assembled + validated, not uploaded")
-        state["unpublished"] = list(dict.fromkeys(unpublished + updated_ccns))
+        previous = (state.get("unpublished") or []) if getattr(
+            args, "preserve_unpublished", False) else []
+        state["unpublished"] = list(dict.fromkeys(previous + unpublished + updated_ccns))
         save_state(state)
         return {"status": "skipped", "publish_ccns": publish_ccns,
                 "validation": validation,
@@ -1708,8 +1771,11 @@ def run_publish_phase(args, env, state, std, updated_ccns, unpublished,
         except OSError:
             pass
     save_published_hashes(baseline)
-    state["unpublished"] = []
-    clear_pending()
+    if getattr(args, "preserve_unpublished", False):
+        finish_chunk_publish(state, publish_ccns, wave_no)
+    else:
+        state["unpublished"] = []
+        clear_pending()
     save_state(state)
     return {"status": "published", "out": out, "publish_ccns": publish_ccns,
             "validation": validation, "pricing_validation": pricing_validation}
@@ -1739,8 +1805,8 @@ def verify_ccn_api(ccn):
 
 def run_chunk(args, env, std):
     """--chunk-ccns entry point: process one small explicit CCN set
-    end-to-end (force-reparse -> publish those CCNs plus the standard
-    carry), with failure isolation per chunk (2026-10-25, Barklee-directed
+    end-to-end (force-reparse -> publish with bounded pending carry),
+    with failure isolation per chunk (2026-10-25, Barklee-directed
     chunk mode: smaller sections, pushed per chunk, so one failure breaks
     one chunk instead of a huge run).
 
@@ -1866,19 +1932,20 @@ def run_chunk(args, env, std):
     published_ccns, api_items, pub_reason = [], {}, None
     carry_published_count = 0
     if updated and not args.dry_run:
-        # Standard carry, exactly as a wave adopts it: previously built
-        # price files (state["unpublished"] + the pending manifest) ride
-        # along, so a chunk publish can never strand or silently clear
-        # work an earlier run already paid for.
+        # Fill only unused slots with previously built files. Adopting the
+        # whole backlog here would turn the next five-CCN chunk back into
+        # a marathon. The publish phase preserves all unselected work.
         carry = [c for c in (state.get("unpublished") or [])
                  if (ROOT / "public/data/prices" / f"{c}.json").exists()]
         _pending = load_pending()
         if _pending:
             carry += [c for c in (_pending.get("publish_ccns") or [])
                       if (ROOT / "public/data/prices" / f"{c}.json").exists()]
-        carry = [c for c in dict.fromkeys(carry) if c not in updated]
+        carry = [c for c in dict.fromkeys(carry) if c not in ccns]
+        carry = carry[:max(0, len(ccns) - len(updated))]
         pub_args = argparse.Namespace(dry_run=False,
-                                      no_publish=bool(args.no_publish))
+                                      no_publish=bool(args.no_publish),
+                                      preserve_unpublished=True)
         try:
             pub = run_publish_phase(pub_args, env, state, std, updated,
                                     carry, index_ccns, pre_count, errors,

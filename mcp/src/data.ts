@@ -28,7 +28,11 @@ export const API_BASE: string = (
 ).replace(/\/+$/, "");
 export const OFFLINE: boolean = process.env.HL_OFFLINE === "1";
 
-export function dataDirStatus(): { dir: string; exists: boolean; files: string[] } {
+export function dataDirStatus(): {
+	dir: string;
+	exists: boolean;
+	files: string[];
+} {
 	const want = [
 		"hospitals.json",
 		"prices/index.json",
@@ -220,9 +224,12 @@ export function searchHospitals(
 	}
 	scored.sort(
 		(a, b) =>
-			b.score - a.score || String(a.h.name ?? "").localeCompare(String(b.h.name ?? "")),
+			b.score - a.score ||
+			String(a.h.name ?? "").localeCompare(String(b.h.name ?? "")),
 	);
-	return scored.slice(0, Math.max(1, Math.min(limit, 100))).map(({ h }) => slimHospital(h));
+	return scored
+		.slice(0, Math.max(1, Math.min(limit, 100)))
+		.map(({ h }) => slimHospital(h));
 }
 
 export interface ProcedureHit {
@@ -233,11 +240,15 @@ export interface ProcedureHit {
 	gross_max: number | null;
 }
 
-function priceRange(entries: CptPriceEntry[]): { min: number | null; max: number | null } {
+function priceRange(entries: CptPriceEntry[]): {
+	min: number | null;
+	max: number | null;
+} {
 	let lo: number | null = null;
 	let hi: number | null = null;
 	for (const e of entries) {
-		const g = typeof e.gross === "number" && Number.isFinite(e.gross) ? e.gross : null;
+		const g =
+			typeof e.gross === "number" && Number.isFinite(e.gross) ? e.gross : null;
 		if (g === null) continue;
 		if (lo === null || g < lo) lo = g;
 		if (hi === null || g > hi) hi = g;
@@ -254,7 +265,7 @@ export function searchProcedures(query: string, limit: number): ProcedureHit[] {
 		let score = -1;
 		if (q && code === q) score = 100;
 		else if (q && code.startsWith(q)) score = 80;
-		else if (q && desc && desc.toUpperCase().includes(q)) score = 60;
+		else if (q && desc?.toUpperCase().includes(q)) score = 60;
 		else if (!q) score = 1;
 		if (score < 0) continue;
 		const entries = idx[code];
@@ -268,7 +279,12 @@ export function searchProcedures(query: string, limit: number): ProcedureHit[] {
 			score,
 		});
 	}
-	out.sort((a, b) => b.score - a.score || b.hospitals - a.hospitals || a.code.localeCompare(b.code));
+	out.sort(
+		(a, b) =>
+			b.score - a.score ||
+			b.hospitals - a.hospitals ||
+			a.code.localeCompare(b.code),
+	);
 	return out
 		.slice(0, Math.max(1, Math.min(limit, 100)))
 		.map(({ score: _s, ...rest }) => rest);
@@ -284,7 +300,12 @@ export function getProcedurePrices(
 	code: string,
 	limit: number,
 	offset: number,
-): { code: string; description: string | null; total: number; rows: ProcedurePriceRow[] } {
+): {
+	code: string;
+	description: string | null;
+	total: number;
+	rows: ProcedurePriceRow[];
+} {
 	const c = code.trim().toUpperCase();
 	const entries = loadCptIndex()[c] ?? [];
 	const rows: ProcedurePriceRow[] = entries.map((e) => {
@@ -311,14 +332,19 @@ export function getProcedurePrices(
 	};
 }
 
-export function listStates(): Array<{ state: string; hospitals: number; with_prices: number }> {
+export function listStates(): Array<{
+	state: string;
+	hospitals: number;
+	with_prices: number;
+}> {
 	const counts = new Map<string, number>();
 	for (const h of loadHospitals()) {
 		const st = String(h.state ?? "").toUpperCase() || "UNKNOWN";
 		counts.set(st, (counts.get(st) ?? 0) + 1);
 	}
 	const priced = new Set<string>();
-	for (const e of loadPriceIndex()) priced.add(String(e.ccn ?? "").toUpperCase());
+	for (const e of loadPriceIndex())
+		priced.add(String(e.ccn ?? "").toUpperCase());
 	const pricedByState = new Map<string, number>();
 	for (const h of loadHospitals()) {
 		if (!priced.has(String(h.ccn ?? "").toUpperCase())) continue;
@@ -331,7 +357,9 @@ export function listStates(): Array<{ state: string; hospitals: number; with_pri
 			hospitals,
 			with_prices: pricedByState.get(state) ?? 0,
 		}))
-		.sort((a, b) => b.hospitals - a.hospitals || a.state.localeCompare(b.state));
+		.sort(
+			(a, b) => b.hospitals - a.hospitals || a.state.localeCompare(b.state),
+		);
 }
 
 export function searchPayers(query: string, limit: number): FeaturedPayer[] {
@@ -350,7 +378,9 @@ export function searchPayers(query: string, limit: number): FeaturedPayer[] {
 		if (score >= 0) scored.push({ p, score });
 	}
 	scored.sort(
-		(a, b) => b.score - a.score || (b.p.hospital_count ?? 0) - (a.p.hospital_count ?? 0),
+		(a, b) =>
+			b.score - a.score ||
+			(b.p.hospital_count ?? 0) - (a.p.hospital_count ?? 0),
 	);
 	return scored.slice(0, Math.max(1, Math.min(limit, 100))).map(({ p }) => p);
 }
@@ -381,7 +411,8 @@ export async function fetchHospitalPrices(
 	if (!/^\d{6}$/.test(c)) {
 		return {
 			source: "unavailable",
-			reason: "live price API requires a 6-digit CMS certification number (CCN)",
+			reason:
+				"live price API requires a 6-digit CMS certification number (CCN)",
 		};
 	}
 	if (OFFLINE) {
@@ -396,7 +427,12 @@ export async function fetchHospitalPrices(
 			headers: { "user-agent": "hospital-ledger-mcp/1.0.0" },
 		});
 		if (!r.ok) {
-			return { source: "live-api", url, http_status: r.status, error: `API returned HTTP ${r.status}` };
+			return {
+				source: "live-api",
+				url,
+				http_status: r.status,
+				error: `API returned HTTP ${r.status}`,
+			};
 		}
 		const data = (await r.json()) as {
 			hospital_name?: string;
@@ -421,7 +457,11 @@ export async function fetchHospitalPrices(
 			pagination: { offset: off, limit: lim, total: items.length },
 		};
 	} catch (e) {
-		return { source: "live-api", url, error: e instanceof Error ? e.message : String(e) };
+		return {
+			source: "live-api",
+			url,
+			error: e instanceof Error ? e.message : String(e),
+		};
 	} finally {
 		clearTimeout(timer);
 	}

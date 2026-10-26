@@ -1,54 +1,54 @@
 {
-  "name": "hospital-ledger",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "wrangler dev",
-    "build": "npm run test:site-data && vite build",
-    "preview": "wrangler dev",
-    "audit:copy": "python3 scripts/predeploy_audit.py",
-    "audit:copy:live": "python3 scripts/predeploy_audit.py --check-live",
-    "refresh": "bash scripts/refresh.sh",
-    "refresh:dry": "bash scripts/refresh.sh --dry-run",
-    "refresh:quick": "bash scripts/refresh.sh --quick",
-    "predeploy": "python3 scripts/predeploy_audit.py && python3 scripts/csp_audit.py && npm run typecheck && npm run test:site-data && npm run test:faq && npm run build:faq-island",
-    "deploy": "bash scripts/deploy.sh",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.island.json && tsc -p tsconfig.test.json",
-    "audit:csp": "python3 scripts/csp_audit.py",
-    "test:faq": "vitest run --config vitest.faq.config.mjs",
-    "test:fetch-proxy": "vitest run --config vitest.fetch-proxy.config.mjs",
-    "test:site-data": "vitest run --config vitest.site-data.config.mjs",
-    "build:faq-island": "node tools/build-faq-island.mjs",
-    "probe:constrained": "node tests/probe-constrained.mjs probe",
-    "verify": "bash scripts/verify.sh"
-  },
-  "dependencies": {
-    "hono": "^4.13.13",
-    "htmlparser2": "^12.0.0",
-    "zod": "^4.6.5"
-  },
-  "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260820.1",
-    "@hono/vite-build": "^1.2.0",
-    "@hono/vite-dev-server": "^0.18.0",
-    "@types/node": "^24.13.5",
-    "esbuild": "^0.25.12",
-    "jsdom": "^30.0.1",
-    "typescript": "^5.7.2",
-    "vite": "^6.4.4",
-    "vitest": "^5.0.5",
-    "wrangler": "^4.124.0"
-  },
-  "overrides": {
-    "miniflare": {
-      "undici": ">=7.30.1 <8.0.0"
-    },
-    "jsdom": {
-      "undici": ">=8.12.2"
-    }
-  },
-  "engines": {
-    "node": ">=22.22.0"
-  }
+	"name": "hospital-ledger",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "wrangler dev",
+		"build": "npm run test:site-data && vite build",
+		"preview": "wrangler dev",
+		"audit:copy": "python3 scripts/predeploy_audit.py",
+		"audit:copy:live": "python3 scripts/predeploy_audit.py --check-live",
+		"refresh": "bash scripts/refresh.sh",
+		"refresh:dry": "bash scripts/refresh.sh --dry-run",
+		"refresh:quick": "bash scripts/refresh.sh --quick",
+		"predeploy": "python3 scripts/predeploy_audit.py && python3 scripts/csp_audit.py && npm run typecheck && npm run test:site-data && npm run test:faq && npm run build:faq-island",
+		"deploy": "bash scripts/deploy.sh",
+		"typecheck": "tsc --noEmit && tsc -p tsconfig.island.json && tsc -p tsconfig.test.json",
+		"audit:csp": "python3 scripts/csp_audit.py",
+		"test:faq": "vitest run --config vitest.faq.config.mjs",
+		"test:fetch-proxy": "vitest run --config vitest.fetch-proxy.config.mjs",
+		"test:site-data": "vitest run --config vitest.site-data.config.mjs",
+		"build:faq-island": "node tools/build-faq-island.mjs",
+		"probe:constrained": "node tests/probe-constrained.mjs probe",
+		"verify": "bash scripts/verify.sh"
+	},
+	"dependencies": {
+		"hono": "^4.13.13",
+		"htmlparser2": "^12.0.0",
+		"zod": "^4.6.5"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^5.20260820.1",
+		"@hono/vite-build": "^1.2.0",
+		"@hono/vite-dev-server": "^0.18.0",
+		"@types/node": "^24.13.5",
+		"esbuild": "^0.25.12",
+		"jsdom": "^30.0.1",
+		"typescript": "^5.7.2",
+		"vite": "^6.4.4",
+		"vitest": "^5.0.5",
+		"wrangler": "^4.124.0"
+	},
+	"overrides": {
+		"miniflare": {
+			"undici": ">=7.30.1 <8.0.0"
+		},
+		"jsdom": {
+			"undici": ">=8.12.2"
+		}
+	},
+	"engines": {
+		"node": ">=22.22.0"
+	}
 }

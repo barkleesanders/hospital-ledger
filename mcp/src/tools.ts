@@ -38,7 +38,8 @@ function str(v: unknown, d = ""): string {
 }
 function num(v: unknown, d: number): number {
 	if (typeof v === "number" && Number.isFinite(v)) return v;
-	if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+	if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)))
+		return Number(v);
 	return d;
 }
 function reqStr(v: unknown, name: string): string {
@@ -50,7 +51,11 @@ function reqStr(v: unknown, name: string): string {
 async function tSearchHospitals(a: Record<string, unknown>) {
 	return {
 		query: str(a.query),
-		results: searchHospitals(reqStr(a.query, "query"), str(a.state) || undefined, num(a.limit, 20)),
+		results: searchHospitals(
+			reqStr(a.query, "query"),
+			str(a.state) || undefined,
+			num(a.limit, 20),
+		),
 	};
 }
 
@@ -70,7 +75,11 @@ async function tGetHospital(a: Record<string, unknown>) {
 			required: Boolean(h.required),
 		},
 		price_index: idx ?? null,
-		prices: await fetchHospitalPrices(ccn, num(a.items_limit, 25), num(a.items_offset, 0)),
+		prices: await fetchHospitalPrices(
+			ccn,
+			num(a.items_limit, 25),
+			num(a.items_offset, 0),
+		),
 	};
 }
 
@@ -84,7 +93,10 @@ async function tSearchProcedures(a: Record<string, unknown>) {
 async function tGetProcedure(a: Record<string, unknown>) {
 	const code = reqStr(a.code, "code");
 	const r = getProcedurePrices(code, num(a.limit, 25), num(a.offset, 0));
-	return { ...r, pagination: { limit: num(a.limit, 25), offset: num(a.offset, 0) } };
+	return {
+		...r,
+		pagination: { limit: num(a.limit, 25), offset: num(a.offset, 0) },
+	};
 }
 
 async function tGetPriceIndex() {
@@ -125,7 +137,12 @@ async function tGetPayer(a: Record<string, unknown>) {
 			.filter((p) => p.slug.includes(slug) || slug.includes(p.slug))
 			.slice(0, 5)
 			.map((p) => p.slug);
-		return { found: false, slug, hint: "no per-payer file", similar_slugs: close };
+		return {
+			found: false,
+			slug,
+			hint: "no per-payer file",
+			similar_slugs: close,
+		};
 	}
 	return { found: true, slug, data };
 }
@@ -142,9 +159,17 @@ export const TOOLS: Record<string, ToolDef> = {
 		description:
 			"Search hospitals by name, city, or 6-digit CMS certification number (CCN). Optional state filter (2-letter code).",
 		args: {
-			query: { type: "string", required: true, description: "Hospital name, city, or CCN (partial matches ok)" },
+			query: {
+				type: "string",
+				required: true,
+				description: "Hospital name, city, or CCN (partial matches ok)",
+			},
 			state: { type: "string", description: "2-letter state code, e.g. CA" },
-			limit: { type: "number", default: 20, description: "Max results (1-100)" },
+			limit: {
+				type: "number",
+				default: 20,
+				description: "Max results (1-100)",
+			},
 		},
 		run: tSearchHospitals,
 	},
@@ -152,9 +177,21 @@ export const TOOLS: Record<string, ToolDef> = {
 		description:
 			"Full record for one hospital by CCN: directory info, price-index entry with compliance grade, and price payload (items paginated). Price payload is fetched live from the site's public API.",
 		args: {
-			ccn: { type: "string", required: true, description: "6-digit CMS certification number, e.g. 050441" },
-			items_limit: { type: "number", default: 25, description: "Price items per page (1-200)" },
-			items_offset: { type: "number", default: 0, description: "Price items page offset" },
+			ccn: {
+				type: "string",
+				required: true,
+				description: "6-digit CMS certification number, e.g. 050441",
+			},
+			items_limit: {
+				type: "number",
+				default: 25,
+				description: "Price items per page (1-200)",
+			},
+			items_offset: {
+				type: "number",
+				default: 0,
+				description: "Price items page offset",
+			},
 		},
 		run: tGetHospital,
 	},
@@ -162,8 +199,16 @@ export const TOOLS: Record<string, ToolDef> = {
 		description:
 			"Search procedure codes by code prefix (e.g. 992) or description keyword (e.g. mri). Returns hospital counts and gross-charge ranges per code.",
 		args: {
-			query: { type: "string", required: true, description: "Code prefix or description keyword" },
-			limit: { type: "number", default: 20, description: "Max results (1-100)" },
+			query: {
+				type: "string",
+				required: true,
+				description: "Code prefix or description keyword",
+			},
+			limit: {
+				type: "number",
+				default: 20,
+				description: "Max results (1-100)",
+			},
 		},
 		run: tSearchProcedures,
 	},
@@ -171,7 +216,11 @@ export const TOOLS: Record<string, ToolDef> = {
 		description:
 			"Cross-hospital price comparison for one CPT/HCPCS code: per-hospital gross, cash, min/max and payer counts, cheapest first.",
 		args: {
-			code: { type: "string", required: true, description: "CPT/HCPCS code, e.g. 99213 or J2354" },
+			code: {
+				type: "string",
+				required: true,
+				description: "CPT/HCPCS code, e.g. 99213 or J2354",
+			},
 			limit: { type: "number", default: 25, description: "Max rows (1-200)" },
 			offset: { type: "number", default: 0, description: "Row offset" },
 		},
@@ -184,27 +233,43 @@ export const TOOLS: Record<string, ToolDef> = {
 		run: tGetPriceIndex,
 	},
 	"list-states": {
-		description: "All states/territories with hospital counts and how many have published price data.",
+		description:
+			"All states/territories with hospital counts and how many have published price data.",
 		args: {},
 		run: tListStates,
 	},
 	"search-payers": {
-		description: "Search health insurers/payers by name. Returns slug, category, hospital count, median rate.",
+		description:
+			"Search health insurers/payers by name. Returns slug, category, hospital count, median rate.",
 		args: {
-			query: { type: "string", required: true, description: "Payer name, e.g. aetna" },
-			limit: { type: "number", default: 20, description: "Max results (1-100)" },
+			query: {
+				type: "string",
+				required: true,
+				description: "Payer name, e.g. aetna",
+			},
+			limit: {
+				type: "number",
+				default: 20,
+				description: "Max results (1-100)",
+			},
 		},
 		run: tSearchPayers,
 	},
 	"get-payer": {
-		description: "Detail file for one payer by slug (from search-payers): aliases, rates, hospital list.",
+		description:
+			"Detail file for one payer by slug (from search-payers): aliases, rates, hospital list.",
 		args: {
-			slug: { type: "string", required: true, description: "Payer slug, e.g. aetna" },
+			slug: {
+				type: "string",
+				required: true,
+				description: "Payer slug, e.g. aetna",
+			},
 		},
 		run: tGetPayer,
 	},
 	status: {
-		description: "Show which datasets the server is reading and whether live API access is enabled.",
+		description:
+			"Show which datasets the server is reading and whether live API access is enabled.",
 		args: {},
 		run: tStatus,
 	},
@@ -212,7 +277,10 @@ export const TOOLS: Record<string, ToolDef> = {
 
 export const TOOL_NAMES = Object.keys(TOOLS);
 
-export async function runTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+export async function runTool(
+	name: string,
+	args: Record<string, unknown>,
+): Promise<unknown> {
 	const def = TOOLS[name];
 	if (!def) {
 		const names = TOOL_NAMES.join(", ");

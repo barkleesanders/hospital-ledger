@@ -14,7 +14,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { TOOLS, type ArgDef } from "./tools.js";
+import { type ArgDef, TOOLS } from "./tools.js";
 
 function zodShape(args: Record<string, ArgDef>): Record<string, z.ZodTypeAny> {
 	const shape: Record<string, z.ZodTypeAny> = {};
@@ -38,7 +38,9 @@ for (const [name, def] of Object.entries(TOOLS)) {
 	server.tool(name, def.description, zodShape(def.args), async (a) => {
 		const result = await def.run(a as Record<string, unknown>);
 		return {
-			content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+			content: [
+				{ type: "text" as const, text: JSON.stringify(result, null, 2) },
+			],
 		};
 	});
 }
