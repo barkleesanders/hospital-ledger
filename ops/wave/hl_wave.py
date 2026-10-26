@@ -892,19 +892,25 @@ def load_r2_env():
 
 
 def r2_get_sha256(key, penv):
-    # Caller timeout must EXCEED r2_put.py's internal retry budget (300s
-    # here): a caller cap <= the callee budget kills the callee mid-resume
+    # Caller timeout must EXCEED r2_put.py get_sha256's 600-second read
+    # timeout: a shorter cap kills the callee mid-resume
     # on a stalled proxy (2026-10-23: a 2MB GET reached ~87% in 300s and
     # was SIGKILLed by the caller's own timeout, not by any network fault).
-    p = subprocess.run([VENV_PY, "scripts/r2_put.py", "--get-sha256", key],
-                       cwd=str(ROOT), env=penv, capture_output=True, text=True, timeout=360)
-    if p.returncode == 0 and p.stdout.strip():
+    try:
+        p = subprocess.run([VENV_PY, "scripts/r2_put.py", "--get-sha256", key],
+                           cwd=str(ROOT), env=penv, capture_output=True, text=True, timeout=660)
+    except subprocess.TimeoutExpired as error:
+        # A slow read is not a hash mismatch. Preserve the existing independent
+        # CDN verification leg; its bytes still have to match the caller's hash.
+        log(f"byte-verify {key}: S3 hash read timed out after {error.timeout}s; trying CDN")
+        p = None
+    if p is not None and p.returncode == 0 and p.stdout.strip():
         return p.stdout.strip()
     # S3 read path flapping (2026-10-01): verify against the CDN-served copy.
     # Fail-closed: a stale CDN copy yields a mismatch, never a false match.
     tmp = f"/tmp/hl-verify-{key.replace('/', '_')}"
     if _cdn_get(key, tmp):
-        digest = hashlib.sha256(open(tmp, "rb").read()).hexdigest()
+        digest = hashlib.sha256(Path(tmp).read_bytes()).hexdigest()
         try:
             os.unlink(tmp)
         except OSError:

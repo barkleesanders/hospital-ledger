@@ -12,6 +12,7 @@
 Run: ~/hospital-ledger/.venv/bin/python3 test_hl_wave_fixes.py
 """
 import argparse
+import ast
 import hashlib
 import importlib.util
 import json
@@ -20,6 +21,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("hl_wave", HERE / "hl_wave.py")
@@ -431,6 +433,38 @@ class VerifySyncedBaseManifestStaleHeal(unittest.TestCase):
         # cron tick scale, never hours.
         self.assertLessEqual(hw.RETRY_BASE_SECS, 300)
         self.assertLessEqual(hw.RETRY_MAX_DELAY_SECS, 1200)
+
+
+class HashReadBudget(unittest.TestCase):
+    def test_caller_exceeds_actual_streaming_hash_read_timeout(self):
+        tree = ast.parse((HERE.parents[1] / 'scripts/r2_put.py').read_text())
+        function = next(n for n in tree.body
+                        if isinstance(n, ast.FunctionDef) and n.name == 'get_sha256')
+        call = next(n for n in ast.walk(function) if isinstance(n, ast.Call)
+                    and isinstance(n.func, ast.Name) and n.func.id == '_get_with_retry')
+        timeout = next(k.value.value for k in call.keywords if k.arg == 'timeout')
+        with patch.object(hw.subprocess, 'run') as run:
+            run.return_value.returncode = 0
+            run.return_value.stdout = 'a' * 64
+            self.assertEqual(hw.r2_get_sha256('prices/050025.json', {}), 'a' * 64)
+            self.assertGreater(run.call_args.kwargs['timeout'], timeout)
+
+    def test_timeout_uses_independent_byte_verification_and_logs_reason(self):
+        body = b'complete CDN bytes'
+
+        def cdn_get(_key, target):
+            Path(target).write_bytes(body)
+            return True
+
+        with patch.object(hw.subprocess, 'run', side_effect=hw.subprocess.TimeoutExpired('fixture', 660)), \
+                patch.object(hw, '_cdn_get', side_effect=cdn_get), patch.object(hw, 'log') as log:
+            self.assertEqual(hw.r2_get_sha256('prices/050025.json', {}), hashlib.sha256(body).hexdigest())
+            self.assertTrue(any('timed out' in call.args[0] for call in log.call_args_list))
+
+    def test_timeout_and_unavailable_independent_copy_fail_closed(self):
+        with patch.object(hw.subprocess, 'run', side_effect=hw.subprocess.TimeoutExpired('fixture', 660)), \
+                patch.object(hw, '_cdn_get', return_value=False), patch.object(hw, 'log'):
+            self.assertIsNone(hw.r2_get_sha256('prices/050025.json', {}))
 
 
 if __name__ == "__main__":
