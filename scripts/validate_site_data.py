@@ -146,7 +146,7 @@ def check_summary(root: Path, rep: Report, manifest: dict | None) -> dict | None
         rep.fail("summary.generated_at unparsable")
     if manifest and isinstance(manifest.get("generated_at"), str):
         rep.expect(manifest["generated_at"] == gen, "manifest.generated_at == summary.generated_at")
-    # Ordering invariants — the counts nest.
+    # CMS compliance counts nest within the CMS facility registry.
     rep.expect(0 < s["compliant"] <= s["cms_required_total"] <= s["total_facilities"],
                "compliant <= cms_required_total <= total_facilities")
     rep.expect(s["missing"] == s["cms_required_total"] - s["compliant"],
@@ -154,8 +154,13 @@ def check_summary(root: Path, rep: Report, manifest: dict | None) -> dict | None
     expect_pct = round(100 * s["compliant"] / s["cms_required_total"], 1)
     rep.expect(abs(s["compliance_pct"] - expect_pct) <= 0.15,
                f"compliance_pct {s['compliance_pct']} ≈ {expect_pct}")
-    rep.expect(s["standardized_price_hospitals"] <= s["standardized_price_index_hospitals"] <= s["compliant"],
-               "standardized_price_hospitals <= standardized_price_index_hospitals <= compliant")
+    # build_site_data.py counts the whole pricing index, including psychiatric,
+    # long-term and legacy seed identifiers outside the CMS-required/live set.
+    # Measured 2026-10-25: 3,987 index records vs 3,986 compliant, with 53
+    # non-required registry records and 128 seed identifiers outside the registry.
+    # These are different populations; validate their internal totals below.
+    rep.expect(0 <= s["standardized_price_hospitals"] <= s["standardized_price_index_hospitals"],
+               "0 <= standardized_price_hospitals <= standardized_price_index_hospitals")
     rep.expect(s["cpt_indexed_hospitals"] <= s["standardized_price_hospitals"],
                "cpt_indexed_hospitals <= standardized_price_hospitals")
     rep.expect(s["cpt_indexed_rows"] <= s["standardized_price_rows"],

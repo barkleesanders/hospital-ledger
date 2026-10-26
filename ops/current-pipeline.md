@@ -1,7 +1,7 @@
 # The refresh pipeline as it runs today
 
 This is the current operating setup for keeping hospitalledger.com's price
-data fresh, as of 2026-10-14. It supersedes the older runbooks where they
+data fresh, with operational updates through 2026-10-25. It supersedes the older runbooks where they
 disagree (`ops/hl-refresh-runbook.md` describes the retired Mac launchd
 full-tier refresh; `README-tier3-pipeline.md` is historical). The agent
 skills that operate this pipeline live in `skills/` and are part of the
@@ -154,7 +154,7 @@ uploads. Its semantics were hardened against the same cutting network:
 
 ## Phase 0: self-update
 
-Every run starts by pulling the pipeline bundle: the tarball's sha256 is
+The counts-refresh runner starts by pulling the pipeline bundle: its sha256 is
 verified before unpacking, and the tree is re-extracted over the working
 copy (`~/hospital-ledger.env` lives outside the tree and is untouched).
 Bundle-owned scripts are never patched locally to make a check pass — a
@@ -163,7 +163,52 @@ bundle. The wave layer and the skills are the locally-owned surface;
 their lessons write back the same day they are learned (see
 `skills/hospital-ledger-refresh/SKILL.md` → "Lessons").
 
-## Latest publish (the receipt)
+The daily wave and pending retry call their installed validator directly;
+they do **not** run phase 0. Publishing a bundle is not proof that those
+jobs have received it. Before expanding the price index above the old
+validator's compliance-population bound, verify the installed validator on
+the VM (or a completed counts-run installation). The VM's SSH routes were
+refusing connections on 2026-10-25, so that installation remains unverified.
+
+## Chunk continuation (2026-10-25)
+
+`hl_wave.py --chunk-ccns CCN[,CCN...]` processes at most ten requested
+identifiers; the continuation driver uses at most five. Chunk results
+neither increment nor reset the standing loop's failure streak. Parse and
+slim timeouts park individual rows. A nonempty parsed corpus can produce
+an empty price preview; that row must restore both its pre-slim index and
+price file (or remove a new rejected file) and park before valid peers
+enter publication. Backups stay on disk and decoded previews are scoped
+to one slim call, not retained across the next parser. Requested failures
+cannot be re-adopted through pending carry in the same chunk.
+
+Publication stays within the requested chunk size, including pending
+carry: only unused slots may adopt earlier work. Unselected unpublished
+and pending entries survive success, transport parking, and stage-only
+builds. The daily wave and publish-retry paths retain their existing
+behavior; this bound applies to explicit chunk mode.
+
+Pricing and compliance counts have different source populations.
+`build_site_data.py` defines `compliant` from CMS-required registry rows
+with a verified MRF, while pricing metrics count all price-index entries.
+The 2026-10-25 continuation exposed 53 other registry entries and 128
+legacy seed identifiers in an index of 3,987 records. The valid required
+MRF numerator was 3,986. The validator checks pricing totals against the
+price index and compliance totals against the registry independently.
+
+Coordinate this validator update with the original producer runtime before
+publishing an index above its old `index <= compliant` bound. The isolated
+Mini continuation restored its last compatible generation and retained
+additional parsed records for publication after that update. Its loop
+snapshot staying byte-identical is evidence for the isolated continuation;
+it is not a fresh read of the unavailable VM's loop or schedules.
+
+Regression commands are wired into `scripts/verify.sh`, including chunk
+streak isolation, per-row timeout/empty-preview handling, and separate
+count populations. Bundle-owned fixes must be packaged from this source
+tree for release; an isolated continuation is not proof of VM installation.
+
+## Historical publish receipt (2026-10-14)
 
 - Producer: `muse.ai nova (wave-loop)`
 - `generated_at`: `2026-10-14T00:56:57Z`

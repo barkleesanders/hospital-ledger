@@ -18,7 +18,7 @@
  * Env: HL_DATA_DIR, HL_API_BASE, HL_OFFLINE=1 (see README.md).
  */
 
-import { TOOLS, TOOL_NAMES, runTool } from "./tools.js";
+import { runTool, TOOL_NAMES, TOOLS } from "./tools.js";
 
 function printHelp(): void {
 	const lines = [
@@ -31,26 +31,40 @@ function printHelp(): void {
 	for (const name of TOOL_NAMES) {
 		const def = TOOLS[name];
 		const argList = Object.entries(def.args)
-			.map(([k, d]) => `${d.required ? `--${k} <${d.type}>` : `[--${k} <${d.type}>]`}`)
+			.map(
+				([k, d]) =>
+					`${d.required ? `--${k} <${d.type}>` : `[--${k} <${d.type}>]`}`,
+			)
 			.join(" ");
-		lines.push(`  ${name}${argList ? " " + argList : ""}`);
+		lines.push(`  ${name}${argList ? ` ${argList}` : ""}`);
 		lines.push(`      ${def.description}`);
 	}
-	lines.push("", "Output: JSON on stdout. Env: HL_DATA_DIR, HL_API_BASE, HL_OFFLINE=1.");
+	lines.push(
+		"",
+		"Output: JSON on stdout. Env: HL_DATA_DIR, HL_API_BASE, HL_OFFLINE=1.",
+	);
 	console.log(lines.join("\n"));
 }
 
-function parseArgs(argv: string[], def: (typeof TOOLS)[string]): Record<string, unknown> {
+function parseArgs(
+	argv: string[],
+	def: (typeof TOOLS)[string],
+): Record<string, unknown> {
 	const args: Record<string, unknown> = {};
 	const declared = def.args;
 	let i = 0;
 	while (i < argv.length) {
 		const tok = argv[i];
 		if (!tok.startsWith("--")) {
-			throw new Error(`unexpected positional argument "${tok}" (use --key value)`);
+			throw new Error(
+				`unexpected positional argument "${tok}" (use --key value)`,
+			);
 		}
 		const eq = tok.indexOf("=");
-		const key = (eq === -1 ? tok.slice(2) : tok.slice(2, eq)).replace(/-/g, "_");
+		const key = (eq === -1 ? tok.slice(2) : tok.slice(2, eq)).replace(
+			/-/g,
+			"_",
+		);
 		const spec = declared[key];
 		if (!spec) throw new Error(`unknown argument --${key} for this tool`);
 		let raw: string | undefined;
@@ -65,7 +79,8 @@ function parseArgs(argv: string[], def: (typeof TOOLS)[string]): Record<string, 
 		}
 		if (spec.type === "number") {
 			const n = Number(raw);
-			if (!Number.isFinite(n)) throw new Error(`--${key} expects a number, got "${raw}"`);
+			if (!Number.isFinite(n))
+				throw new Error(`--${key} expects a number, got "${raw}"`);
 			args[key] = n;
 		} else if (spec.type === "boolean") {
 			args[key] = raw === "true" || raw === "1" || raw === "yes";
@@ -85,7 +100,9 @@ async function main(): Promise<void> {
 	}
 	const def = TOOLS[tool];
 	if (!def) {
-		console.error(`unknown tool "${tool}". Available: ${TOOL_NAMES.join(", ")}`);
+		console.error(
+			`unknown tool "${tool}". Available: ${TOOL_NAMES.join(", ")}`,
+		);
 		process.exit(2);
 	}
 	let args: Record<string, unknown>;
