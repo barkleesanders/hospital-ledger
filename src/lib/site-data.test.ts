@@ -159,11 +159,12 @@ describe("hospital identifier contract", () => {
 		expect(response.headers.get("location")).toBe("/hospital/25063E?ref=proof");
 	});
 
-	it.each(["250128", "25063E"])(
+	it.each(["250128", "25063E", "25063e"])(
 		"serves numeric and legacy ID %s",
 		async (ccn) => {
+			const canonical = ccn.toUpperCase();
 			const record = {
-				ccn,
+				ccn: canonical,
 				hospital_name: "Identifier regression fixture",
 				items: [
 					{
@@ -176,20 +177,23 @@ describe("hospital identifier contract", () => {
 					},
 				],
 			};
-			const e = env({ [`prices/${ccn}.json`]: JSON.stringify(record) });
+			const e = env({ [`prices/${canonical}.json`]: JSON.stringify(record) });
 			const api = await app.request(`/api/prices/${ccn}`, {}, e);
 			expect(api.status).toBe(200);
 			expect(await api.json()).toEqual(record);
 			const page = await app.request(`/hospital/${ccn}`, {}, e);
 			expect(page.status).toBe(200);
 			expect(await page.text()).toContain("Identifier regression fixture");
+			expect(RecordContextSchema.parse({ kind: "hospital", id: ccn }).id).toBe(
+				canonical,
+			);
 			expect(
 				RecordContextSchema.safeParse({ kind: "hospital", id: ccn }).success,
 			).toBe(true);
 		},
 	);
 
-	it.each(["25063e", "2506_E", "12345", "1234567", "2506%2FE"])(
+	it.each(["2506_E", "12345", "1234567", "2506%2FE"])(
 		"rejects malformed ID %s in every entry point",
 		async (ccn) => {
 			for (const prefix of ["/api/prices/", "/hospital/"]) {

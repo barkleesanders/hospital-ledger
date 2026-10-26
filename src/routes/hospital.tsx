@@ -322,7 +322,7 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 }
 
 export async function hospitalPageHandler(c: Context<Env>): Promise<Response> {
-	const ccn = String(c.req.param("ccn") ?? "");
+	const ccn = String(c.req.param("ccn") ?? "").toUpperCase();
 	const canonicalUrl = `https://hospitalledger.com/hospital/${ccn}`;
 	if (!HOSPITAL_ID_PATTERN.test(ccn)) {
 		return c.html(notFoundPage(ccn, canonicalUrl), 400);

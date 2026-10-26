@@ -85,7 +85,7 @@ export type RecordKind = "hospital" | "procedure" | "payer";
 export const RecordContextSchema = z.discriminatedUnion("kind", [
 	z.object({
 		kind: z.literal("hospital"),
-		id: z.string().regex(HOSPITAL_ID_PATTERN),
+		id: z.string().toUpperCase().regex(HOSPITAL_ID_PATTERN),
 	}),
 	z.object({
 		kind: z.literal("procedure"),

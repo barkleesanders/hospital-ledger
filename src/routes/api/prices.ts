@@ -270,7 +270,7 @@ async function fetchPreviewFromParsedR2(
 }
 
 export async function pricesHandler(c: Context<Env>): Promise<Response> {
-	const ccn = String(c.req.param("ccn") ?? "");
+	const ccn = String(c.req.param("ccn") ?? "").toUpperCase();
 	if (!HOSPITAL_ID_PATTERN.test(ccn)) {
 		return badRequest("invalid ccn");
 	}
