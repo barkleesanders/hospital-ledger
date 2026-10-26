@@ -771,8 +771,11 @@
 		hospForm.addEventListener("submit", (e) => {
 			e.preventDefault();
 			const v = document.getElementById("by-hosp-input").value.trim();
-			if (/^\d{6}$/.test(v)) {
-				location.href = `/hospital/${v}`;
+			const identifier = v.toUpperCase();
+			// All-letter input can be a hospital name (Kaiser, Sutter, Baylor).
+			// Published numeric/legacy identifiers contain at least one digit.
+			if (/^[0-9A-Z]{6}$/.test(identifier) && /\d/.test(identifier)) {
+				location.href = `/hospital/${encodeURIComponent(identifier)}`;
 			} else if (v) {
 				const q = document.getElementById("q");
 				if (q) {

@@ -14,8 +14,7 @@ import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
 import { type HospitalData, loadHospital } from "../lib/data";
 import { fmtMoney } from "../lib/format";
-
-const VALID_CCN = /^\d{6}$/;
+import { HOSPITAL_ID_PATTERN } from "../lib/hospital-id";
 
 /** "City, ST" for a CCN, or null when the CCN is not in the CMS snapshot. */
 const GEO: Record<string, string[]> = HOSPITAL_GEO;
@@ -325,7 +324,7 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 export async function hospitalPageHandler(c: Context<Env>): Promise<Response> {
 	const ccn = String(c.req.param("ccn") ?? "");
 	const canonicalUrl = `https://hospitalledger.com/hospital/${ccn}`;
-	if (!VALID_CCN.test(ccn)) {
+	if (!HOSPITAL_ID_PATTERN.test(ccn)) {
 		return c.html(notFoundPage(ccn, canonicalUrl), 400);
 	}
 	const data = await loadHospital(c.env, c.req.raw, ccn);

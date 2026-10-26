@@ -38,6 +38,7 @@
 import type { Context, Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
+import { HOSPITAL_ID_PATTERN } from "../lib/hospital-id";
 
 export type FaqCorpusDoc = { title: string; url: string; text: string };
 
@@ -82,7 +83,10 @@ export type RecordKind = "hospital" | "procedure" | "payer";
  * The patterns are the ones src/routes/{hospital,procedure,payer}.tsx accept.
  */
 export const RecordContextSchema = z.discriminatedUnion("kind", [
-	z.object({ kind: z.literal("hospital"), id: z.string().regex(/^\d{6}$/) }),
+	z.object({
+		kind: z.literal("hospital"),
+		id: z.string().regex(HOSPITAL_ID_PATTERN),
+	}),
 	z.object({
 		kind: z.literal("procedure"),
 		id: z.string().regex(/^[A-Z0-9][A-Z0-9-]{1,9}$/i),

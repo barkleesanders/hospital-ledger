@@ -17,6 +17,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CPT_NAMES } from "../../src/lib/cpt-names.js";
+import { HOSPITAL_ID_PATTERN } from "../../src/lib/hospital-id.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
@@ -408,11 +409,11 @@ export async function fetchHospitalPrices(
 	offset: number,
 ): Promise<PricePayload> {
 	const c = ccn.trim().toUpperCase();
-	if (!/^\d{6}$/.test(c)) {
+	if (!HOSPITAL_ID_PATTERN.test(c)) {
 		return {
 			source: "unavailable",
 			reason:
-				"live price API requires a 6-digit CMS certification number (CCN)",
+				"live price API requires a 6-character hospital ID (digits or uppercase letters)",
 		};
 	}
 	if (OFFLINE) {

@@ -188,16 +188,16 @@ class Claim:
 # ─────────────────────────────────────────────────────────────────────────────
 CLAIMS: list[Claim] = [
     Claim(
-        "README: priced index hospitals",
+        "README: nonempty price-preview hospitals",
         "README.md",
         r"\| Hospitals with a standardized on-site price preview \| \*\*([\d,]+)\*\*",
-        lambda: f"{_summary()['standardized_price_index_hospitals']:,}",
+        lambda: f"{_summary()['standardized_price_hospitals']:,}",
     ),
     Claim(
         "README: standardized price rows",
         "README.md",
-        r"\| Standardized price rows across those hospitals \| \*\*([\d.]+ M)\*\*",
-        lambda: _millions(_summary()["standardized_price_rows"]),
+        r"\| Standardized price rows across those hospitals \| \*\*([\d,]+)\*\*",
+        lambda: f"{_summary()['standardized_price_rows']:,}",
     ),
     Claim(
         "README: CPT/HCPCS-coded rows",
@@ -238,8 +238,8 @@ CLAIMS: list[Claim] = [
     Claim(
         "README: Stage 4 coverage line",
         "README.md",
-        r"live \((\d[\d,]*) standardized on-site price previews;",
-        lambda: f"{_summary()['standardized_price_index_hospitals']:,}",
+        r"live \((\d[\d,]*) nonempty on-site price previews;",
+        lambda: f"{_summary()['standardized_price_hospitals']:,}",
     ),
     Claim(
         "README: closing-paragraph parsed count",

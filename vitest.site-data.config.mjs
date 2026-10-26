@@ -5,7 +5,7 @@ import { defineConfig } from "vitest/config";
 // Worker build, not a test setup.
 export default defineConfig({
 	test: {
-		include: ["src/lib/site-data.test.ts", "src/lib/r2.test.ts", "tests/procedure-client.test.js"],
+		include: ["src/lib/site-data.test.ts", "src/lib/r2.test.ts", "tests/procedure-client.test.js", "tests/hospital-id-clients.test.js"],
 		testTimeout: 15000,
 	},
 });

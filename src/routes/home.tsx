@@ -458,7 +458,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 								<input
 									id="by-hosp-input"
 									type="text"
-									placeholder="Hospital name or 6-digit CCN"
+									placeholder="Hospital name or 6-character ID"
 									class="flex-1 min-w-0 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
 								/>
 								<button
