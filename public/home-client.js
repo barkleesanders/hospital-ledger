@@ -772,7 +772,9 @@
 			e.preventDefault();
 			const v = document.getElementById("by-hosp-input").value.trim();
 			const identifier = v.toUpperCase();
-			if (/^[0-9A-Z]{6}$/.test(identifier)) {
+			// All-letter input can be a hospital name (Kaiser, Sutter, Baylor).
+			// Published numeric/legacy identifiers contain at least one digit.
+			if (/^[0-9A-Z]{6}$/.test(identifier) && /\d/.test(identifier)) {
 				location.href = `/hospital/${encodeURIComponent(identifier)}`;
 			} else if (v) {
 				const q = document.getElementById("q");

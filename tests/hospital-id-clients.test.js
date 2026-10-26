@@ -25,6 +25,45 @@ afterEach(() => {
 });
 
 describe("homepage direct hospital lookup", () => {
+	it.each(["Sutter", "Kaiser", "Baylor"])(
+		"keeps hospital name %s on the search path",
+		(value) => {
+			let submit;
+			const location = { href: "", hash: "", pathname: "/" };
+			const dispatchEvent = vi.fn();
+			const scrollIntoView = vi.fn();
+			const query = { value: "", dispatchEvent };
+			const elements = {
+				"by-hosp-form": {
+					addEventListener: (_event, callback) => {
+						submit = callback;
+					},
+				},
+				"by-hosp-input": { value },
+				q: query,
+				search: { scrollIntoView },
+			};
+			runInNewContext(source, {
+				document: {
+					getElementById: (id) => elements[id] || null,
+					addEventListener: () => {},
+				},
+				window: {},
+				location,
+				console,
+				setTimeout,
+				clearTimeout,
+				Event: class {},
+				fetch: () => new Promise(() => {}),
+			});
+			submit({ preventDefault() {} });
+			expect(location.href).toBe("");
+			expect(query.value).toBe(value);
+			expect(dispatchEvent).toHaveBeenCalledOnce();
+			expect(scrollIntoView).toHaveBeenCalledOnce();
+		},
+	);
+
 	it.each(["250128", "25063E", " 25063e "])(
 		"navigates ID %s to its canonical page",
 		(value) => {
