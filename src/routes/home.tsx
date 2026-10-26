@@ -1049,20 +1049,20 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 							price rows.
 						</span>
 					</p>
-					<div class="mt-4 grid grid-cols-1 md:grid-cols-[1fr_180px_160px] gap-3">
+					<div class="mt-4 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_240px_280px] gap-3">
 						<input
 							id="q"
 							type="search"
 							placeholder="Hospital name, city, or CCN…"
-							class="rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 px-4 py-3 text-base focus:border-emerald-500 focus:outline-none"
+							class="min-w-0 w-full rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 px-4 py-3 text-base focus:border-emerald-500 focus:outline-none"
 						/>
 						<select
 							id="state"
-							class="rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 px-3 py-3"
+							class="min-w-0 w-full rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 px-3 py-3"
 						/>
 						<select
 							id="status"
-							class="rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 px-3 py-3"
+							class="min-w-0 w-full rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 px-3 py-3"
 						>
 							<option value="">All statuses</option>
 							<option value="compliant">✓ Compliant (live MRF)</option>
@@ -1321,16 +1321,16 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 							</div>
 						</div>
 					</div>
-					<div class="mt-4 grid grid-cols-1 md:grid-cols-[1fr_180px] gap-3">
+					<div class="mt-4 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_240px] gap-3">
 						<input
 							id="cpt-q"
 							type="search"
 							placeholder="CPT/HCPCS code or procedure (e.g. 99213, MRI, colonoscopy)…"
-							class="rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 px-4 py-3 text-base focus:border-emerald-500 focus:outline-none"
+							class="min-w-0 w-full rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder-zinc-500 px-4 py-3 text-base focus:border-emerald-500 focus:outline-none"
 						/>
 						<select
 							id="cpt-sort"
-							class="rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 px-3 py-3"
+							class="min-w-0 w-full rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 px-3 py-3"
 						>
 							<option value="coverage">Most hospitals</option>
 							<option value="code">By code</option>

@@ -88,7 +88,17 @@ const fixtureSummary = {
 const fixtures = {
 	"meta/summary.json": fixtureSummary,
 	"meta/hospitals.json": ["400006", "050025", "070003", "390001"].map(
-		(ccn) => ({ ccn, required: true, has_live_mrf: true }),
+		(ccn) => ({
+			ccn,
+			name: `Fixture Hospital ${ccn}`,
+			city: "Fixture City",
+			state: "CA",
+			type: "Acute Care Hospitals",
+			ownership: "Voluntary",
+			required: true,
+			has_live_mrf: true,
+			enforcement_count: 0,
+		}),
 	),
 	"prices/index.json": index,
 	"prices/400006.json": historical,
@@ -291,6 +301,10 @@ try {
 					"rgb(9, 9, 11)",
 		);
 		await page.evaluate(() => document.fonts.ready);
+		if (path === "/")
+			await page.waitForFunction(() =>
+				document.querySelector("#state")?.textContent.includes("CA"),
+			);
 		if (path === "/hospital/400006") {
 			assert.match(
 				await page.locator("#historical-price-notice").textContent(),
