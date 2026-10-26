@@ -104,8 +104,8 @@ export type InfiniteFaqOptions<E extends FaqEnv> = {
 	siteName: string;
 	/** Where to send people when the corpus has no answer (the site's own explainer URL). */
 	fallbackUrl: string;
-	/** Loads the grounding text: the site's own public pages, rendered once per isolate. */
-	corpus: () => Promise<FaqCorpusDoc[]>;
+	/** Loads public-page grounding from the same request environment as the page. */
+	corpus: (env: E["Bindings"]) => Promise<FaqCorpusDoc[]>;
 	/** Default: llama-3.3-70b — measured faster to first token and non-reasoning. */
 	model?: FaqModel;
 	/** Output budget. Default 800 for llama, 2048 for gpt-oss (its reasoning eats the budget). */
@@ -652,7 +652,7 @@ async function ground<E extends FaqEnv>(
 	context: RecordContext | undefined,
 	budget: number,
 ): Promise<Grounding> {
-	const siteDocs = await opts.corpus();
+	const siteDocs = await opts.corpus(env);
 
 	// The record the visitor is looking at goes first: it is what the question is
 	// about, and renderCorpus() cuts from the tail when the budget runs out.

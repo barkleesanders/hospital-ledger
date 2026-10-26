@@ -69,10 +69,20 @@ phase0_self_update() {
   source /home/hatch/.config/muse-creds/env   # BEARER_SHIM_KEY
   local remote wm current
   wm="$HIDDEN/pipeline-sha256.txt"
-  remote="$(curl -sf -m 30 -H "Authorization: Bearer ${BEARER_SHIM_KEY}" \
-    https://authshim.barkleesanders.com/pull/pub/hospital-ledger-pipeline.sha256 | tr -d ' \n\r')"
+  # Muse's configured proxy measured 23-30+ seconds for this tiny response on
+  # 2026-10-26. Bound retries, retain curl's safe transport/HTTP diagnostic,
+  # and never confuse a timed-out download with an unchanged bundle.
+  if ! remote="$(curl -fsS --connect-timeout 20 --max-time 90 \
+    --retry 2 --retry-delay 3 --retry-max-time 240 \
+    -H "Authorization: Bearer ${BEARER_SHIM_KEY}" \
+    https://authshim.barkleesanders.com/pull/pub/hospital-ledger-pipeline.sha256)"; then
+    unset BEARER_SHIM_KEY
+    echo "[phase0] FAIL: checksum download failed (transport/HTTP diagnostic above)"
+    return 1
+  fi
   unset BEARER_SHIM_KEY
-  [ -n "$remote" ] || { echo "[phase0] FAIL: could not fetch remote sha256"; return 1; }
+  remote="$(printf '%s' "$remote" | tr -d ' \n\r')"
+  [[ "$remote" =~ ^[0-9a-f]{64}$ ]] || { echo "[phase0] FAIL: checksum response is not a SHA-256"; return 1; }
   current=""; [ -f "$wm" ] && current="$(tr -d ' \n\r' < "$wm")"
   if [ "$remote" = "$current" ]; then
     echo "[phase0] bundle up to date ($remote)"
@@ -191,6 +201,8 @@ phase5_assemble() {
     echo "[phase5] FAIL: cannot fetch live prices/index.json from R2"
     return 1
   fi
+  "$VENV_PY" "$ROOT/scripts/site_data_metrics.py" "$OUT" \
+    || { echo "[phase5] FAIL: registry/index cohort counts"; return 1; }
   "$ROOT/.venv/bin/python" "$ROOT/scripts/make_manifest.py" "$OUT" --producer "$PRODUCER" --tier counts \
     --note "native refresh $TS" || { echo "[phase5] FAIL: make_manifest"; return 1; }
   [ -f "$OUT/meta/manifest.json" ] || { echo "[phase5] FAIL: manifest missing"; return 1; }

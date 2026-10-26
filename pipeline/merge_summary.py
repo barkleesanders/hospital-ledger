@@ -22,6 +22,11 @@ All other fields: taken from fresh (compliance context).
 import json
 import sys
 
+COHORT_FIELDS = (
+    "required_live_price_hospitals", "required_live_zero_price_hospitals",
+    "required_live_unindexed_hospitals", "price_hospitals_outside_required_live",
+)
+
 # Fields the counts refresh owns (compliance data)
 FRESH_FIELDS = {
     "generated_at",
@@ -60,6 +65,13 @@ def main():
             merged[field] = live[field]
         elif field in merged:
             del merged[field]
+
+    # A cohort depends on BOTH the fresh registry and the carried-forward
+    # price index. Neither input summary can supply that join. The counts
+    # runner recomputes it after fetching the matching live index.
+    for field in COHORT_FIELDS:
+        merged.pop(field, None)
+        merged.get("count_definitions", {}).pop(field, None)
 
     # Safety: if live has price data but fresh doesn't, ensure we didn't lose it
     # If live is missing price data (shouldn't happen), warn but proceed

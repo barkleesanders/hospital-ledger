@@ -13,6 +13,7 @@ Also builds:
 """
 import json, os, sys, glob, re, gzip, subprocess, tempfile, atexit, io
 from collections import defaultdict
+from site_data_metrics import price_index_metrics, refresh_summary_metrics, rows_by_ccn
 
 # zstd binary for compressing the multi-GB CPT temp spill files (~6x smaller).
 # Without it the uncompressed spills (~9 GB transient) overrun a disk-tight box
@@ -194,12 +195,9 @@ if merge_index and os.path.exists(INDEX):
     try:
         with open(INDEX) as handle:
             existing_index = json.load(handle)
-        for summary in existing_index.get('hospitals', []):
-            ccn = summary.get('ccn')
-            if ccn:
-                summary_by_ccn[ccn] = summary
-    except (OSError, json.JSONDecodeError):
-        summary_by_ccn = {}
+        summary_by_ccn = rows_by_ccn(existing_index.get('hospitals', []), 'prices/index')
+    except (OSError, json.JSONDecodeError) as error:
+        raise RuntimeError('cannot merge prices: existing index is unreadable; refusing to discard its hospitals') from error
 
 cpt_index = defaultdict(list)
 generated_ccns = set()
@@ -305,6 +303,8 @@ for path in parsed_paths:
     skipped_missing_code = 0
     skipped_unpriced = 0
     skipped_type = 0
+    historical_keys = set()
+    differing_gross = set()
     for it in items:
         code, code_type = display_code_and_type(it)
         if not code:
@@ -321,17 +321,26 @@ for path in parsed_paths:
             skipped_type += 1
             continue
         key = (code, it.get('billing_class', ''), it.get('setting', ''))
+        if it.get('gross_charge_source'):
+            historical_keys.add(key)
         if key in seen:
+            if gross != seen[key].get('gross_charge'):
+                differing_gross.add(key)
             # Keep the one with more payer info
             if len(payer_rates) > len(seen[key].get('payer_rates') or []):
                 seen[key] = it
             continue
         seen[key] = it
 
+    # These sticky sets retain evidence even when payer-based selection drops
+    # the historical row. No per-row price-history allocation on large files.
+    historical_conflicts = historical_keys & differing_gross
     slim = []
     counts_by_type = defaultdict(int)
     for it in seen.values():
         code, code_type = display_code_and_type(it)
+        if (code, it.get('billing_class', ''), it.get('setting', '')) in historical_conflicts:
+            continue
         payer_rates = it.get('payer_rates') or []
         # Compact payer rates: keep top 5 by rate_dollar
         payers = sorted(
@@ -351,6 +360,8 @@ for path in parsed_paths:
         }
         if payers:
             rec['payers'] = [{'p': p['payer'][:40], 'r': p['rate_dollar']} for p in payers]
+        if isinstance(it.get('gross_charge_source'), dict):
+            rec['gross_charge_source'] = it['gross_charge_source']
         if it.get('billing_class'):
             rec['bc'] = it['billing_class'][:16]
         if it.get('setting'):
@@ -387,6 +398,7 @@ for path in parsed_paths:
                 'missing_code': skipped_missing_code,
                 'unpriced': skipped_unpriced,
                 'unsupported_type': skipped_type,
+                'conflicting_historical_gross': len(historical_conflicts),
             },
         },
         'items': slim,
@@ -539,8 +551,10 @@ if index_from_prices:
             })
 
 ccn_summaries = [summary_by_ccn[ccn] for ccn in sorted(summary_by_ccn)]
+price_index_metrics([], ccn_summaries)
 with open(INDEX, 'w') as f:
     json.dump({'hospitals': ccn_summaries}, f, separators=(',', ':'))
+refresh_summary_metrics(os.path.dirname(OUT_DIR), ccn_summaries)
 
 if not keep_stale:
     for stale_path in glob.glob(os.path.join(OUT_DIR, '*.json')):

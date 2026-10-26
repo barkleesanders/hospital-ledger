@@ -196,6 +196,7 @@ def _build_layout(client, summary_from_prices_file):
     scripts_dir = os.path.join(PUB, "scripts")
     os.makedirs(scripts_dir, exist_ok=True)
     shutil.copy2(os.path.join(REPO, "scripts", "build_site_data.py"), scripts_dir)
+    shutil.copy2(os.path.join(REPO, "scripts", "site_data_metrics.py"), scripts_dir)
     db_link = os.path.join(PUB, "db")
     if not os.path.exists(db_link):
         os.symlink(os.path.join(REPO, "db"), db_link)

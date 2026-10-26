@@ -72,6 +72,11 @@ export type HospitalItem = {
 	min: number | null;
 	max: number | null;
 	pc?: number;
+	gross_charge_source?: {
+		effective_date: string;
+		header: string;
+		column_1based: number;
+	};
 	payers?: Array<{ p: string; r: number | null }>;
 };
 

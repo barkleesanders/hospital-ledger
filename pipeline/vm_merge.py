@@ -373,7 +373,7 @@ def main():
         shutil.copy2(os.path.join(prices_dir, "index.json"), os.path.join(pub, "prices", "index.json"))
         scripts_dir = os.path.join(MERGE_DIR, "scripts")
         os.makedirs(scripts_dir, exist_ok=True)
-        for sn in ("build_site_data.py", "build_aggregates.py", "payer_canonical.py"):
+        for sn in ("build_site_data.py", "site_data_metrics.py", "build_aggregates.py", "payer_canonical.py"):
             shutil.copy2(os.path.join(REPO, "scripts", sn), os.path.join(scripts_dir, sn))
         db_link = os.path.join(MERGE_DIR, "db")
         if not os.path.exists(db_link):

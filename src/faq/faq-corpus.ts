@@ -22,6 +22,7 @@
  * visitor is already on the record's page, so the document says so instead.
  */
 import { parseDocument } from "htmlparser2";
+import { complianceElementStatus, complianceRating } from "../lib/compliance";
 import type {
 	Bindings,
 	HospitalData,
@@ -30,6 +31,8 @@ import type {
 } from "../lib/data";
 import { loadHospital, loadPayer, loadProcedure } from "../lib/data";
 import { fmtMoney } from "../lib/format";
+import { grossChargeDate } from "../lib/price-provenance";
+import { bundledSummary, loadSummary, type Summary } from "../lib/site-data";
 import { aboutPage } from "../routes/about-the-numbers";
 import { homePage } from "../routes/home";
 import { complianceExplainer, ELEMENT_LABELS } from "../routes/hospital";
@@ -94,7 +97,11 @@ export function pageText(html: string): string {
 		.trim();
 }
 
-type PublicPage = { title: string; path: string; render: () => string };
+type PublicPage = {
+	title: string;
+	path: string;
+	render: (summary: Summary) => string;
+};
 
 /** The public pages behind the corpus, in prompt order (most-asked first). */
 const PUBLIC_PAGES: PublicPage[] = [
@@ -102,12 +109,13 @@ const PUBLIC_PAGES: PublicPage[] = [
 		title:
 			"Hospital Ledger — home page (what the site is, how we count, where the data comes from)",
 		path: "/",
-		render: () => String(homePage(`${SITE_ORIGIN}/`)),
+		render: (summary) => String(homePage(`${SITE_ORIGIN}/`, summary)),
 	},
 	{
 		title: "About the numbers (methodology)",
 		path: "/about-the-numbers",
-		render: () => String(aboutPage(`${SITE_ORIGIN}/about-the-numbers`)),
+		render: (summary) =>
+			String(aboutPage(`${SITE_ORIGIN}/about-the-numbers`, summary)),
 	},
 	{
 		title:
@@ -130,34 +138,44 @@ function gradesDoc(): FaqCorpusDoc {
 			"How a hospital's compliance grade is scored (shown on every hospital page)",
 		url: `${SITE_ORIGIN}/`,
 		text: [
-			'Every hospital page opens with a "45 CFR § 180 compliance" card: a letter grade (A, B, C, D or F) and a score out of 100, with a dot for each of the six data elements the federal hospital price transparency rule (45 CFR Part 180) requires a hospital to publish:',
+			'Every hospital page opens with a "45 CFR § 180 compliance" card. When assessment metadata is available, it shows a letter grade (A, B, C, D or F) and a score out of 100 for the six data elements the federal hospital price transparency rule (45 CFR Part 180) requires a hospital to publish:',
 			...Object.values(ELEMENT_LABELS).map((label) => `- ${label}`),
 			`Score 80 or above: ${complianceExplainer(80)} Score 60 to 79: ${complianceExplainer(60)} Score below 60: ${complianceExplainer(0)}`,
 			"The compliance grade reflects how completely the hospital published the six required data elements, not the quality of care. Data comes straight from the hospital's federally-mandated machine-readable file.",
+			"When a valid grade or score is missing, the page says Grade unavailable. An element without an explicit assessment is unknown. Missing assessment metadata does not mean a failing grade, an unpublished element, or hospital noncompliance.",
 			"Each hospital page also shows how many procedures it lists, how many insurances it has negotiated rates with, how many CPT / HCPCS codes it covers, a link to the hospital's source file, and its most expensive procedures by gross charge with cash, minimum and maximum negotiated prices.",
 		].join("\n"),
 	};
 }
 
 /** Build the site corpus from scratch (exported for tests; the loader caches it). */
-export function buildSiteCorpus(): FaqCorpusDoc[] {
+export function buildSiteCorpus(
+	summary: Summary = bundledSummary,
+): FaqCorpusDoc[] {
 	return [
 		...PUBLIC_PAGES.map((p) => ({
 			title: p.title,
 			url: `${SITE_ORIGIN}${p.path}`,
-			text: pageText(p.render()),
+			text: pageText(p.render(summary)),
 		})),
 		gradesDoc(),
 	];
 }
 
-let siteCached: FaqCorpusDoc[] | null = null;
+let siteCached: { key: string; docs: FaqCorpusDoc[] } | null = null;
 
 /** Corpus loader for mountInfiniteFaq: the site's own pages, rendered once per isolate. */
-export async function loadFaqCorpus(): Promise<FaqCorpusDoc[]> {
-	if (!siteCached) siteCached = buildSiteCorpus();
+export async function loadFaqCorpus(env?: {
+	HL_MRF_PARSED?: R2Bucket;
+}): Promise<FaqCorpusDoc[]> {
+	const summary = env ? (await loadSummary(env)).summary : bundledSummary;
+	// Refresh with the data, not merely with a Worker deploy. Include all fields:
+	// publication may reconcile cohorts without changing generated_at.
+	const key = JSON.stringify(summary);
+	if (!siteCached || siteCached.key !== key)
+		siteCached = { key, docs: buildSiteCorpus(summary) };
 
-	return siteCached;
+	return siteCached.docs;
 }
 
 /**
@@ -293,8 +311,7 @@ const n = (v: number) => v.toLocaleString("en-US");
 export function hospitalDoc(_ccn: string, data: HospitalData): FaqCorpusDoc {
 	const name = quoted(data.hospital_name) || "This hospital";
 	const compliance = data.compliance ?? {};
-	const grade = (compliance.grade ?? "F").toUpperCase();
-	const score = Number(compliance.score ?? 0);
+	const rating = complianceRating(compliance);
 	const elements = compliance.elements ?? {};
 	const items = data.items ?? [];
 	const cptCount = items.filter(
@@ -311,11 +328,12 @@ export function hospitalDoc(_ccn: string, data: HospitalData): FaqCorpusDoc {
 		`The hospital page the visitor is reading on ${SITE_NAME} (this page).`,
 		`Hospital: "${name}"`,
 		"The law: 45 CFR Part 180 (the federal hospital price transparency rule) requires every hospital to publish a machine-readable file with six data elements: a machine-readable file; gross / standard charges; a discounted cash price; payer-specific negotiated rates; minimum and maximum negotiated charges; and free public access with no login.",
-		`Compliance grade: ${grade}, score ${score} out of 100. ${complianceExplainer(score)} The grade reflects how completely the hospital published the six required data elements, not the quality of care.`,
+		rating
+			? `Compliance grade: ${rating.grade}, score ${rating.score} out of 100. ${complianceExplainer(rating.score)} The grade reflects how completely the hospital published the six required data elements, not the quality of care.`
+			: "Compliance grade and score: unavailable. Missing assessment metadata does not establish noncompliance.",
 		"What this hospital published, element by element:",
 		...Object.entries(ELEMENT_LABELS).map(
-			([k, label]) =>
-				`- ${label}: ${elements[k] ? "published" : "NOT published"}`,
+			([k, label]) => `- ${label}: ${complianceElementStatus(elements[k])}`,
 		),
 		`Procedures listed: ${n(items.length)}`,
 		`Insurances with rates: ${n(payerSet.size)}`,
@@ -324,20 +342,25 @@ export function hospitalDoc(_ccn: string, data: HospitalData): FaqCorpusDoc {
 	];
 
 	const top = items.slice(0, RECORD_ROWS);
+	if (items.some((it) => grossChargeDate(it.gross_charge_source))) {
+		lines.push(
+			"Historical charges: source-column dates are price effective dates, not retrieval dates. These amounts are not verified current prices.",
+		);
+	}
 
 	if (top.length) {
 		lines.push(
 			`Most expensive procedures by gross charge (the page shows the top ${Math.min(50, items.length)} of ${n(items.length)}; the first ${top.length} are):`,
 			...top.map(
 				(it) =>
-					`- ${quoted(it.code, 12)} ${quoted(it.desc, 80)}: gross ${fmtMoney(it.gross)}, cash ${fmtMoney(it.cash)}, min payer ${fmtMoney(it.min)}, max payer ${fmtMoney(it.max)}, ${it.pc ?? 0} insurers`,
+					`- ${quoted(it.code, 12)} ${quoted(it.desc, 80)}: gross ${fmtMoney(it.gross)}${grossChargeDate(it.gross_charge_source) ? ` (source date ${grossChargeDate(it.gross_charge_source)})` : ""}, cash ${fmtMoney(it.cash)}, min payer ${fmtMoney(it.min)}, max payer ${fmtMoney(it.max)}, ${it.pc ?? 0} insurers`,
 			),
 		);
 	}
 
 	lines.push(
 		"Prices are reproduced as published in the hospital's machine-readable file (45 CFR § 180); they are not a quote and what a patient pays depends on insurance and the services provided.",
-		"The visitor is on this hospital's own page, so do not repeat or link its web address; each procedure listed has its own page, reached by clicking it.",
+		"The visitor is on this hospital's own page, so do not repeat or link its web address. CPT and HCPCS entries link to procedure comparisons. Hospital-local CDM identifiers are not interchangeable across hospitals and do not link to a cross-hospital comparison.",
 	);
 
 	return {
@@ -432,7 +455,7 @@ export function payerDoc(slug: string, data: PayerData): FaqCorpusDoc {
 			`Hospitals with the most procedures negotiated (the page lists ${n(Math.min(500, hospitals.length))} in all):`,
 			...rows.map(
 				(h) =>
-					`- "${quoted(h.name, 80)}" (${quoted(h.state, 2) || "state not given"}): ${n(h.n_items_with_payer ?? 0)} procedures with a rate, median rate ${fmtMoney(h.median_rate)}, compliance grade ${quoted(h.compliance_grade, 2) || "not graded"}`,
+					`- "${quoted(h.name, 80)}" (${quoted(h.state, 2) || "state not given"}): ${n(h.n_items_with_payer ?? 0)} procedures with a rate, median rate ${fmtMoney(h.median_rate)}, compliance grade ${complianceRating({ grade: h.compliance_grade, score: h.compliance_score })?.grade ?? "not graded"}`,
 			),
 		);
 	}

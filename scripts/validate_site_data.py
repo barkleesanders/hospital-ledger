@@ -21,9 +21,11 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import math
 import re
 import sys
 from pathlib import Path
+from site_data_metrics import COHORT_FIELDS, price_index_metrics
 
 CONTRACT_VERSION = "1"
 CCN_RE = re.compile(r"^[0-9A-Z]{6}$")
@@ -132,6 +134,11 @@ def check_summary(root: Path, rep: Report, manifest: dict | None) -> dict | None
     for k, t in REQUIRED_SUMMARY.items():
         v = s.get(k)
         rep.expect(isinstance(v, t) and not isinstance(v, bool), f"summary.{k} is {getattr(t, '__name__', 'number')}")
+    has_cohorts = any(k in s for k in COHORT_FIELDS)
+    if has_cohorts:
+        for k in COHORT_FIELDS:
+            rep.expect(type(s.get(k)) is int and s[k] >= 0,
+                       f"summary.{k} is a nonnegative integer (got {s.get(k)!r}; cohort fields must be complete)")
     if rep.fails:
         return s
     gen = s["generated_at"]
@@ -165,6 +172,16 @@ def check_summary(root: Path, rep: Report, manifest: dict | None) -> dict | None
                "cpt_indexed_hospitals <= standardized_price_hospitals")
     rep.expect(s["cpt_indexed_rows"] <= s["standardized_price_rows"],
                "cpt_indexed_rows <= standardized_price_rows")
+    if has_cohorts:
+        cohort_total = sum(s[k] for k in COHORT_FIELDS[:3])
+        rep.expect(cohort_total == s["compliant"],
+                   f"required/live priced + zero + unindexed = {cohort_total} == compliant {s['compliant']}")
+        priced_total = s["required_live_price_hospitals"] + s["price_hospitals_outside_required_live"]
+        rep.expect(priced_total == s["standardized_price_hospitals"],
+                   f"required/live priced + outside = {priced_total} == standardized_price_hospitals {s['standardized_price_hospitals']}")
+        zero_ceiling = s["standardized_price_index_hospitals"] - s["standardized_price_hospitals"]
+        rep.expect(s["required_live_zero_price_hospitals"] <= zero_ceiling,
+                   f"required_live_zero_price_hospitals {s['required_live_zero_price_hospitals']} <= all zero-row index entries {zero_ceiling}")
     for k in ("states", "types", "worst_offenders"):
         rep.expect(isinstance(s.get(k), list), f"summary.{k} is a list")
     return s
@@ -178,10 +195,13 @@ def check_hospitals(root: Path, rep: Report, summary: dict | None) -> None:
     if not isinstance(h, list) or not h:
         rep.fail("meta/hospitals.json: not a non-empty list")
         return
-    bad = [x for x in h if not (isinstance(x, dict) and CCN_RE.match(str(x.get("ccn", "")))
+    bad = [x for x in h if not (isinstance(x, dict) and isinstance(x.get("ccn"), str)
+                                  and CCN_RE.fullmatch(x["ccn"])
                                   and isinstance(x.get("name"), str) and isinstance(x.get("state"), str)
                                   and isinstance(x.get("required"), bool) and isinstance(x.get("has_live_mrf"), bool))]
     rep.expect(not bad, f"hospitals.json rows carry ccn/name/state/required/has_live_mrf ({len(bad)} bad)")
+    if bad:
+        return
     ccns = [x.get("ccn") for x in h]
     rep.expect(len(ccns) == len(set(ccns)), "hospitals.json CCNs are unique")
     if summary:
@@ -204,11 +224,29 @@ def check_prices_index(root: Path, rep: Report, summary: dict | None) -> list[st
         return []
     bad = 0
     for x in hs:
-        if not (isinstance(x, dict) and CCN_RE.match(str(x.get("ccn", ""))) and isinstance(x.get("n"), int)
+        if not (isinstance(x, dict) and isinstance(x.get("ccn"), str) and CCN_RE.fullmatch(x["ccn"])
+                and type(x.get("n")) is int and x["n"] >= 0
                 and isinstance(x.get("name"), str) and isinstance(x.get("counts"), dict)
                 and isinstance(x.get("cpt_indexed"), int) and isinstance(x.get("compliance"), dict)):
             bad += 1
     rep.expect(bad == 0, f"prices/index.json rows carry ccn/n/name/counts/cpt_indexed/compliance ({bad} bad)")
+    # Join the actual registry and index: scalar subtraction across these
+    # populations can pass arithmetic checks while assigning hospitals wrongly.
+    registry_path = root / "meta" / "hospitals.json"
+    if registry_path.is_file():
+        registry = load_json(registry_path, rep)
+        try:
+            metrics = price_index_metrics(registry, hs)
+        except ValueError as exc:
+            rep.fail(str(exc))
+            return []
+        if summary:
+            for key in COHORT_FIELDS:
+                if key in summary:
+                    rep.expect(summary[key] == metrics[key],
+                               f"summary.{key}={summary[key]!r} == registry/index CCN join {metrics[key]}")
+    if bad:
+        return []
     if summary:
         rep.expect(len(hs) == summary["standardized_price_index_hospitals"],
                    f"len(prices/index)={len(hs)} == summary.standardized_price_index_hospitals")
@@ -224,14 +262,30 @@ def check_prices_index(root: Path, rep: Report, summary: dict | None) -> list[st
 def check_price_files(root: Path, rep: Report, index_ccns: list[str]) -> None:
     files = sorted((root / "prices").glob("*.json")) if (root / "prices").is_dir() else []
     files = [f for f in files if f.name != "index.json"]
-    if not files:
-        rep.ok("prices/{ccn}.json: none present (counts tier or index-only upload)")
+    if not rep.expect(bool(files), 'full pricing has per-hospital files'):
         return
     idx = set(index_ccns)
+    rep.expect({f.stem for f in files} == idx,
+               f"full pricing files match index CCNs ({len(files)} files, {len(idx)} entries; "
+               f"missing={len(idx - {f.stem for f in files})}, extra={len({f.stem for f in files} - idx)})")
+    index = load_json(root / 'prices' / 'index.json', rep)
+    entries = index.get('hospitals') if isinstance(index, dict) else None
+    if not isinstance(entries, list):
+        rep.fail('prices/index.json: cannot verify per-file row counts')
+        return
+    expected_counts = {}
+    for entry in entries:
+        if (not isinstance(entry, dict) or not isinstance(entry.get('ccn'), str)
+                or not CCN_RE.fullmatch(entry['ccn']) or type(entry.get('n')) is not int
+                or entry['n'] < 0 or entry['ccn'] in expected_counts):
+            rep.fail('prices/index.json: invalid or duplicate per-file row count')
+            return
+        expected_counts[entry['ccn']] = entry['n']
+    rep.expect(set(expected_counts) == idx, 'full pricing file check uses every price-index CCN')
     bad: list[str] = []
     for f in files:
         ccn = f.stem
-        if not CCN_RE.match(ccn):
+        if not CCN_RE.fullmatch(ccn):
             bad.append(f"{f.name}: filename is not a CCN"); continue
         if f.stat().st_size > PRICE_FILE_MAX_BYTES:
             bad.append(f"{f.name}: {f.stat().st_size} bytes > {PRICE_FILE_MAX_BYTES}"); continue
@@ -242,11 +296,20 @@ def check_price_files(root: Path, rep: Report, index_ccns: list[str]) -> None:
             bad.append(f"{f.name}: ccn field {d.get('ccn')!r} != filename"); continue
         if not isinstance(d.get("hospital_name"), str) or not isinstance(d.get("items"), list):
             bad.append(f"{f.name}: missing hospital_name/items"); continue
-        for it in d["items"][:200]:
-            if not (isinstance(it, dict) and isinstance(it.get("code"), str)
+        if len(d['items']) != expected_counts.get(ccn):
+            bad.append(f"{f.name}: {len(d['items'])} items != index n={expected_counts.get(ccn)!r}")
+        for position, it in enumerate(d["items"], start=1):
+            if not (isinstance(it, dict) and isinstance(it.get("code"), str) and it['code']
                     and it.get("type") in DISPLAY_TYPES
                     and all(k in it for k in ("gross", "cash", "min", "max"))):
-                bad.append(f"{f.name}: item shape {it!r:.80}"); break
+                bad.append(f"{f.name}: item {position} has invalid shape"); break
+            try:
+                numeric = all(it[k] is None or (type(it[k]) in (int, float) and math.isfinite(it[k]))
+                              for k in ('gross', 'cash', 'min', 'max'))
+            except OverflowError:
+                numeric = False
+            if not numeric:
+                bad.append(f"{f.name}: item {position} has invalid monetary values"); break
         if idx and ccn not in idx:
             bad.append(f"{f.name}: not listed in prices/index.json")
     rep.expect(not bad, f"prices/{{ccn}}.json ({len(files)} files) conform" + (": " + "; ".join(bad[:5]) if bad else ""))

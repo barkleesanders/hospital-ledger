@@ -2,7 +2,7 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "hospital-ledger",
 	"main": "dist/index.js",
-	"build": { "command": "npm run test:site-data" },
+	"build": { "command": "npm run test:site-data && npm run test:harness" },
 	"compatibility_date": "2025-11-01",
 	"cache": { "enabled": true },
 	// enable_request_signal: a Stop click (client disconnect) reaches the /api/faq/ask

@@ -16,6 +16,7 @@ import { Layout } from "../components/Layout";
 import { ProcedureCarousel } from "../components/ProcedureCarousel";
 import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
+import { priceCoverage } from "../lib/price-coverage";
 import { bundledSummary, loadSummary, type Summary } from "../lib/site-data";
 
 const fmt = (n: number) => n.toLocaleString("en-US");
@@ -29,6 +30,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 		SITE_COUNTS.standardized_price_hospitals ??
 		SITE_COUNTS.standardized_price_index_hospitals ??
 		3654;
+	const coverage = priceCoverage(SITE_COUNTS);
 	const parsedMrfOutputs =
 		SITE_COUNTS.standardized_price_index_hospitals ?? 3768;
 	const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 62577586;
@@ -95,8 +97,8 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 					<p class="mt-5 text-sm sm:text-base text-zinc-400 max-w-2xl leading-relaxed">
 						<span class="font-semibold text-zinc-200">How we count:</span> the
 						headline counts only hospitals with{" "}
-						<code class="mono text-zinc-200">n &gt; 0</code> price rows. Every
-						number is mirrored in{" "}
+						<code class="mono text-zinc-200">n &gt; 0</code> price rows, across
+						all indexed hospital populations. Aggregate counts are in{" "}
 						<a
 							href="/data/summary.json"
 							class="underline hover:text-emerald-300"
@@ -112,48 +114,64 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						</a>
 						.
 					</p>
-					<div class="mt-5 text-sm sm:text-base text-zinc-400 max-w-2xl leading-relaxed">
+					<div
+						id="coverage-gap"
+						class="mt-5 text-sm sm:text-base text-zinc-400 max-w-2xl leading-relaxed"
+					>
 						<p class="font-semibold text-zinc-200">
 							Why isn't every hospital here?
 						</p>
-						<p class="mt-1.5">
-							<span class="tab-num text-zinc-200">{fmt(liveMrfRequired)}</span>{" "}
-							hospitals have a live price file, but{" "}
-							<span class="tab-num text-zinc-200">
-								{fmt(liveMrfRequired - standardizedPriceHospitals)}
-							</span>{" "}
-							of them aren't in the{" "}
-							<span class="tab-num text-zinc-200">
-								{fmt(standardizedPriceHospitals)}
-							</span>{" "}
-							headline — for two reasons:
-						</p>
-						<ul class="mt-2.5 space-y-2.5 list-disc pl-6 marker:text-emerald-400">
-							<li>
-								<span class="tab-num font-semibold text-zinc-100">
-									{fmt(parsedMrfOutputs - standardizedPriceHospitals)}
-								</span>{" "}
-								published a file that is empty or a placeholder — zero usable
-								price rows. That is a gap in the hospital's own compliance, not
-								a parsing failure on our side.
-							</li>
-							<li>
-								<span class="tab-num font-semibold text-zinc-100">
-									{fmt(liveMrfRequired - parsedMrfOutputs)}
-								</span>{" "}
-								publish a file we cannot retrieve — blocked by the hospital's
-								CDN, password-protected, or locked behind a vendor download
-								portal.
-							</li>
-						</ul>
+						{coverage ? (
+							<>
+								<p class="mt-1.5">
+									Of {fmt(liveMrfRequired)} CMS-required hospitals with a
+									verified live file,{" "}
+									{fmt(coverage.required_live_price_hospitals)} have searchable
+									prices.{" "}
+									{fmt(
+										coverage.required_live_zero_price_hospitals +
+											coverage.required_live_unindexed_hospitals,
+									)}{" "}
+									still lack searchable rows:
+								</p>
+								<ul class="mt-2.5 space-y-2.5 list-disc pl-6 marker:text-emerald-400">
+									<li>
+										{fmt(coverage.required_live_zero_price_hospitals)} have an
+										index entry with zero rows.
+									</li>
+									<li>
+										{fmt(coverage.required_live_unindexed_hospitals)} are not
+										yet in the price index.
+									</li>
+								</ul>
+								<p class="mt-2.5">
+									The headline also includes{" "}
+									{fmt(coverage.price_hospitals_outside_required_live)} priced
+									hospital records outside that required/live-file group. These
+									are different populations, not interchangeable totals.
+								</p>
+							</>
+						) : (
+							<p class="mt-1.5">
+								The live-file and price-index totals cover different
+								populations. A consistent hospital-by-hospital coverage
+								breakdown is not currently available; we do not subtract those
+								totals to estimate the gap.
+							</p>
+						)}
 						<p class="mt-2.5">
-							Every CMS-required hospital with a live file is now accounted for.
-							Full breakdown at{" "}
+							Zero indexed rows do not establish that a hospital's source file
+							is empty or noncompliant; retrieval, parsing, and filtering still
+							need investigation. Full breakdown at{" "}
 							<a
 								href="/about-the-numbers"
 								class="underline hover:text-emerald-300"
 							>
 								/about-the-numbers
+							</a>{" "}
+							and{" "}
+							<a href="/api/coverage" class="underline hover:text-emerald-300">
+								/api/coverage
 							</a>
 							.
 						</p>
@@ -243,7 +261,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						</div>
 					</div>
 
-					<div class="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3">
+					<div class="mt-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
 						<div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
 							<div class="text-xs uppercase tracking-wider text-zinc-500">
 								Hospitals · with prices
@@ -347,7 +365,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						going to. Every price is straight from that hospital's own published
 						file.
 					</p>
-					<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 						<form
 							id="by-proc-form"
 							class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 lift min-w-0"
@@ -487,7 +505,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 					<h2 class="serif text-2xl sm:text-3xl md:text-4xl mb-6">
 						Three steps. No fees, no signup.
 					</h2>
-					<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
 						<div>
 							<div class="num-step text-2xl mb-2">01</div>
 							<h3 class="serif text-2xl mb-2">Search</h3>
@@ -521,7 +539,10 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 					</div>
 				</section>
 
-				<section id="why" class="grid md:grid-cols-3 gap-4 md:gap-6">
+				<section
+					id="why"
+					class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6"
+				>
 					<div class="md:col-span-2">
 						<div class="section-rule">
 							<span class="num">03</span>
@@ -550,28 +571,23 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 							<li class="flex gap-3">
 								<span class="text-emerald-400 mt-1">▸</span>
 								<span>
-									Most hospitals technically comply by uploading a giant
-									unreadable file. We verified live MRFs for{" "}
+									Hospitals publish files in many different formats. We verified
+									live MRFs for{" "}
 									<span class="tab-num">{fmt(liveMrfRequired)}</span> of{" "}
 									<span class="tab-num">{fmt(cmsRequiredTotal)}</span>{" "}
-									CMS-required hospitals and standardized price rows for{" "}
+									CMS-required hospitals. Separately, we have standardized price
+									rows for{" "}
 									<span class="tab-num">{fmt(standardizedPriceHospitals)}</span>{" "}
-									of them.
+									hospital records across all indexed populations.
 								</span>
 							</li>
 							<li class="flex gap-3">
 								<span class="text-emerald-400 mt-1">▸</span>
 								<span>
-									The{" "}
-									<span class="tab-num">
-										{fmt(liveMrfRequired - standardizedPriceHospitals)}
-									</span>
-									-hospital gap between "live MRF" and "standardized prices" is
-									the parser's coverage hole — files we can download but haven't
-									fully extracted usable rows from yet (
-									{fmt(parsedMrfOutputs - standardizedPriceHospitals)} parsed to
-									zero rows, {fmt(liveMrfRequired - parsedMrfOutputs)} still in
-									the parse queue). Closing it is in progress; see{" "}
+									A live URL and a searchable price are different milestones. We
+									measure the remaining coverage gap by joining hospital
+									identifiers, not by subtracting totals from different
+									populations. See{" "}
 									<a
 										href="/about-the-numbers"
 										class="text-emerald-300 underline"
@@ -802,12 +818,12 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						<div class="text-xs uppercase tracking-wider text-emerald-400 mb-3">
 							What this would cost if I charged for it
 						</div>
-						<div class="grid sm:grid-cols-3 gap-3">
+						<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
 							<div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
 								<div class="text-xs uppercase tracking-wider text-zinc-500">
 									If a contracting firm built it
 								</div>
-								<div class="mt-2 text-3xl font-semibold tab-num text-zinc-100">
+								<div class="mt-2 text-xl sm:text-3xl font-semibold tab-num text-zinc-100">
 									~$593,000
 								</div>
 								<div class="text-xs text-zinc-500 mt-2 leading-relaxed">
@@ -834,7 +850,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 								<div class="text-xs uppercase tracking-wider text-zinc-500">
 									Commercial alternative
 								</div>
-								<div class="mt-2 text-3xl font-semibold tab-num text-zinc-100">
+								<div class="mt-2 text-xl sm:text-3xl font-semibold tab-num text-zinc-100">
 									"Contact sales"
 								</div>
 								<div class="text-xs text-zinc-500 mt-2 leading-relaxed">
@@ -861,7 +877,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 								<div class="text-xs uppercase tracking-wider text-emerald-300">
 									What we charge
 								</div>
-								<div class="mt-2 text-3xl font-semibold tab-num text-emerald-300">
+								<div class="mt-2 text-xl sm:text-3xl font-semibold tab-num text-emerald-300">
 									$0
 								</div>
 								<div class="text-xs text-zinc-400 mt-2 leading-relaxed">
@@ -885,7 +901,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						</p>
 					</div>
 
-					<div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+					<div class="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-sm">
 						<div class="rounded-lg bg-zinc-950/50 border border-zinc-800 p-4">
 							<div class="text-xs uppercase tracking-wider text-zinc-500">
 								Raw data processed
@@ -932,7 +948,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						</div>
 					</div>
 
-					<div class="mt-6 grid md:grid-cols-2 gap-4">
+					<div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
 						<div class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4">
 							<div class="text-xs uppercase tracking-wider text-emerald-400 mb-3">
 								The 11-stage pipeline
@@ -1008,6 +1024,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						<a
 							class="text-emerald-300 underline"
 							href="https://github.com/barkleesanders/hospital-ledger"
+							style="overflow-wrap:anywhere"
 						>
 							github.com/barkleesanders/hospital-ledger
 						</a>{" "}
@@ -1032,7 +1049,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 							price rows.
 						</span>
 					</p>
-					<div class="mt-4 grid md:grid-cols-[1fr_180px_160px] gap-3">
+					<div class="mt-4 grid grid-cols-1 md:grid-cols-[1fr_180px_160px] gap-3">
 						<input
 							id="q"
 							type="search"
@@ -1081,7 +1098,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 					</div>
 				</section>
 
-				<section id="states" class="grid md:grid-cols-2 gap-8">
+				<section id="states" class="grid grid-cols-1 md:grid-cols-2 gap-8">
 					<div>
 						<h2 class="text-2xl font-semibold tracking-tight">Worst states</h2>
 						<p class="text-sm text-zinc-400 mt-1">
@@ -1136,7 +1153,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 							Open the current summary JSON
 						</a>
 					</div>
-					<div class="mt-6 grid gap-4 md:grid-cols-3">
+					<div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
 						<div class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4">
 							<div class="text-xs uppercase tracking-wider text-emerald-400">
 								Primary sources
@@ -1212,7 +1229,8 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 								>
 									{fmt(standardizedPriceHospitals)}
 								</span>{" "}
-								hospitals with standardized price rows, out of{" "}
+								hospitals with standardized price rows across all indexed
+								populations. Separately,{" "}
 								<span
 									id="methodology-live-mrf-count"
 									class="tab-num text-zinc-300"
@@ -1228,8 +1246,9 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 							</div>
 							<ul class="mt-3 space-y-2 text-sm text-zinc-300">
 								<li>
-									<strong>Compliant</strong> means a live machine-readable file
-									was found and verified.
+									<strong>Verified live file</strong> (the API's legacy{" "}
+									<code>compliant</code> field) means a file URL was found and
+									verified, not that CMS has determined legal compliance.
 								</li>
 								<li>
 									<strong>Missing</strong> means no live public MRF was found
@@ -1247,9 +1266,10 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 								</li>
 							</ul>
 							<p class="mt-3 text-xs text-zinc-500">
-								Current limits: some hospitals are behind bot-defense or publish
-								malformed files. Missing rows can mean non-compliance, anti-bot
-								blocking, or broken vendor output.
+								Current limits: missing rows can reflect retrieval problems,
+								discovery mistakes, unsupported formats, filtering, or
+								source-file problems. A missing price alone does not identify
+								the cause.
 							</p>
 						</div>
 					</div>
@@ -1301,7 +1321,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 							</div>
 						</div>
 					</div>
-					<div class="mt-4 grid md:grid-cols-[1fr_180px] gap-3">
+					<div class="mt-4 grid grid-cols-1 md:grid-cols-[1fr_180px] gap-3">
 						<input
 							id="cpt-q"
 							type="search"
@@ -1323,13 +1343,14 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 				<section
 					id="api"
 					class="rounded-lg border border-zinc-800 bg-zinc-900 p-4 sm:p-6"
+					style="overflow-wrap:anywhere"
 				>
 					<h2 class="text-2xl font-semibold tracking-tight">Use it</h2>
 					<p class="text-zinc-300 mt-2">
 						Everything here is <strong>CC0 / public domain</strong>. No
 						attribution required. Build whatever you want on top.
 					</p>
-					<div class="mt-4 grid md:grid-cols-2 gap-3 text-sm">
+					<div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
 						<a
 							href="/data/hospitals.json"
 							class="rounded-md border border-zinc-700 hover:bg-zinc-800 p-3"
@@ -1387,9 +1408,9 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 					</p>
 					<p>
 						<strong>Limits:</strong> Some MRFs require browser bot-bypass
-						(Akamai-walled hospitals). We don't claim 100% — and the 13.8% gap
-						IS the policy artifact: federally-required, federally-cited, still
-						not public.
+						(Akamai-walled hospitals), and some discovery or parsing paths still
+						need repair. Missing searchable rows are not proof that the hospital
+						failed to publish a price file.
 					</p>
 					<p class="text-zinc-600">
 						© 2026 Hospital Ledger. Not affiliated with CMS, HHS, Cost Plus

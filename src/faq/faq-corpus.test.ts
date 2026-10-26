@@ -262,8 +262,12 @@ describe("hospitalDoc", () => {
 		expect(doc.text).toContain(
 			"This hospital published most of what § 180 requires.",
 		);
-		expect(doc.text).toContain("- Machine-readable file published: published");
-		expect(doc.text).toContain("- Min / max negotiated charges: NOT published");
+		expect(doc.text).toContain(
+			"- Machine-readable file published: assessment threshold met",
+		);
+		expect(doc.text).toContain(
+			"- Min / max negotiated charges: below assessment threshold",
+		);
 		expect(doc.text).toContain("Procedures listed: 3");
 		expect(doc.text).toContain("Insurances with rates: 2");
 		expect(doc.text).toContain("CPT / HCPCS codes: 2");
