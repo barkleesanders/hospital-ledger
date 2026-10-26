@@ -37,7 +37,7 @@ const hospital = (ccn, items, compliance = {}) => ({
 });
 const historical = hospital("400006", [
 	{
-		code: "LOCAL001",
+		code: "PROSTATE BIOPSY W/IMAGING GUIDANCE",
 		type: "CDM",
 		desc: "Historical fixture charge",
 		gross: 15,
@@ -311,7 +311,7 @@ try {
 				/not verified current/,
 			);
 			assert.equal(
-				await page.locator('a[href="/procedure/LOCAL001"]').count(),
+				await page.locator('#hospital-prices a[href^="/procedure/"]').count(),
 				0,
 			);
 		}

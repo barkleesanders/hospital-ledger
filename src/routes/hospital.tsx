@@ -263,10 +263,10 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 									class="block rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 hover:border-emerald-700/50 transition"
 								>
 									<div class="flex items-baseline justify-between gap-2 mb-2 min-w-0">
-										<div class="mono text-emerald-300 text-sm shrink-0">
+										<div class="mono text-emerald-300 text-sm min-w-0 break-words">
 											{it.code}
 										</div>
-										<div class="text-right tab-num text-base font-medium text-emerald-300">
+										<div class="text-right tab-num text-base font-medium text-emerald-300 shrink-0">
 											{fmtMoney(it.cash)}
 										</div>
 									</div>
