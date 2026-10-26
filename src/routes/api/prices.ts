@@ -12,6 +12,7 @@
 
 import type { Context } from "hono";
 import type { Env } from "../../index";
+import { HOSPITAL_ID_PATTERN } from "../../lib/hospital-id";
 import { badRequest, json } from "../../lib/responses";
 
 const DISPLAY_TYPES = new Set(["CPT", "HCPCS", "DRG", "MS-DRG", "REV", "CDM"]);
@@ -270,7 +271,7 @@ async function fetchPreviewFromParsedR2(
 
 export async function pricesHandler(c: Context<Env>): Promise<Response> {
 	const ccn = String(c.req.param("ccn") ?? "");
-	if (!/^\d{6}$/.test(ccn)) {
+	if (!HOSPITAL_ID_PATTERN.test(ccn)) {
 		return badRequest("invalid ccn");
 	}
 	const env = c.env;

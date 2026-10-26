@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { RecordContextSchema } from "../faq/faq-route";
 import app from "../index";
 import { bundledSummary, loadSummary, resetSummaryMemo } from "./site-data";
 
@@ -143,6 +144,61 @@ describe("/data/*.json", () => {
 			const res = await app.request("/data/prices/index.json", {}, e);
 			expect(res.headers.get("x-hl-price-index-source")).toBe("assets");
 			expect(res.headers.get("x-hl-price-index-hospitals")).toBe("5");
+		},
+	);
+});
+
+describe("hospital identifier contract", () => {
+	it("normalizes only the hospital prefix, preserving identifier and query", async () => {
+		const response = await app.request(
+			"/HOSPITAL/25063E?ref=proof",
+			{},
+			env({}),
+		);
+		expect(response.status).toBe(301);
+		expect(response.headers.get("location")).toBe("/hospital/25063E?ref=proof");
+	});
+
+	it.each(["250128", "25063E"])(
+		"serves numeric and legacy ID %s",
+		async (ccn) => {
+			const record = {
+				ccn,
+				hospital_name: "Identifier regression fixture",
+				items: [
+					{
+						code: "99213",
+						type: "CPT",
+						gross: 100,
+						cash: 80,
+						min: null,
+						max: null,
+					},
+				],
+			};
+			const e = env({ [`prices/${ccn}.json`]: JSON.stringify(record) });
+			const api = await app.request(`/api/prices/${ccn}`, {}, e);
+			expect(api.status).toBe(200);
+			expect(await api.json()).toEqual(record);
+			const page = await app.request(`/hospital/${ccn}`, {}, e);
+			expect(page.status).toBe(200);
+			expect(await page.text()).toContain("Identifier regression fixture");
+			expect(
+				RecordContextSchema.safeParse({ kind: "hospital", id: ccn }).success,
+			).toBe(true);
+		},
+	);
+
+	it.each(["25063e", "2506_E", "12345", "1234567", "2506%2FE"])(
+		"rejects malformed ID %s in every entry point",
+		async (ccn) => {
+			for (const prefix of ["/api/prices/", "/hospital/"]) {
+				const response = await app.request(prefix + ccn, {}, env({}));
+				expect(response.status).toBe(400);
+			}
+			expect(
+				RecordContextSchema.safeParse({ kind: "hospital", id: ccn }).success,
+			).toBe(false);
 		},
 	);
 });

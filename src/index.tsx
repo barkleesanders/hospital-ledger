@@ -128,13 +128,16 @@ app.use("*", async (c, next) => {
 	if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
 		return c.redirect(url.pathname.slice(0, -1) + url.search, 301);
 	}
-	// Lowercase only the entity prefix paths (the params themselves are already canonical)
-	const lowered = url.pathname.toLowerCase();
+	// Hospital IDs are case-sensitive R2 keys: preserve legacy suffixes such
+	// as 25063E. Keep the existing normalization for procedure/payer URLs.
+	const normalized = /^\/hospital\//i.test(url.pathname)
+		? url.pathname.replace(/^\/hospital\//i, "/hospital/")
+		: url.pathname.toLowerCase();
 	if (
-		lowered !== url.pathname &&
+		normalized !== url.pathname &&
 		/^\/(procedure|payer|hospital)\//i.test(url.pathname)
 	) {
-		return c.redirect(lowered + url.search, 301);
+		return c.redirect(normalized + url.search, 301);
 	}
 	return next();
 });
