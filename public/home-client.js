@@ -771,8 +771,9 @@
 		hospForm.addEventListener("submit", (e) => {
 			e.preventDefault();
 			const v = document.getElementById("by-hosp-input").value.trim();
-			if (/^\d{6}$/.test(v)) {
-				location.href = `/hospital/${v}`;
+			const identifier = v.toUpperCase();
+			if (/^[0-9A-Z]{6}$/.test(identifier)) {
+				location.href = `/hospital/${encodeURIComponent(identifier)}`;
 			} else if (v) {
 				const q = document.getElementById("q");
 				if (q) {

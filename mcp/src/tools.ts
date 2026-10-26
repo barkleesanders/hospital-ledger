@@ -62,24 +62,32 @@ async function tSearchHospitals(a: Record<string, unknown>) {
 async function tGetHospital(a: Record<string, unknown>) {
 	const ccn = reqStr(a.ccn, "ccn").toUpperCase();
 	const h = hospitalByCcn(ccn);
-	if (!h) return { found: false, ccn };
 	const idx = priceIndexEntry(ccn);
+	const prices = await fetchHospitalPrices(
+		ccn,
+		num(a.items_limit, 25),
+		num(a.items_offset, 0),
+	);
+	if (!h && !idx && !Array.isArray(prices.items))
+		return { found: false, ccn, prices };
 	return {
 		found: true,
-		hospital: {
-			...slimHospital(h),
-			address: String(h.address ?? ""),
-			zip: String(h.zip ?? ""),
-			ownership: String(h.ownership ?? ""),
-			emergency: Boolean(h.emergency),
-			required: Boolean(h.required),
-		},
+		hospital: h
+			? {
+					...slimHospital(h),
+					address: String(h.address ?? ""),
+					zip: String(h.zip ?? ""),
+					ownership: String(h.ownership ?? ""),
+					emergency: Boolean(h.emergency),
+					required: Boolean(h.required),
+				}
+			: {
+					ccn,
+					name: prices.hospital_name || idx?.name || `Hospital ${ccn}`,
+					directory_source: "price-record-only",
+				},
 		price_index: idx ?? null,
-		prices: await fetchHospitalPrices(
-			ccn,
-			num(a.items_limit, 25),
-			num(a.items_offset, 0),
-		),
+		prices,
 	};
 }
 
@@ -180,7 +188,8 @@ export const TOOLS: Record<string, ToolDef> = {
 			ccn: {
 				type: "string",
 				required: true,
-				description: "6-digit CMS certification number, e.g. 050441",
+				description:
+					"6-character hospital ID: numeric CMS CCN (050441) or legacy ID (25063E)",
 			},
 			items_limit: {
 				type: "number",
