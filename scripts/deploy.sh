@@ -42,6 +42,8 @@ if [ -d "$PRICES" ] && [ ! -d "$STASH" ]; then
 fi
 
 rm -rf dist
-npx --no-install vite build
-npx --no-install wrangler deploy -c wrangler.jsonc
+./node_modules/.bin/vite build
+node tools/build-faq-island.mjs
+node tools/test-harness.mjs
+./node_modules/.bin/wrangler deploy -c wrangler.jsonc
 # trap restore_prices runs here on normal exit too

@@ -19,6 +19,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from site_data_metrics import price_index_metrics, refresh_summary_metrics, rows_by_ccn
 
 ROOT = Path(__file__).resolve().parents[1]
 PRICES_DIR = ROOT / "public" / "data" / "prices"
@@ -60,9 +61,10 @@ def summary_from_prices_file(path: Path):
         "counts": by_type,
         "cpt_indexed": cpt_indexed,
     }
+    # An absent assessment remains unknown, but the index contract always
+    # carries an object. Omitting it blocks otherwise valid recovered prices.
     compliance = data.get("compliance")
-    if compliance:
-        summary["compliance"] = compliance
+    summary["compliance"] = compliance if isinstance(compliance, dict) else {}
     return summary
 
 
@@ -78,7 +80,7 @@ def main() -> int:
 
     with INDEX_PATH.open() as f:
         existing = json.load(f)
-    existing_by_ccn = {h["ccn"]: h for h in existing.get("hospitals", [])}
+    existing_by_ccn = rows_by_ccn(existing.get("hospitals", []), 'prices/index')
 
     n_added = 0
     n_updated_with_rows = 0
@@ -117,10 +119,12 @@ def main() -> int:
         existing_by_ccn[ccn] = summary
 
     out = {"hospitals": sorted(existing_by_ccn.values(), key=lambda h: h["ccn"])}
+    price_index_metrics([], out['hospitals'])
     tmp_path = INDEX_PATH.with_suffix(".json.tmp")
     with tmp_path.open("w") as f:
         json.dump(out, f, separators=(",", ":"))
     tmp_path.replace(INDEX_PATH)
+    refresh_summary_metrics(PRICES_DIR.parent, out['hospitals'])
 
     summaries = list(existing_by_ccn.values())
     with_rows = sum(1 for h in summaries if h.get("n", 0) > 0)

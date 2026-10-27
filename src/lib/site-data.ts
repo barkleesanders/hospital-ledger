@@ -11,9 +11,14 @@
  */
 
 import bundledSummaryJson from "../../public/data/summary.json";
+import {
+	derivePriceCoverage,
+	type PriceCoverage,
+	priceCoverage,
+} from "./price-coverage";
 import { readR2Json } from "./r2";
 
-export type Summary = {
+export type Summary = Partial<PriceCoverage> & {
 	generated_at: string;
 	total_facilities?: number;
 	cms_required_total: number;
@@ -81,6 +86,54 @@ export async function loadSummary(
 	const hit = isValidSummary(fromR2)
 		? { summary: fromR2, source: "r2" as const }
 		: { summary: bundledSummary, source: "bundled" as const };
+	// Old producers predate cohort metrics. Derive them only from matching live
+	// inputs; never combine a bundled registry with an R2 index. The raw summary
+	// route remains byte-preserving for manifest hashes; /api/coverage exposes this
+	// compatibility join until the producer publishes the additive fields.
+	if (hit.source === "r2" && !priceCoverage(hit.summary)) {
+		try {
+			const [registry, index] = await Promise.all([
+				readR2Json<unknown>(env.HL_MRF_PARSED, "meta/hospitals.json"),
+				readR2Json<unknown>(env.HL_MRF_PARSED, "prices/index.json"),
+			]);
+			const c = derivePriceCoverage(registry, index);
+			if (
+				c &&
+				c.required_live_hospitals === hit.summary.compliant &&
+				c.registry_hospitals === hit.summary.total_facilities &&
+				c.index_hospitals === hit.summary.standardized_price_index_hospitals &&
+				c.price_hospitals === hit.summary.standardized_price_hospitals
+			) {
+				hit.summary = {
+					...hit.summary,
+					required_live_price_hospitals: c.required_live_price_hospitals,
+					required_live_zero_price_hospitals:
+						c.required_live_zero_price_hospitals,
+					required_live_unindexed_hospitals:
+						c.required_live_unindexed_hospitals,
+					price_hospitals_outside_required_live:
+						c.price_hospitals_outside_required_live,
+				};
+			} else {
+				console.warn({
+					event: "coverage.unavailable",
+					reason: c ? "snapshot-count-mismatch" : "missing-or-invalid-inputs",
+					summary_live: hit.summary.compliant,
+					joined_live: c?.required_live_hospitals ?? null,
+					summary_priced: hit.summary.standardized_price_hospitals ?? null,
+					joined_priced: c?.price_hospitals ?? null,
+				});
+			}
+		} catch (error) {
+			// Cohort enrichment is optional; an unavailable index must not turn an
+			// otherwise usable summary into a homepage or FAQ outage.
+			console.warn({
+				event: "coverage.unavailable",
+				reason: "storage-read-failed",
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
 	memo = { at: now, ...hit };
 	return hit;
 }

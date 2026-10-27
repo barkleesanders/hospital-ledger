@@ -12,9 +12,11 @@ import HOSPITAL_GEO from "../../public/data/hospital-geo.json";
 import { Layout, PageHeader } from "../components/Layout";
 import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
+import { complianceElementStatus, complianceRating } from "../lib/compliance";
 import { type HospitalData, loadHospital } from "../lib/data";
 import { fmtMoney } from "../lib/format";
 import { HOSPITAL_ID_PATTERN } from "../lib/hospital-id";
+import { grossChargeDate } from "../lib/price-provenance";
 
 /** "City, ST" for a CCN, or null when the CCN is not in the CMS snapshot. */
 const GEO: Record<string, string[]> = HOSPITAL_GEO;
@@ -76,9 +78,8 @@ export function complianceExplainer(score: number): string {
 function hospitalPage(ccn: string, data: HospitalData, url: string) {
 	const name = data.hospital_name || `Hospital ${ccn}`;
 	const compliance = data.compliance ?? {};
-	const grade = (compliance.grade ?? "F").toUpperCase();
-	const score = Number(compliance.score ?? 0);
-	const colorClass = GRADE_COLOR[grade] ?? GRADE_COLOR.F ?? "";
+	const rating = complianceRating(compliance);
+	const colorClass = rating ? GRADE_COLOR[rating.grade] : "text-zinc-400";
 	const elements = compliance.elements ?? {};
 	const items = data.items ?? [];
 	const cptCount = items.filter(
@@ -91,7 +92,12 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 		}
 	}
 	const top = items.slice(0, 50);
-	const explainer = complianceExplainer(score);
+	const hasDatedCharges = items.some((it) =>
+		grossChargeDate(it.gross_charge_source),
+	);
+	const explainer = rating
+		? complianceExplainer(rating.score)
+		: "A compliance grade and score are not available for this record. Missing assessment metadata does not establish noncompliance.";
 	const geo = geoFor(ccn);
 	const where = geo ? ` (${geo})` : "";
 	const priceCount = items.length;
@@ -101,7 +107,7 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 			: "";
 	const description =
 		`${name}${where}: ${priceCount.toLocaleString("en-US")} published prices ` +
-		`${procPhrase}price-transparency compliance grade ${grade}. Free, no signup.`;
+		`${procPhrase}price-transparency compliance grade ${rating?.grade ?? "unavailable"}. Free, no signup.`;
 	const jsonLd = {
 		"@context": "https://schema.org",
 		"@type": "Hospital",
@@ -150,26 +156,29 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 				<section class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6 mb-6">
 					<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 						<div>
-							<div class="text-xs uppercase tracking-wider text-zinc-500 mb-1">
+							<div class="text-xs uppercase tracking-wider text-zinc-400 mb-1">
 								45 CFR § 180 compliance
 							</div>
 							<div
-								class={`text-3xl sm:text-4xl md:text-5xl font-semibold tab-num ${colorClass}`}
+								class={`${rating ? "text-3xl sm:text-4xl md:text-5xl" : "text-xl sm:text-2xl"} break-words font-semibold tab-num ${colorClass}`}
 							>
-								{grade} · {score}
+								{rating
+									? `${rating.grade} · ${rating.score}`
+									: "Grade unavailable"}
 							</div>
 							<div class="text-sm text-zinc-400 mt-1">{explainer}</div>
 						</div>
 						<div class="flex flex-col gap-2 text-sm">
 							{Object.entries(ELEMENT_LABELS).map(([k, label]) => {
-								const ok = !!elements[k];
+								const status = complianceElementStatus(elements[k]);
+								const ok = status === "assessment threshold met";
 								return (
 									<div class="flex items-center gap-2">
-										<span class={ok ? "text-emerald-400" : "text-zinc-600"}>
-											{ok ? "●" : "○"}
+										<span class={ok ? "text-emerald-400" : "text-zinc-400"}>
+											{ok ? "●" : status === "unknown" ? "—" : "○"}
 										</span>
-										<span class={ok ? "text-zinc-200" : "text-zinc-500"}>
-											{label}
+										<span class={ok ? "text-zinc-200" : "text-zinc-400"}>
+											{label}: {status}
 										</span>
 									</div>
 								);
@@ -185,9 +194,9 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 					/>
 				</div>
 
-				<section class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+				<section class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-6">
 					<div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
-						<div class="text-xs uppercase tracking-wider text-zinc-500">
+						<div class="text-xs uppercase tracking-wider text-zinc-400">
 							Procedures listed
 						</div>
 						<div class="mt-1 text-2xl font-semibold tab-num text-zinc-100">
@@ -195,7 +204,7 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 						</div>
 					</div>
 					<div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
-						<div class="text-xs uppercase tracking-wider text-zinc-500">
+						<div class="text-xs uppercase tracking-wider text-zinc-400">
 							Insurances with rates
 						</div>
 						<div class="mt-1 text-2xl font-semibold tab-num text-emerald-300">
@@ -203,7 +212,7 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 						</div>
 					</div>
 					<div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
-						<div class="text-xs uppercase tracking-wider text-zinc-500">
+						<div class="text-xs uppercase tracking-wider text-zinc-400">
 							CPT / HCPCS codes
 						</div>
 						<div class="mt-1 text-2xl font-semibold tab-num text-zinc-100">
@@ -211,7 +220,7 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 						</div>
 					</div>
 					<div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
-						<div class="text-xs uppercase tracking-wider text-zinc-500">
+						<div class="text-xs uppercase tracking-wider text-zinc-400">
 							Source MRF
 						</div>
 						<div class="mt-1 text-sm">
@@ -231,38 +240,55 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 					</div>
 				</section>
 
-				<section class="mb-8">
+				<section id="hospital-prices" class="mb-8">
 					<h2 class="text-lg font-semibold mb-2">
 						Most expensive procedures (gross)
 					</h2>
+					{hasDatedCharges ? (
+						<p id="historical-price-notice" class="text-sm text-amber-200 mb-3">
+							Historical charges: dates below come from the source's dated
+							charge columns. These amounts are not verified current prices.
+							Downloading a file today does not update its price effective
+							dates.
+						</p>
+					) : null}
 					{/* Mobile: card-stacked list (visible 0-767px) */}
 					<div class="md:hidden space-y-2">
-						{top.map((it) => (
-							<a
-								href={`/procedure/${it.code}`}
-								class="block rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 hover:border-emerald-700/50 transition"
-							>
-								<div class="flex items-baseline justify-between gap-2 mb-2 min-w-0">
-									<div class="mono text-emerald-300 text-sm shrink-0">
-										{it.code}
+						{top.map((it) => {
+							const Item =
+								it.type === "CPT" || it.type === "HCPCS" ? "a" : "div";
+							return (
+								<Item
+									{...(Item === "a" ? { href: `/procedure/${it.code}` } : {})}
+									class="block rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 hover:border-emerald-700/50 transition"
+								>
+									<div class="flex items-baseline justify-between gap-2 mb-2 min-w-0">
+										<div class="mono text-emerald-300 text-sm min-w-0 break-words">
+											{it.code}
+										</div>
+										<div class="text-right tab-num text-base font-medium text-emerald-300 shrink-0">
+											{fmtMoney(it.cash)}
+										</div>
 									</div>
-									<div class="text-right tab-num text-base font-medium text-emerald-300">
-										{fmtMoney(it.cash)}
+									{it.desc ? (
+										<div class="text-xs text-zinc-300 mb-2 line-clamp-2">
+											{it.desc}
+										</div>
+									) : null}
+									<div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+										<div class="text-zinc-400">Gross</div>
+										<div class="text-right tab-num text-zinc-400">
+											{fmtMoney(it.gross)}
+										</div>
 									</div>
-								</div>
-								{it.desc ? (
-									<div class="text-xs text-zinc-300 mb-2 line-clamp-2">
-										{it.desc}
-									</div>
-								) : null}
-								<div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-									<div class="text-zinc-500">Gross</div>
-									<div class="text-right tab-num text-zinc-400">
-										{fmtMoney(it.gross)}
-									</div>
-								</div>
-							</a>
-						))}
+									{grossChargeDate(it.gross_charge_source) ? (
+										<div class="mt-2 text-xs text-amber-200">
+											Source date: {grossChargeDate(it.gross_charge_source)}
+										</div>
+									) : null}
+								</Item>
+							);
+						})}
 					</div>
 					{/* Desktop: table (visible 768px+) */}
 					<div class="hidden md:block overflow-x-auto rounded-lg border border-zinc-800">
@@ -285,6 +311,11 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 										<td class="px-3 py-2 text-zinc-200">{it.desc ?? ""}</td>
 										<td class="px-3 py-2 text-right tab-num text-zinc-300">
 											{fmtMoney(it.gross)}
+											{grossChargeDate(it.gross_charge_source) ? (
+												<div class="text-xs text-amber-200">
+													Source date: {grossChargeDate(it.gross_charge_source)}
+												</div>
+											) : null}
 										</td>
 										<td class="px-3 py-2 text-right tab-num text-emerald-300">
 											{fmtMoney(it.cash)}
@@ -303,14 +334,14 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 							</tbody>
 						</table>
 					</div>
-					<div class="mt-2 text-xs text-zinc-500">
+					<div class="mt-2 text-xs text-zinc-400">
 						Showing top {Math.min(50, items.length)} of{" "}
 						{items.length.toLocaleString("en-US")} priced procedures, sorted by
 						gross charge.
 					</div>
 				</section>
 
-				<p class="text-xs text-zinc-500">
+				<p class="text-xs text-zinc-400">
 					Data straight from this hospital's federally-mandated machine-readable
 					file (45 CFR § 180). The compliance grade reflects how completely the
 					hospital published the six required data elements, not the quality of

@@ -4,8 +4,9 @@
  */
 
 import type { FC } from "hono/jsx";
+import { complianceRating, type Grade } from "../lib/compliance";
 
-export type Grade = "A" | "B" | "C" | "D" | "F";
+export type { Grade } from "../lib/compliance";
 
 const GRADE_COLOR: Record<Grade, string> = {
 	A: "text-emerald-300 border-emerald-700/40 bg-emerald-900/20",
@@ -19,18 +20,20 @@ export const GradeBadge: FC<{
 	grade?: string | null;
 	score?: number | null;
 }> = ({ grade, score }) => {
-	const g =
-		((grade ?? "F").toUpperCase() as Grade) in GRADE_COLOR
-			? ((grade ?? "F").toUpperCase() as Grade)
-			: "F";
-	const s = Number(score ?? 0);
-	const klass = GRADE_COLOR[g];
+	const rating = complianceRating({ grade, score });
+	const klass = rating
+		? GRADE_COLOR[rating.grade]
+		: "text-zinc-400 border-zinc-700 bg-zinc-900/20";
 	return (
 		<span
 			class={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs ${klass}`}
-			title={`§ 180 compliance score ${s}/100`}
+			title={
+				rating
+					? `§ 180 compliance score ${rating.score}/100`
+					: "Compliance grade unavailable"
+			}
 		>
-			{g} · {s}
+			{rating ? `${rating.grade} · ${rating.score}` : "Not graded"}
 		</span>
 	);
 };

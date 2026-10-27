@@ -34,7 +34,7 @@ Handles common variations:
  - XLSX (.xlsx, .xls)
  - ZIP archives (auto-extract + recurse)
 """
-import argparse, sys, os, json, re, csv, io, gzip, zipfile, datetime, subprocess, tempfile, html as html_lib, codecs, itertools, hashlib, difflib
+import argparse, sys, os, json, re, csv, io, gzip, zipfile, datetime, subprocess, tempfile, html as html_lib, codecs, itertools, hashlib, difflib, math
 from urllib.parse import urlparse, urljoin
 from pathlib import Path
 
@@ -327,6 +327,12 @@ def first_col(cols, hints):
 
 
 def first_code_col(cols):
+    # In the dated DCH chargemaster layout, MNEMONIC is the service identity
+    # and historical CPT columns are sparse attributes. Other layouts keep
+    # the clinical-code priorities below so cross-hospital CPT indexing works.
+    mnemonic = next((i for i, c in enumerate(cols) if norm_col_name(c) == 'mnemonic'), None)
+    if mnemonic is not None and dated_standard_charge_columns(cols):
+        return mnemonic
     priority_hints = [
         'cpt hcpcs', 'cpt_hcpcs', 'hcpcs cpt', 'hcpcs_cpt',
         # Chargemaster extracts (Select Medical layout, 2026-10-25): the
@@ -350,10 +356,26 @@ def first_code_col(cols):
             continue
         if kw_match(col, CODE_COL_HINTS):
             return i
-    return None
+    return mnemonic
 
 
 def first_gross_col(cols):
+    dated = dated_standard_charge_columns(cols)
+    if dated:
+        # An explicitly named undated gross charge remains authoritative;
+        # the history family must not replace a current canonical measure.
+        dated_indexes = {entry[1] for entry in dated}
+        undated = next((i for i, c in enumerate(cols)
+                        if i not in dated_indexes
+                        and not re.search(r'\d{2}/\d{2}/\d{2}', str(c))
+                        and not kw_match(c, CASH_COL_HINTS + MIN_COL_HINTS + MAX_COL_HINTS
+                                         + NEGOTIATED_DOLLAR_HINTS + RATE_EXCLUDE_HINTS)
+                        and (kw_match(c, ['gross', 'charge_master', 'cdm_price', 'list_price'])
+                             or norm_col_name(c) in ('standard_charge', 'standard_charges',
+                                                    'charge', 'charges', 'total_charge', 'total_charges'))), None)
+        if undated is not None:
+            return undated
+        return dated[0][1]
     exact = next((i for i, c in enumerate(cols) if kw_match(c, ['gross', 'charge_master', 'cdm_price', 'list_price', 'price', 'amount'])), None)
     if exact is not None:
         return exact
@@ -377,6 +399,42 @@ def first_gross_col(cols):
 def norm_col_name(c):
     """Canonical header form for comparison: lowercase, underscore-joined."""
     return str(c or '').strip().lower().replace(' ', '_').replace('-', '_')
+
+
+def dated_standard_charge_columns(cols):
+    """Recognize only the explicit dated gross-charge family, newest first.
+
+    No payer RATE CHARGE, cash, setting-specific or percentile columns are
+    interchangeable with these fields. Invalid calendar dates are excluded.
+    """
+    dated = []
+    for index, header in enumerate(cols):
+        match = re.fullmatch(r'STD CHARGE (\d{2}/\d{2}/\d{2})', str(header).strip(), re.IGNORECASE)
+        if not match:
+            continue
+        try:
+            effective = datetime.datetime.strptime(match[1], '%m/%d/%y').date()
+        except ValueError:
+            continue
+        dated.append((effective, index, str(header).strip()))
+    return sorted(dated, key=lambda entry: entry[0], reverse=True)
+
+
+def csv_code_and_type(row, cols, code_col, type_col):
+    if code_col is not None and norm_col_name(cols[code_col]) == 'mnemonic':
+        return row_get(row, code_col), 'CDM'
+    return normalize_code_and_type(row_get(row, code_col), row_get(row, type_col))
+
+
+def gross_charge_fields(row, gross_col, dated):
+    if not dated or gross_col not in {entry[1] for entry in dated}:
+        return {'gross_charge': to_float(row_get(row, gross_col))}
+    for effective, index, header in dated:
+        amount = to_float(row_get(row, index))
+        if amount is not None and math.isfinite(amount) and amount >= 0:
+            return {'gross_charge': amount, 'gross_charge_source': {
+                'header': header, 'effective_date': effective.isoformat(), 'column_1based': index + 1}}
+    return {'gross_charge': None}
 
 
 def first_col_excluding(cols, hints, exclude=()):
@@ -497,7 +555,14 @@ def resolve_csv_columns(cols, sample_rows):
     if fp in aliases:
         notes.append('header-alias hit %s' % fp)
         COLUMN_MAP_NOTES = notes
-        return dict(aliases[fp]['mapping']), notes
+        mapping = dict(aliases[fp]['mapping'])
+        # Historical layouts may already have learned a sparse CPT/charge
+        # column. Explicit semantic fields take precedence over that cache.
+        if dated_standard_charge_columns(cols):
+            if any(norm_col_name(c) == 'mnemonic' for c in cols):
+                mapping['code'] = first_code_col(cols)
+            mapping['gross'] = first_gross_col(cols)
+        return mapping, notes
     code_col = first_code_col(cols)
     mapping = {
         'code': code_col,
@@ -754,6 +819,7 @@ def parse_csv_tall(content_bytes, max_rows=200_000):
     code_type_col = mapping['code_type']
     desc_col = mapping['desc']
     gross_col = mapping['gross']
+    dated_gross = dated_standard_charge_columns(cols)
     cash_col = mapping['cash']
     min_col = mapping['min']
     max_col = mapping['max']
@@ -770,7 +836,7 @@ def parse_csv_tall(content_bytes, max_rows=200_000):
         if not row: continue
         code = row_get(row, code_col)
         desc = row_get(row, desc_col)
-        code, code_type = normalize_code_and_type(code, row_get(row, code_type_col))
+        code, code_type = csv_code_and_type(row, cols, code_col, code_type_col)
         key = (code, desc)
         if key not in items:
             items[key] = {
@@ -778,7 +844,7 @@ def parse_csv_tall(content_bytes, max_rows=200_000):
                 'description': desc[:300],
                 'setting': row_get(row, setting_col),
                 'billing_class': row_get(row, billing_col),
-                'gross_charge': to_float(row_get(row, gross_col)),
+                **gross_charge_fields(row, gross_col, dated_gross),
                 'cash_discount': to_float(row_get(row, cash_col)),
                 'min_negotiated': to_float(row_get(row, min_col)),
                 'max_negotiated': to_float(row_get(row, max_col)),
@@ -813,6 +879,7 @@ def parse_csv_wide(content_bytes, max_rows=200_000):
     code_type_col = mapping['code_type']
     desc_col = mapping['desc']
     gross_col = mapping['gross']
+    dated_gross = dated_standard_charge_columns(cols)
     cash_col = mapping['cash']
     min_col = mapping['min']
     max_col = mapping['max']
@@ -833,14 +900,14 @@ def parse_csv_wide(content_bytes, max_rows=200_000):
         if not row or all(not c for c in row): continue
         code = row_get(row, code_col)
         desc = row_get(row, desc_col)
-        code, code_type = normalize_code_and_type(code, row_get(row, code_type_col))
+        code, code_type = csv_code_and_type(row, cols, code_col, code_type_col)
         if not code and not desc: continue
         item = {
             'code': code, 'code_type': code_type,
             'description': desc[:300],
             'setting': row_get(row, setting_col),
             'billing_class': row_get(row, billing_col),
-            'gross_charge': to_float(row_get(row, gross_col)),
+            **gross_charge_fields(row, gross_col, dated_gross),
             'cash_discount': to_float(row_get(row, cash_col)),
             'min_negotiated': to_float(row_get(row, min_col)),
             'max_negotiated': to_float(row_get(row, max_col)),
@@ -2306,6 +2373,7 @@ def stream_parse_large_csv(url, max_rows=200_000):
         # Rows after the header inside the window, then the live stream.
         tail_rows = window[header_idx + 1:]
         data_iter = itertools.chain(tail_rows, reader)
+        dated_gross = dated_standard_charge_columns(cols)
 
         if tall:
             code_col = first_code_col(cols)
@@ -2333,8 +2401,7 @@ def stream_parse_large_csv(url, max_rows=200_000):
                     continue
                 code = row_get(row, code_col)
                 desc = row_get(row, desc_col)
-                code, code_type = normalize_code_and_type(
-                    code, row_get(row, code_type_col))
+                code, code_type = csv_code_and_type(row, cols, code_col, code_type_col)
                 key = (code, desc)
                 if key not in items:
                     items[key] = {
@@ -2342,7 +2409,7 @@ def stream_parse_large_csv(url, max_rows=200_000):
                         'description': desc[:300],
                         'setting': row_get(row, setting_col),
                         'billing_class': row_get(row, billing_col),
-                        'gross_charge': to_float(row_get(row, gross_col)),
+                        **gross_charge_fields(row, gross_col, dated_gross),
                         'cash_discount': to_float(row_get(row, cash_col)),
                         'min_negotiated': to_float(row_get(row, min_col)),
                         'max_negotiated': to_float(row_get(row, max_col)),
@@ -2388,8 +2455,7 @@ def stream_parse_large_csv(url, max_rows=200_000):
                     continue
                 code = row_get(row, code_col)
                 desc = row_get(row, desc_col)
-                code, code_type = normalize_code_and_type(
-                    code, row_get(row, code_type_col))
+                code, code_type = csv_code_and_type(row, cols, code_col, code_type_col)
                 if not code and not desc:
                     continue
                 item = {
@@ -2397,7 +2463,7 @@ def stream_parse_large_csv(url, max_rows=200_000):
                     'description': desc[:300],
                     'setting': row_get(row, setting_col),
                     'billing_class': row_get(row, billing_col),
-                    'gross_charge': to_float(row_get(row, gross_col)),
+                    **gross_charge_fields(row, gross_col, dated_gross),
                     'cash_discount': to_float(row_get(row, cash_col)),
                     'min_negotiated': to_float(row_get(row, min_col)),
                     'max_negotiated': to_float(row_get(row, max_col)),

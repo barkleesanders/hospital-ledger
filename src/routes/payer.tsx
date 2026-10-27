@@ -75,7 +75,7 @@ function payerPage(slug: string, data: PayerData, url: string) {
 			<main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
 				<section class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
 					<div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
-						<div class="text-xs uppercase tracking-wider text-zinc-500">
+						<div class="text-xs uppercase tracking-wider text-zinc-400">
 							Hospitals with this insurance
 						</div>
 						<div class="mt-1 text-2xl font-semibold tab-num text-emerald-300">
@@ -83,7 +83,7 @@ function payerPage(slug: string, data: PayerData, url: string) {
 						</div>
 					</div>
 					<div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
-						<div class="text-xs uppercase tracking-wider text-zinc-500">
+						<div class="text-xs uppercase tracking-wider text-zinc-400">
 							Median negotiated rate
 						</div>
 						<div class="mt-1 text-2xl font-semibold tab-num text-zinc-100">
@@ -91,7 +91,7 @@ function payerPage(slug: string, data: PayerData, url: string) {
 						</div>
 					</div>
 					<div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
-						<div class="text-xs uppercase tracking-wider text-zinc-500">
+						<div class="text-xs uppercase tracking-wider text-zinc-400">
 							Plan name aliases on MRFs
 						</div>
 						<div class="mt-1 text-sm text-zinc-300 leading-snug">
@@ -115,7 +115,7 @@ function payerPage(slug: string, data: PayerData, url: string) {
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 						<div>
 							<label
-								class="text-xs uppercase tracking-wider text-zinc-500"
+								class="text-xs uppercase tracking-wider text-zinc-400"
 								for="filter-state"
 							>
 								Filter hospitals by state
@@ -132,7 +132,7 @@ function payerPage(slug: string, data: PayerData, url: string) {
 						</div>
 						<div>
 							<label
-								class="text-xs uppercase tracking-wider text-zinc-500"
+								class="text-xs uppercase tracking-wider text-zinc-400"
 								for="sort-by"
 							>
 								Sort
@@ -167,18 +167,18 @@ function payerPage(slug: string, data: PayerData, url: string) {
 									<div class="font-medium text-emerald-300 truncate text-sm">
 										{h.name}
 									</div>
-									<div class="text-xs text-zinc-500 shrink-0">{h.state}</div>
+									<div class="text-xs text-zinc-400 shrink-0">{h.state}</div>
 								</div>
 								<div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-									<div class="text-zinc-500">Median rate</div>
+									<div class="text-zinc-400">Median rate</div>
 									<div class="text-right tab-num text-base font-medium text-emerald-300">
 										{fmtMoney(h.median_rate)}
 									</div>
-									<div class="text-zinc-500">Procedures w/ rate</div>
+									<div class="text-zinc-400">Procedures w/ rate</div>
 									<div class="text-right tab-num text-zinc-300">
 										{(h.n_items_with_payer ?? 0).toLocaleString("en-US")}
 									</div>
-									<div class="text-zinc-500">Compliance</div>
+									<div class="text-zinc-400">Compliance</div>
 									<div class="text-right">
 										<GradeBadge
 											grade={h.compliance_grade}
@@ -232,7 +232,7 @@ function payerPage(slug: string, data: PayerData, url: string) {
 					</div>
 				</section>
 
-				<p class="mt-6 text-xs text-zinc-500">
+				<p class="mt-6 text-xs text-zinc-400">
 					"Negotiated rate" is what each hospital agreed to accept from this
 					insurance for a specific procedure. Your actual cost depends on your
 					plan's deductible, copay, coinsurance, and out-of-network rules. Some

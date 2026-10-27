@@ -570,6 +570,7 @@ if parse_fail_rate > 0.20:
 wscripts = os.path.join(WDIR, "scripts")
 os.makedirs(wscripts, exist_ok=True)
 shutil.copy(os.path.join(SCRIPTS, "slim_parsed.py"), wscripts)
+shutil.copy(os.path.join(SCRIPTS, "site_data_metrics.py"), wscripts)
 os.makedirs(os.path.join(WDIR, "tmp"), exist_ok=True)
 prices_dir = os.path.join(WDIR, "public", "data", "prices")
 index_path = os.path.join(prices_dir, "index.json")
@@ -582,7 +583,8 @@ slim_outputs = (index_path, payer_raw, compl_raw, detail_raw, wave_cpt_index)
 # attempt). If the inputs are byte-identical to a previous successful run
 # with the same script and all outputs are present, skip the re-run.
 inputs_fp = _parsed_fingerprint(pdir)
-script_fp = _local_sha(os.path.join(wscripts, "slim_parsed.py"))
+script_fp = (_local_sha(os.path.join(wscripts, "slim_parsed.py"))
+             + _local_sha(os.path.join(wscripts, "site_data_metrics.py")))
 if _slim_outputs_ready(inputs_fp, script_fp, slim_outputs):
     log(f"slim: inputs unchanged since successful run "
         f"({n_parsed_inputs} parsed files), skipping re-run")

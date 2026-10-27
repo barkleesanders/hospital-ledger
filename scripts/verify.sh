@@ -7,6 +7,7 @@ VERIFY_PYTHON="${HOSPITAL_LEDGER_TEST_PYTHON:-python3}"
 "$VERIFY_PYTHON" ops/wave/test_hl_wave_fixes.py
 "$VERIFY_PYTHON" ops/wave/test_hl_wave_chunk.py
 "$VERIFY_PYTHON" ops/wave/test_hl_wave_reparse.py
+"$VERIFY_PYTHON" scripts/test_mrf_parse_charge_history.py
 "$VERIFY_PYTHON" -m py_compile scripts/tune_ingest_workers.py scripts/ingest_capacity.py \
   scripts/coverage_closeout.py scripts/full_standardize.py scripts/batch_ingest.py scripts/retry_failed_ingest.py
 shasum -a 256 ops/wave/vm_wave.py pipeline/vm_wave.py

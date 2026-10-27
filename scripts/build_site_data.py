@@ -8,6 +8,7 @@ Schema per hospital:
 """
 import json, sqlite3, os, datetime
 from collections import defaultdict
+from site_data_metrics import COHORT_DEFINITIONS, price_index_metrics
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = os.path.join(ROOT, 'db', 'hospital_ledger.db')
@@ -148,33 +149,13 @@ type_arr = [{'type': t, **st, 'pct': round(100 * st['live'] / st['total'], 1)}
             for t, st in type_stats.items()]
 type_arr.sort(key=lambda x: -x['total'])
 
-def price_index_metrics():
-    metrics = {
-        'standardized_price_index_hospitals': 0,
-        'standardized_price_hospitals': 0,
-        'standardized_price_rows': 0,
-        'cpt_indexed_hospitals': 0,
-        'cpt_indexed_rows': 0,
-        'zero_price_index_entries': 0,
-    }
+def load_price_index_metrics():
     try:
         with open(PRICE_INDEX) as f:
             entries = json.load(f).get('hospitals', [])
-    except (OSError, json.JSONDecodeError):
-        return metrics
-    metrics['standardized_price_index_hospitals'] = len(entries)
-    for h in entries:
-        n = int(h.get('n') or h.get('count') or h.get('items') or 0)
-        cpt = int(h.get('cpt_indexed') or 0)
-        metrics['standardized_price_rows'] += n
-        metrics['cpt_indexed_rows'] += cpt
-        if n > 0:
-            metrics['standardized_price_hospitals'] += 1
-        else:
-            metrics['zero_price_index_entries'] += 1
-        if cpt > 0:
-            metrics['cpt_indexed_hospitals'] += 1
-    return metrics
+    except FileNotFoundError:
+        entries = []
+    return price_index_metrics(hospitals, entries)
 
 summary = {
     'generated_at': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z'),
@@ -187,7 +168,7 @@ summary = {
     'under_enforcement': len(under_enf),
     'missing_with_enforcement': len(missing_with_enf),
     'enforcement_actions_total': sum(h.get('enforcement_count', 0) for h in required),
-    **price_index_metrics(),
+    **load_price_index_metrics(),
     'count_definitions': {
         'total_facilities': 'Rows in public/data/hospitals.json from CMS Hospital General Information.',
         'cms_required_total': 'Hospitals whose type is in the CMS price-transparency-required set.',
@@ -195,6 +176,7 @@ summary = {
         'standardized_price_index_hospitals': 'Entries in public/data/prices/index.json, including zero-row outputs.',
         'standardized_price_hospitals': 'Entries in public/data/prices/index.json with n > 0 standardized rows.',
         'cpt_indexed_hospitals': 'Entries in public/data/prices/index.json with cpt_indexed > 0.',
+        **COHORT_DEFINITIONS,
     },
     'states': state_arr,
     'types': type_arr,
