@@ -95,6 +95,14 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 	const hasDatedCharges = items.some((it) =>
 		grossChargeDate(it.gross_charge_source),
 	);
+	const chargeDates = items
+		.map((it) => grossChargeDate(it.gross_charge_source))
+		.filter((d): d is string => !!d)
+		.sort();
+	const newestChargeDate = chargeDates.length
+		? chargeDates[chargeDates.length - 1]
+		: null;
+	const retrievedDate = data.fetched_at ? data.fetched_at.slice(0, 10) : null;
 	const explainer = rating
 		? complianceExplainer(rating.score)
 		: "A compliance grade and score are not available for this record. Missing assessment metadata does not establish noncompliance.";
@@ -236,6 +244,17 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 							) : (
 								"—"
 							)}
+						</div>
+						<div id="source-vintage" class="mt-1 text-xs text-zinc-400">
+							{data.source_updated ? (
+								<div>
+									File last updated: {data.source_updated} (per the
+									hospital's file)
+								</div>
+							) : newestChargeDate ? (
+								<div>Newest charge date in file: {newestChargeDate}</div>
+							) : null}
+							{retrievedDate ? <div>Retrieved: {retrievedDate}</div> : null}
 						</div>
 					</div>
 				</section>
