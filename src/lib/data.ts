@@ -85,6 +85,11 @@ export type HospitalData = {
 	hospital_name: string;
 	source_url?: string;
 	format?: string;
+	/** When Hospital Ledger retrieved the source file (ISO timestamp). */
+	fetched_at?: string;
+	/** Last-updated date declared inside the source file itself, when the
+	 * file carries one (e.g. the CMS template's last_updated_on). */
+	source_updated?: string;
 	n_slim?: number;
 	compliance?: {
 		score?: number | null;
