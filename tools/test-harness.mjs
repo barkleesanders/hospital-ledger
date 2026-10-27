@@ -51,6 +51,20 @@ const historical = hospital("400006", [
 		},
 	},
 ]);
+historical.fetched_at = "2026-10-26T01:10:22Z";
+const declared = hospital("390001", [
+	{
+		code: "99213",
+		type: "CPT",
+		desc: "Fixture office visit",
+		gross: 100,
+		cash: 80,
+		min: null,
+		max: null,
+	},
+]);
+declared.source_updated = "2026-02-17";
+declared.fetched_at = "2026-10-20T00:00:00Z";
 const ungraded = hospital("050025", [
 	{
 		code: "27130",
@@ -102,6 +116,7 @@ const fixtures = {
 	),
 	"prices/index.json": index,
 	"prices/400006.json": historical,
+	"prices/390001.json": declared,
 	"prices/050025.json": ungraded,
 	"prices/070003.json": empty,
 	"aggregates/payer/aetna.json": {
@@ -287,6 +302,7 @@ try {
 		"/",
 		"/about-the-numbers",
 		"/hospital/400006",
+		"/hospital/390001",
 		"/hospital/050025",
 		"/hospital/070003",
 		"/hospital/999999",
@@ -314,6 +330,16 @@ try {
 				await page.locator('#hospital-prices a[href^="/procedure/"]').count(),
 				0,
 			);
+			const vintage = await page.locator("#source-vintage").textContent();
+			assert.match(vintage, /Newest charge date in file: 2020-01-01/);
+			assert.match(vintage, /Retrieved: 2026-10-26/);
+			assert.doesNotMatch(vintage, /File last updated/);
+		}
+		if (path === "/hospital/390001") {
+			const vintage = await page.locator("#source-vintage").textContent();
+			assert.match(vintage, /File last updated: 2026-02-17/);
+			assert.match(vintage, /Retrieved: 2026-10-20/);
+			assert.doesNotMatch(vintage, /Newest charge date/);
 		}
 		if (path === "/hospital/050025")
 			assert.match(
