@@ -727,6 +727,84 @@ def normalize_source_url(url):
     return html_lib.unescape(url)
 
 
+
+def _normalize_declared_date(value):
+    """Normalize a hospital-declared file date to YYYY-MM-DD, or None."""
+    if value is None:
+        return None
+    text = str(value).strip().strip('"').strip()
+    if not text:
+        return None
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", text)
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    else:
+        m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})", text)
+        if not m:
+            return None
+        mo, d, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    try:
+        dt = datetime.date(y, mo, d)
+    except ValueError:
+        return None
+    if y < 2019 or y > 2031:
+        return None
+    return dt.isoformat()
+
+
+def extract_declared_updated(content_bytes):
+    """Best-effort extraction of the file's own declared updated date.
+
+    CMS templates declare it at the very top of the file: JSON files carry
+    a top-level "last_updated_on"; CSV files prepend a metadata header row
+    (hospital_name,last_updated_on,version,...) followed by a value row.
+    Returns YYYY-MM-DD or None. Never raises: this is display metadata for
+    the site's data-vintage stamp, not parse-critical data.
+    """
+    try:
+        head = content_bytes[:65536].decode("utf-8", errors="replace")
+    except Exception:
+        return None
+    try:
+        m = re.search(r'"(?:last_updated_on|last_updated|lastUpdatedOn)"\s*:\s*"([^"]+)"', head)
+        if m:
+            return _normalize_declared_date(m.group(1))
+        lines = [ln for ln in head.splitlines() if ln.strip()][:4]
+        if len(lines) >= 2:
+            delim = sniff_delimiter(lines[0])
+            header = [norm_col_name(c) for c in next(csv.reader([lines[0]], delimiter=delim))]
+            if "last_updated_on" in header:
+                idx = header.index("last_updated_on")
+                values = next(csv.reader([lines[1]], delimiter=delim))
+                if idx < len(values):
+                    return _normalize_declared_date(values[idx])
+    except Exception:
+        return None
+    return None
+
+
+def _probe_declared_updated(url):
+    """Head probe for the declared date of a streamed (unbuffered) file.
+
+    Reads only the first chunks of the body; never buffers the whole file.
+    Best-effort: returns None on any failure.
+    """
+    try:
+        client = httpx.Client(
+            headers={"User-Agent": UA}, follow_redirects=True,
+            timeout=30.0, verify=False, **hl_edge.httpx_kwargs())
+        with client:
+            with client.stream("GET", url) as resp:
+                buf = b""
+                for chunk in resp.iter_bytes(16384):
+                    buf += chunk
+                    if len(buf) >= 65536:
+                        break
+                return extract_declared_updated(buf)
+    except Exception:
+        return None
+
+
 def extract_nested_code(value):
     if isinstance(value, dict):
         for key, inner in value.items():
@@ -2554,6 +2632,9 @@ def ingest_one(ccn, name, url, save_raw=False):
                 'format_detected': 'json-stream', 'row_count': len(items),
                 'items': items,
             }
+            _declared = _probe_declared_updated(streamed_final_url)
+            if _declared:
+                record['source_updated'] = _declared
             with open(out_path, 'w') as f:
                 json.dump(record, f, separators=(',', ':'))
             return True, len(items), 'json-stream', ''
@@ -2579,6 +2660,9 @@ def ingest_one(ccn, name, url, save_raw=False):
                 'format_detected': 'csv-stream', 'row_count': len(items),
                 'items': items,
             }
+            _declared = _probe_declared_updated(streamed_final_url)
+            if _declared:
+                record['source_updated'] = _declared
             with open(out_path, 'w') as f:
                 json.dump(record, f, separators=(',', ':'))
             return True, len(items), 'csv-stream', ''
@@ -2606,6 +2690,9 @@ def ingest_one(ccn, name, url, save_raw=False):
         'column_notes': list(COLUMN_MAP_NOTES),
         'items': items,
     }
+    _declared = extract_declared_updated(raw)
+    if _declared:
+        record['source_updated'] = _declared
     with open(out_path, 'w') as f:
         json.dump(record, f, separators=(',', ':'))
     return True, len(items), fmt, ''
