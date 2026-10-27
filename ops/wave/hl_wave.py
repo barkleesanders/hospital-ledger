@@ -366,6 +366,11 @@ def record_deferred(reason, std, detail="", extra=None):
         fh.write(json.dumps(rec) + "\n")
     log(f"DEFERRED: {reason} ({streak} streak unchanged) -> "
         f"pending manifest, retry owns recovery")
+    try:
+        import hl_lessons_gate as _lg
+        _lg.note_run(rec)
+    except Exception:
+        pass
     return 0
 
 
@@ -417,6 +422,11 @@ def record_chunk(ccns, updated, published, parked, std, extra=None):
     log(f"CHUNK: {len(ccns)} CCNs -> updated={list(updated)} "
         f"published={list(published)} parked={len(parked)} "
         f"(streak unchanged at {streak})")
+    try:
+        import hl_lessons_gate as _lg
+        _lg.note_run(rec)
+    except Exception:
+        pass
     return rec
 
 
@@ -2253,6 +2263,11 @@ def main():
            "no_publish": args.no_publish}
     with open(WAVE_LOG, "a") as f:
         f.write(json.dumps(rec) + "\n")
+    try:
+        import hl_lessons_gate as _lg
+        _lg.note_run(rec)
+    except Exception:
+        pass
     log(f"wave {state['waves_done']} done: updated={updated_ccns} "
         f"published={published} errors={len(errors)} deferred={len(still_deferred)}")
     return 0
