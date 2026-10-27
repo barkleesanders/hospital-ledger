@@ -384,6 +384,7 @@ for path in parsed_paths:
         'hospital_name': data.get('hospital_name', ''),
         'source_url': data.get('source_url', ''),
         'fetched_at': data.get('fetched_at', ''),
+        'source_updated': data.get('source_updated', ''),
         'format': data.get('format_detected', ''),
         'n_total_raw': data.get('row_count', 0),
         'n_slim': len(slim),
