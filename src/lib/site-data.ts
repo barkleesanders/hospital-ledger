@@ -8,6 +8,8 @@
  *
  * Measured 2026-10-13: R2 meta/summary.json generated_at 2026-10-14T00:56:57Z,
  * 3,831 price-index hospitals; the bundled copy was 2026-09-27, 3,810.
+ * Bundled copy refreshed 2026-10-28 to the R2 generation of
+ * 2026-10-28T14:25:41Z: 4,425 price-index hospitals, 4,348 with rows.
  */
 
 import bundledSummaryJson from "../../public/data/summary.json";

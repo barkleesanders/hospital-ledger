@@ -32,24 +32,28 @@ export type ProcedureSlide = {
 // $1 placeholders and seven-figure rounding artifacts. `hospitals` is the
 // exact distinct-CCN count in the index. Refresh with:
 //   curl https://hospitalledger.com/api/cpt-index | python3 scripts/compute_carousel_stats.py
-// Last refreshed: 2026-05-18 from production cpt-index.
+// Last refreshed: 2026-05-18 from production cpt-index (min/max/hospitals);
+// medians re-verified 2026-10-28 against /api/procedure/:code stats
+// (gross_p50). NOTE: /api/cpt-index now serves a top-25 sample per code, so
+// compute_carousel_stats.py can no longer recompute p5/p95 — those await a
+// full-rows source.
 export const PROCEDURE_SLIDES: ProcedureSlide[] = [
 	{
 		code: "27130",
 		name: "TOTAL HIP REPLACEMENT",
 		short: "hip replacement",
 		min: 605,
-		median: 11048,
+		median: 13106,
 		max: 78288,
 		hospitals: 1254,
-		medianFrac: 0.134,
+		medianFrac: 0.161,
 	},
 	{
 		code: "27447",
 		name: "TOTAL KNEE REPLACEMENT",
 		short: "knee replacement",
 		min: 1448,
-		median: 12519,
+		median: 13364,
 		max: 79249,
 		hospitals: 1304,
 	},
@@ -67,7 +71,7 @@ export const PROCEDURE_SLIDES: ProcedureSlide[] = [
 		name: "GALLBLADDER REMOVAL (LAPAROSCOPIC)",
 		short: "gallbladder removal",
 		min: 1317,
-		median: 10013,
+		median: 10132,
 		max: 42610,
 		hospitals: 1359,
 	},
@@ -76,7 +80,7 @@ export const PROCEDURE_SLIDES: ProcedureSlide[] = [
 		name: "DIAGNOSTIC COLONOSCOPY",
 		short: "colonoscopy",
 		min: 487,
-		median: 2548,
+		median: 2550,
 		max: 9538,
 		hospitals: 1544,
 	},
@@ -85,7 +89,7 @@ export const PROCEDURE_SLIDES: ProcedureSlide[] = [
 		name: "CATARACT SURGERY",
 		short: "cataract surgery",
 		min: 1074,
-		median: 5834,
+		median: 5895,
 		max: 15651,
 		hospitals: 1127,
 	},
@@ -94,7 +98,7 @@ export const PROCEDURE_SLIDES: ProcedureSlide[] = [
 		name: "MRI BRAIN W/ CONTRAST",
 		short: "brain MRI",
 		min: 705,
-		median: 4627,
+		median: 4632,
 		max: 11810,
 		hospitals: 1677,
 	},
@@ -103,7 +107,7 @@ export const PROCEDURE_SLIDES: ProcedureSlide[] = [
 		name: "CARDIAC CATHETERIZATION",
 		short: "cardiac cath",
 		min: 2015,
-		median: 18065,
+		median: 18228,
 		max: 41919,
 		hospitals: 1262,
 	},

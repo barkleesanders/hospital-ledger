@@ -29,12 +29,12 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 	const standardizedPriceHospitals =
 		SITE_COUNTS.standardized_price_hospitals ??
 		SITE_COUNTS.standardized_price_index_hospitals ??
-		3654;
+		4348;
 	const coverage = priceCoverage(SITE_COUNTS);
 	const parsedMrfOutputs =
-		SITE_COUNTS.standardized_price_index_hospitals ?? 3768;
-	const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 62577586;
-	const cptIndexedRows = SITE_COUNTS.cpt_indexed_rows ?? 14247687;
+		SITE_COUNTS.standardized_price_index_hospitals ?? 4425;
+	const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 75064535;
+	const cptIndexedRows = SITE_COUNTS.cpt_indexed_rows ?? 15808142;
 	const updatedDate = SITE_COUNTS.generated_at.slice(0, 10);
 	return (
 		<Layout
@@ -1028,7 +1028,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						>
 							github.com/barkleesanders/hospital-ledger
 						</a>{" "}
-						— 34 pipeline scripts, ~10,700 lines of Python, ~3,400 lines of
+						— 59 pipeline scripts, ~19,400 lines of Python, ~8,400 lines of
 						TypeScript. AGPLv3 code, CC0 data.{" "}
 						<span class="text-zinc-500">
 							No tracking. No signup. Free forever.
