@@ -18,8 +18,8 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 	const totalFacilities = S.total_facilities ?? 5426;
 	const cmsRequired = S.cms_required_total;
 	const compliant = S.compliant;
-	const indexEntries = S.standardized_price_index_hospitals ?? 4425;
-	const standardized = S.standardized_price_hospitals ?? 4348;
+	const indexEntries = S.standardized_price_index_hospitals ?? 4427;
+	const standardized = S.standardized_price_hospitals ?? 4358;
 	const coverage = priceCoverage(S);
 	const totalGap = coverage
 		? coverage.required_live_zero_price_hospitals +

@@ -29,12 +29,12 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 	const standardizedPriceHospitals =
 		SITE_COUNTS.standardized_price_hospitals ??
 		SITE_COUNTS.standardized_price_index_hospitals ??
-		4348;
+		4358;
 	const coverage = priceCoverage(SITE_COUNTS);
 	const parsedMrfOutputs =
-		SITE_COUNTS.standardized_price_index_hospitals ?? 4425;
-	const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 75064535;
-	const cptIndexedRows = SITE_COUNTS.cpt_indexed_rows ?? 15808142;
+		SITE_COUNTS.standardized_price_index_hospitals ?? 4427;
+	const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 75126977;
+	const cptIndexedRows = SITE_COUNTS.cpt_indexed_rows ?? 15830405;
 	const updatedDate = SITE_COUNTS.generated_at.slice(0, 10);
 	return (
 		<Layout
