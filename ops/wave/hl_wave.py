@@ -592,6 +592,80 @@ def _is_dns_error(e):
     return False
 
 
+# DoH cross-check (2026-11-01): a local DNS failure is evidence about the
+# LOCAL resolver/egress path, not proof the host is gone -- during the
+# 2026-11-01 VM egress outage, local resolution and fetches failed for
+# healthy hosts. Before detect finalizes any "dns" verdict, the hostname
+# is cross-checked over DNS-over-HTTPS (plain HTTPS, independent of the
+# local resolver):
+#   alive     -- a provider answered NOERROR with an A/CNAME answer: the
+#                name resolves publicly, so the local failure was a
+#                resolver/egress artifact; the row must NOT be parked as
+#                dns-dead.
+#   nxdomain  -- a provider answered NXDOMAIN (Status 3) and none said
+#                alive: the name is publicly gone; dns stands.
+#   unverified-- providers unreachable / SERVFAIL / malformed: the local
+#                verdict stands unchanged. A DoH outage never changes a
+#                class by itself and never raises into detect.
+# Providers are asked in order (Cloudflare, then Google); an "alive"
+# answer ends the check (alive wins any disagreement -- a false "dead"
+# is worse than a retry). Each lookup is bounded at _DOH_TIMEOUT seconds
+# and the check runs ONLY on the dns-verdict path, so waves cannot stall
+# on it and successful/HTTP-error fetches never pay for it.
+_DOH_TIMEOUT = 5.0
+
+
+def _doh_provider_result(provider, host):
+    """One DoH lookup for `host`. Returns "alive" | "nxdomain" |
+    "unverified". Never raises."""
+    try:
+        if provider == "cloudflare":
+            url = ("https://cloudflare-dns.com/dns-query?name="
+                   + urllib.parse.quote(host) + "&type=A")
+            req = urllib.request.Request(
+                url, headers={"Accept": "application/dns-json"})
+        else:
+            url = ("https://dns.google/resolve?name="
+                   + urllib.parse.quote(host) + "&type=A")
+            req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=_DOH_TIMEOUT) as resp:
+            payload = json.loads(resp.read().decode("utf-8", "replace"))
+    except Exception:
+        return "unverified"
+    if not isinstance(payload, dict):
+        return "unverified"
+    status = payload.get("Status")
+    if status == 3:
+        return "nxdomain"
+    if status != 0:
+        return "unverified"
+    for answer in payload.get("Answer") or []:
+        if isinstance(answer, dict) and answer.get("type") in (1, 5):
+            return "alive"
+    return "unverified"
+
+
+def _doh_check(host):
+    """Cross-check `host` via DoH. Returns "alive" | "nxdomain" |
+    "unverified". Never raises."""
+    if not host:
+        return "unverified"
+    results = []
+    for provider in ("cloudflare", "google"):
+        try:
+            result = _doh_provider_result(provider, host)
+        except Exception:
+            result = "unverified"
+        results.append(result)
+        if result == "alive":
+            break  # alive wins outright; skip the second provider
+    if "alive" in results:
+        return "alive"
+    if "nxdomain" in results:
+        return "nxdomain"
+    return "unverified"
+
+
 def detect_changes(client, wave, state, index_ccns, health=None):
     """Probe each URL in the wave (conditional GET); return (changed, errors,
     resolved, dead).
@@ -687,13 +761,16 @@ def detect_changes(client, wave, state, index_ccns, health=None):
                 return True
             if sc != 200:
                 if dns_legs:
-                    # An earlier leg proved the host does not resolve;
-                    # this leg's HTTP status is a proxy/edge rendering of
-                    # that DNS failure (e.g. the CORS proxy's 403 for an
-                    # unresolvable target), not the origin's answer.
-                    errors.append({"ccn": r["ccn"], "class": "dns",
-                                   "detail": f"status={sc} via={via} "
-                                             f"dns-fail={'+'.join(dns_legs)}"})
+                    # An earlier leg proved the host does not resolve
+                    # locally; this leg's HTTP status may be a proxy/edge
+                    # rendering of that DNS failure (e.g. the CORS proxy's
+                    # 403 for an unresolvable target), not the origin's
+                    # answer. Defer the verdict: finalize_pending_dns runs
+                    # the DoH cross-check outside the state lock before
+                    # the class is finalized.
+                    pending_dns.append({"ccn": r["ccn"], "status": sc,
+                                        "via": via,
+                                        "dns_legs": list(dns_legs)})
                 else:
                     errors.append({"ccn": r["ccn"], "class": "http",
                                    "detail": f"status={sc} via={via}"})
@@ -756,23 +833,49 @@ def detect_changes(client, wave, state, index_ccns, health=None):
 
         detail_parts = []
         dns_legs = []  # legs that failed on DNS resolution (2026-11-01)
+        pending_dns = []  # deferred dns verdict from handle() (2026-11-01)
+
+        def finalize_pending_dns():
+            """Finalize a deferred dns verdict with the DoH cross-check.
+
+            Runs outside the state lock (network I/O). doh=alive
+            reclassifies to "http": the name resolves publicly, so the
+            HTTP status this leg returned is a genuine HTTP-layer answer
+            and the local DNS failure was a resolver/egress artifact --
+            the row must not be parked as dns-dead.
+            """
+            if not pending_dns:
+                return
+            p = pending_dns.pop()
+            v = _doh_check(urllib.parse.urlparse(url).hostname)
+            detail = (f"status={p['status']} via={p['via']} "
+                      f"dns-fail={'+'.join(p['dns_legs'])} doh={v}")
+            cls = "http" if v == "alive" else "dns"
+            with state_lock:
+                errors.append({"ccn": p["ccn"], "class": cls,
+                               "detail": detail})
+
+        def handle2(resp, via):
+            handle(resp, via)
+            finalize_pending_dns()
+
         for leg in legs:
             try:
                 if leg == "direct":
                     with client.stream("GET", url, headers=hdrs) as resp:
-                        handle(resp, "direct")
+                        handle2(resp, "direct")
                 elif leg == "proxy":
                     phdrs = dict(hdrs)
                     phdrs["x-cors-key"] = CORS_PROXY_KEY
                     log(f"VIA-PROXY retry {r['ccn']}")
                     with client.stream("GET", proxy_url(url), headers=phdrs) as resp:
-                        handle(resp, "proxy")
+                        handle2(resp, "proxy")
                 else:
                     log(f"VIA-MINI retry {r['ccn']}")
                     mini_resp = fetch_via_mini(url, via_proxy=True)
                     if mini_resp is None:
                         raise RuntimeError("mini fetch returned None")
-                    handle(mini_resp, "mini-proxy")
+                    handle2(mini_resp, "mini-proxy")
                     with state_lock:
                         proxy_fallbacks += 1
                 # A leg that produced ANY response (even an HTTP error status
@@ -800,17 +903,27 @@ def detect_changes(client, wave, state, index_ccns, health=None):
                     with health_lock:
                         note_route(health, f"mrf_{leg}", False,
                                    _scrub(str(e))[:80])
+        # DNS verdict (2026-11-01): if every httpx leg that failed did
+        # so on name resolution, the row's class is dns, not transport.
+        # The Mini leg's opaque failure (fetch returned None) carries
+        # no resolution signal and cannot veto a DNS verdict.
+        httpx_failed = [p.split(":", 1)[0] for p in detail_parts
+                        if not p.startswith("mini:")]
+        cls = "dns" if dns_legs and all(
+            leg in dns_legs for leg in httpx_failed) else "transport"
+        detail = " ".join(detail_parts)
+        if cls == "dns":
+            # DoH cross-check (2026-11-01): never finalize a host as
+            # dns-dead on local resolver evidence alone. Public proof
+            # the name resolves (doh=alive) demotes the row to transport
+            # (retry class); a confirmed public NXDOMAIN keeps dns.
+            v = _doh_check(urllib.parse.urlparse(url).hostname)
+            detail = f"{detail} doh={v}"
+            if v == "alive":
+                cls = "transport"
         with state_lock:
-            # DNS verdict (2026-11-01): if every httpx leg that failed did
-            # so on name resolution, the row's class is dns, not transport.
-            # The Mini leg's opaque failure (fetch returned None) carries
-            # no resolution signal and cannot veto a DNS verdict.
-            httpx_failed = [p.split(":", 1)[0] for p in detail_parts
-                            if not p.startswith("mini:")]
-            cls = "dns" if dns_legs and all(
-                leg in dns_legs for leg in httpx_failed) else "transport"
             errors.append({"ccn": r["ccn"], "class": cls,
-                           "detail": " ".join(detail_parts)[:160]})
+                           "detail": detail[:160]})
 
 # PARALLEL EXECUTION: 3 workers for I/O-bound fetches (see executor below)
     with ThreadPoolExecutor(max_workers=3) as executor:
