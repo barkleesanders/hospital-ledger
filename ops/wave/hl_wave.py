@@ -379,7 +379,7 @@ def record_deferred(reason, std, detail="", extra=None):
 # the durable wave-log record carries only these fixed class tokens, so
 # the evidence trail never persists raw tool output.
 _PARK_CLASSES = ("not-in-queue", "index-unreadable", "index snapshot failed",
-                 "index-regression", "http", "transport", "parse", "slim",
+                 "index-regression", "http", "transport", "dns", "parse", "slim",
                  "too_large", "parse-failed", "publish-deferred",
                  "publish-failed-parked", "built-not-published")
 
@@ -546,7 +546,51 @@ def load_index_ccns():
         return set(), 0
 
 
+def load_index_map():
+    """CCN -> priced item count (n) from the price index. {} on any read failure."""
+    try:
+        d = json.loads(INDEX_PATH.read_text())
+        return {h.get("ccn"): h.get("n") for h in d.get("hospitals", []) if h.get("ccn")}
+    except (OSError, json.JSONDecodeError) as e:
+        log(f"WARNING: could not read index ({e}); treating index as empty")
+        return {}
+
+
 # ---------------------------------------------------------------- change detection
+
+# DNS-failure classification (2026-11-01): a seed host that no longer
+# resolves (decommissioned hosting -- an sg-host subdomain, a netdna-ssl
+# CDN host) is source-rot, not a bot-wall. Before this, the direct leg's
+# DNS ConnectError was silently discarded whenever a later leg rendered
+# the failure as an HTTP status (the CORS proxy answers 403 for targets
+# it cannot resolve), so waves 48/49 recorded a phantom "19xxxx 403
+# cluster" for what were really NXDOMAIN seeds (AMG Specialty x3,
+# 192010's duplicate row). _is_dns_error walks the exception chain for
+# socket.gaierror, with resolver message markers as fallback (httpcore
+# may flatten the chain into its own message).
+_DNS_MSG_MARKERS = ("name or service not known",
+                    "temporary failure in name resolution",
+                    "no address associated with hostname",
+                    "nodename nor servname",
+                    "getaddrinfo failed",
+                    "[errno -2]", "[errno -3]", "[errno -5]",
+                    "[errno 8]", "[errno 11001]", "[errno 11004]")
+
+
+def _is_dns_error(e):
+    """True iff exception `e` (or anything in its cause/context chain) is
+    a DNS resolution failure."""
+    seen = set()
+    cur = e
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        if isinstance(cur, socket.gaierror):
+            return True
+        if any(m in str(cur).lower() for m in _DNS_MSG_MARKERS):
+            return True
+        cur = cur.__cause__ or cur.__context__
+    return False
+
 
 def detect_changes(client, wave, state, index_ccns, health=None):
     """Probe each URL in the wave (conditional GET); return (changed, errors,
@@ -642,8 +686,17 @@ def detect_changes(client, wave, state, index_ccns, health=None):
                     log(f"VIA-PROXY dead {r['ccn']} status={sc}")
                 return True
             if sc != 200:
-                errors.append({"ccn": r["ccn"], "class": "http",
-                               "detail": f"status={sc} via={via}"})
+                if dns_legs:
+                    # An earlier leg proved the host does not resolve;
+                    # this leg's HTTP status is a proxy/edge rendering of
+                    # that DNS failure (e.g. the CORS proxy's 403 for an
+                    # unresolvable target), not the origin's answer.
+                    errors.append({"ccn": r["ccn"], "class": "dns",
+                                   "detail": f"status={sc} via={via} "
+                                             f"dns-fail={'+'.join(dns_legs)}"})
+                else:
+                    errors.append({"ccn": r["ccn"], "class": "http",
+                                   "detail": f"status={sc} via={via}"})
                 return False
             # 200: stream, hash incrementally, enforce the byte cap mid-stream.
             h = hashlib.sha256()
@@ -702,6 +755,7 @@ def detect_changes(client, wave, state, index_ccns, health=None):
             return
 
         detail_parts = []
+        dns_legs = []  # legs that failed on DNS resolution (2026-11-01)
         for leg in legs:
             try:
                 if leg == "direct":
@@ -728,18 +782,34 @@ def detect_changes(client, wave, state, index_ccns, health=None):
                         note_route(health, f"mrf_{leg}", True)
                 return
             except (httpx.TransportError, httpx.TimeoutException) as e:
-                detail_parts.append(f"{leg}:{type(e).__name__}")
+                if _is_dns_error(e):
+                    dns_legs.append(leg)
+                    detail_parts.append(f"{leg}:dns:{type(e).__name__}")
+                else:
+                    detail_parts.append(f"{leg}:{type(e).__name__}")
                 if health is not None:
                     with health_lock:
                         note_route(health, f"mrf_{leg}", False, type(e).__name__)
             except Exception as e:
-                detail_parts.append(f"{leg}:{type(e).__name__}")
+                if _is_dns_error(e):
+                    dns_legs.append(leg)
+                    detail_parts.append(f"{leg}:dns:{type(e).__name__}")
+                else:
+                    detail_parts.append(f"{leg}:{type(e).__name__}")
                 if health is not None:
                     with health_lock:
                         note_route(health, f"mrf_{leg}", False,
                                    _scrub(str(e))[:80])
         with state_lock:
-            errors.append({"ccn": r["ccn"], "class": "transport",
+            # DNS verdict (2026-11-01): if every httpx leg that failed did
+            # so on name resolution, the row's class is dns, not transport.
+            # The Mini leg's opaque failure (fetch returned None) carries
+            # no resolution signal and cannot veto a DNS verdict.
+            httpx_failed = [p.split(":", 1)[0] for p in detail_parts
+                            if not p.startswith("mini:")]
+            cls = "dns" if dns_legs and all(
+                leg in dns_legs for leg in httpx_failed) else "transport"
+            errors.append({"ccn": r["ccn"], "class": cls,
                            "detail": " ".join(detail_parts)[:160]})
 
 # PARALLEL EXECUTION: 3 workers for I/O-bound fetches (see executor below)
@@ -833,17 +903,54 @@ def reparse_changed(changed, max_reparse, errors, state):
     return updated, deferred
 
 
-def verify_index_complete(pre_count, pre_ccns, updated_ccns):
-    """The index must never shrink on a targeted wave. Returns (ok, count)."""
+def verify_index_complete(pre_count, pre_ccns, updated_ccns, pre_map=None):
+    """Concurrency-aware index verification (set membership, not raw counts).
+
+    The pre-2026-10-28 guard demanded count == pre_count + new updates
+    exactly. That false-failed wave 48 (2026-10-28): the wave's own update
+    was correct, but a campaign publish landed mid-wave and grew the index
+    4358 -> 4383, so the count compare read a healthy concurrent publish as
+    a regression and the wave failed closed on nothing. Count equality is
+    the wrong invariant when two publishers share one index.
+
+    Rules instead (still fail closed on any REAL regression):
+      a) every CCN this wave updated is present, priced (n > 0);
+      b) no pre-wave CCN is lost: every pre-wave entry is still present,
+         and every entry that was priced (n > 0) before the wave is still
+         priced -- a disappearance or a priced->zero flip is a regression;
+      c) extra CCNs beyond this wave's updates (concurrent campaign
+         growth) are ACCEPTED and logged as a concurrency note.
+    `pre_map` is the pre-wave CCN -> n map (load_index_map); when omitted,
+    rule (b) degrades to membership-only. Returns (ok, count) as before.
+    """
     ccns, count = load_index_ccns()
-    new_ccns = {c for c in updated_ccns if c not in pre_ccns}
-    expected = pre_count + len(new_ccns)
+    post_map = load_index_map() if pre_map is not None else {}
+    # (a) the wave's own updates must be in the index, priced
     missing_updated = [c for c in updated_ccns if c not in ccns]
-    ok = (count == expected) and not missing_updated
+    zeroed_updated = []
+    if pre_map is not None:
+        zeroed_updated = [c for c in updated_ccns
+                          if c in ccns and not (post_map.get(c) or 0) > 0]
+    # (b) nothing that was live before the wave may be lost or zeroed
+    lost = sorted(pre_ccns - ccns)
+    zeroed = []
+    if pre_map is not None:
+        zeroed = sorted(c for c in pre_ccns
+                        if (pre_map.get(c) or 0) > 0 and c in ccns
+                        and not (post_map.get(c) or 0) > 0)
+    ok = not missing_updated and not zeroed_updated and not lost and not zeroed
     if not ok:
-        log(f"INDEX REGRESSION: pre={pre_count} now={count} expected={expected} "
-            f"missing_updated={missing_updated}")
-    return ok, count
+        log(f"INDEX REGRESSION: pre={pre_count} now={count} "
+            f"missing_updated={missing_updated} "
+            f"zeroed_updated={zeroed_updated} "
+            f"lost={lost[:10]} zeroed={zeroed[:10]}")
+        return False, count
+    # (c) concurrent growth beyond this wave's updates is fine -- note it
+    extra = sorted(ccns - pre_ccns - set(updated_ccns))
+    if extra:
+        log(f"CONCURRENCY NOTE: index grew by {len(extra)} CCN(s) beyond "
+            f"this wave's updates (concurrent campaign publish): {extra[:10]}")
+    return True, count
 
 
 # ---------------------------------------------------------------- pricing-tier validation
@@ -1872,6 +1979,7 @@ def run_chunk(args, env, std):
     state = load_state()
     health = load_route_health()
     index_ccns, pre_count = load_index_ccns()
+    pre_map = load_index_map()
     wave_no = int(state.get("waves_done", 0) or 0) + 1
     parked = []
 
@@ -1918,7 +2026,8 @@ def run_chunk(args, env, std):
         log(f"chunk dry run: {len(rows)} reparses skipped")
 
     if updated:
-        ok, _count = verify_index_complete(pre_count, index_ccns, updated)
+        ok, _count = verify_index_complete(pre_count, index_ccns, updated,
+                                           pre_map=pre_map)
         if not ok:
             # Fail closed on the DATA, not the loop: restore the index,
             # park the whole chunk, publish nothing.
@@ -2106,6 +2215,7 @@ def main():
 
     # Snapshot the index before any mutation (regression restore point).
     index_ccns, pre_count = load_index_ccns()
+    pre_map = load_index_map()
     # 2026-09-29: fail fast on unreadable/corrupt index. Treating it as empty
     # silently mis-baselines change detection (every URL looks new) and risks
     # publishing from a bad base. The Tier-3 index carries ~3,810 hospitals;
@@ -2156,7 +2266,8 @@ def main():
     updated_ccns, still_deferred = [], []
     if to_parse and not args.dry_run:
         updated_ccns, still_deferred = reparse_changed(to_parse, args.max_reparse, errors, state)
-        ok, count = verify_index_complete(pre_count, index_ccns, updated_ccns)
+        ok, count = verify_index_complete(pre_count, index_ccns, updated_ccns,
+                                          pre_map=pre_map)
         if not ok:
             try:
                 shutil.copy2(snapshot, INDEX_PATH)
