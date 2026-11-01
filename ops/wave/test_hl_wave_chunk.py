@@ -64,7 +64,7 @@ class ChunkMode(unittest.TestCase):
         hw.load_edge = lambda: None
         hw.load_granted = lambda edge=None: None
         hw.build_queue = lambda granted: list(self.rows.values())
-        hw.verify_index_complete = lambda pre, ccns, upd: (True, pre + len(upd))
+        hw.verify_index_complete = lambda pre, ccns, upd, *a, **k: (True, pre + len(upd))
         hw.verify_ccn_api = lambda ccn: 7
 
     def tearDown(self):
