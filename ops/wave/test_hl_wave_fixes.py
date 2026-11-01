@@ -16,10 +16,13 @@ import ast
 import hashlib
 import importlib.util
 import json
+import socket
 import sys
 import tempfile
 import time
 import unittest
+
+import httpx
 from pathlib import Path
 from unittest.mock import patch
 
@@ -465,6 +468,131 @@ class HashReadBudget(unittest.TestCase):
         with patch.object(hw.subprocess, 'run', side_effect=hw.subprocess.TimeoutExpired('fixture', 660)), \
                 patch.object(hw, '_cdn_get', return_value=False), patch.object(hw, 'log'):
             self.assertIsNone(hw.r2_get_sha256('prices/050025.json', {}))
+
+
+class DetectDnsClassification(unittest.TestCase):
+    """2026-11-01: DNS resolution failures get their own error class.
+
+    Waves 48/49 recorded a phantom "19xxxx 403 cluster": the seeds were
+    NXDOMAIN (decommissioned sg-host / netdna-ssl hosts), the direct
+    leg's DNS ConnectError was discarded, and the CORS proxy's rendered
+    403 for the unresolvable target was recorded as the row's class.
+    A DNS-failure row must classify as "dns", distinct from a real
+    origin http 403.
+    """
+
+    URL = "http://deadhost.invalid/mrf.csv"
+
+    def setUp(self):
+        self._key = hw.CORS_PROXY_KEY
+        hw.CORS_PROXY_KEY = "test-key"  # arm the proxy leg
+        # Keep the Mini leg out: its opaque None failure is not a
+        # resolution signal and its subprocess is not hermetic.
+        self.health = {"mrf_mini": {"consec_fail": 9,
+                                    "cooldown_until": time.time() + 3600,
+                                    "last_ok": None, "last_fail": None}}
+
+    def tearDown(self):
+        hw.CORS_PROXY_KEY = self._key
+
+    @staticmethod
+    def _dns_error():
+        try:
+            try:
+                raise socket.gaierror(-2, "Name or service not known")
+            except socket.gaierror as g:
+                raise httpx.ConnectError(
+                    "[Errno -2] Name or service not known") from g
+        except httpx.ConnectError as e:
+            return e
+
+    class _Resp:
+        def __init__(self, status, body=b""):
+            self.status_code = status
+            self.headers = {}
+            self._body = body
+
+        def iter_bytes(self, chunk_size=1 << 20):
+            yield self._body
+
+    class _Stream:
+        def __init__(self, outcome):
+            self.outcome = outcome
+
+        def __enter__(self):
+            kind, val = self.outcome
+            if kind == "raise":
+                raise val
+            return val
+
+        def __exit__(self, *exc):
+            return False
+
+    class _Client:
+        def __init__(self, direct, proxy):
+            self._direct, self._proxy = direct, proxy
+
+        def stream(self, method, url, headers=None):
+            if url.startswith(hw.PROXY_BASE):
+                return DetectDnsClassification._Stream(self._proxy)
+            return DetectDnsClassification._Stream(self._direct)
+
+    def _detect(self, client, ccn="192029"):
+        with patch.object(hw, "log", lambda *a: None):
+            return hw.detect_changes(
+                client, [{"ccn": ccn, "url": self.URL}], {"urls": {}},
+                set(), self.health)
+
+    def test_dns_failure_behind_proxy_403_is_dns_class(self):
+        client = self._Client(("raise", self._dns_error()),
+                              ("respond", self._Resp(403)))
+        changed, errors, resolved, dead = self._detect(client)
+        self.assertEqual(resolved, 0)
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["class"], "dns")
+        self.assertIn("status=403", errors[0]["detail"])
+        self.assertIn("via=proxy", errors[0]["detail"])
+
+    def test_plain_http_403_stays_http_class(self):
+        client = self._Client(("respond", self._Resp(403)),
+                              ("respond", self._Resp(403)))
+        changed, errors, resolved, dead = self._detect(client, ccn="191302")
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["class"], "http")
+        self.assertEqual(errors[0]["detail"], "status=403 via=direct")
+
+    def test_all_legs_dns_failure_is_dns_class(self):
+        client = self._Client(("raise", self._dns_error()),
+                              ("raise", self._dns_error()))
+        changed, errors, resolved, dead = self._detect(client)
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["class"], "dns")
+        self.assertIn("direct:dns:", errors[0]["detail"])
+        self.assertIn("proxy:dns:", errors[0]["detail"])
+
+    def test_dns_plus_other_failure_stays_transport(self):
+        client = self._Client(("raise", self._dns_error()),
+                              ("raise", httpx.ReadTimeout("slow")))
+        changed, errors, resolved, dead = self._detect(client)
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["class"], "transport")
+        self.assertIn("direct:dns:", errors[0]["detail"])
+
+    def test_dns_direct_but_proxy_200_resolves(self):
+        client = self._Client(("raise", self._dns_error()),
+                              ("respond", self._Resp(200, b"a,b\n1,2\n")))
+        changed, errors, resolved, dead = self._detect(client)
+        self.assertEqual(errors, [])
+        self.assertEqual(resolved, 1)
+        self.assertEqual(len(changed), 1)  # new-to-index queues a parse
+
+    def test_is_dns_error_helper(self):
+        self.assertTrue(hw._is_dns_error(self._dns_error()))
+        self.assertTrue(hw._is_dns_error(httpx.ConnectError(
+            "[Errno -2] Name or service not known")))
+        self.assertFalse(hw._is_dns_error(
+            httpx.ConnectError("Connection refused")))
+        self.assertFalse(hw._is_dns_error(ValueError("unrelated")))
 
 
 if __name__ == "__main__":

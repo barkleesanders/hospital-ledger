@@ -379,7 +379,7 @@ def record_deferred(reason, std, detail="", extra=None):
 # the durable wave-log record carries only these fixed class tokens, so
 # the evidence trail never persists raw tool output.
 _PARK_CLASSES = ("not-in-queue", "index-unreadable", "index snapshot failed",
-                 "index-regression", "http", "transport", "parse", "slim",
+                 "index-regression", "http", "transport", "dns", "parse", "slim",
                  "too_large", "parse-failed", "publish-deferred",
                  "publish-failed-parked", "built-not-published")
 
@@ -558,6 +558,40 @@ def load_index_map():
 
 # ---------------------------------------------------------------- change detection
 
+# DNS-failure classification (2026-11-01): a seed host that no longer
+# resolves (decommissioned hosting -- an sg-host subdomain, a netdna-ssl
+# CDN host) is source-rot, not a bot-wall. Before this, the direct leg's
+# DNS ConnectError was silently discarded whenever a later leg rendered
+# the failure as an HTTP status (the CORS proxy answers 403 for targets
+# it cannot resolve), so waves 48/49 recorded a phantom "19xxxx 403
+# cluster" for what were really NXDOMAIN seeds (AMG Specialty x3,
+# 192010's duplicate row). _is_dns_error walks the exception chain for
+# socket.gaierror, with resolver message markers as fallback (httpcore
+# may flatten the chain into its own message).
+_DNS_MSG_MARKERS = ("name or service not known",
+                    "temporary failure in name resolution",
+                    "no address associated with hostname",
+                    "nodename nor servname",
+                    "getaddrinfo failed",
+                    "[errno -2]", "[errno -3]", "[errno -5]",
+                    "[errno 8]", "[errno 11001]", "[errno 11004]")
+
+
+def _is_dns_error(e):
+    """True iff exception `e` (or anything in its cause/context chain) is
+    a DNS resolution failure."""
+    seen = set()
+    cur = e
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        if isinstance(cur, socket.gaierror):
+            return True
+        if any(m in str(cur).lower() for m in _DNS_MSG_MARKERS):
+            return True
+        cur = cur.__cause__ or cur.__context__
+    return False
+
+
 def detect_changes(client, wave, state, index_ccns, health=None):
     """Probe each URL in the wave (conditional GET); return (changed, errors,
     resolved, dead).
@@ -652,8 +686,17 @@ def detect_changes(client, wave, state, index_ccns, health=None):
                     log(f"VIA-PROXY dead {r['ccn']} status={sc}")
                 return True
             if sc != 200:
-                errors.append({"ccn": r["ccn"], "class": "http",
-                               "detail": f"status={sc} via={via}"})
+                if dns_legs:
+                    # An earlier leg proved the host does not resolve;
+                    # this leg's HTTP status is a proxy/edge rendering of
+                    # that DNS failure (e.g. the CORS proxy's 403 for an
+                    # unresolvable target), not the origin's answer.
+                    errors.append({"ccn": r["ccn"], "class": "dns",
+                                   "detail": f"status={sc} via={via} "
+                                             f"dns-fail={'+'.join(dns_legs)}"})
+                else:
+                    errors.append({"ccn": r["ccn"], "class": "http",
+                                   "detail": f"status={sc} via={via}"})
                 return False
             # 200: stream, hash incrementally, enforce the byte cap mid-stream.
             h = hashlib.sha256()
@@ -712,6 +755,7 @@ def detect_changes(client, wave, state, index_ccns, health=None):
             return
 
         detail_parts = []
+        dns_legs = []  # legs that failed on DNS resolution (2026-11-01)
         for leg in legs:
             try:
                 if leg == "direct":
@@ -738,18 +782,34 @@ def detect_changes(client, wave, state, index_ccns, health=None):
                         note_route(health, f"mrf_{leg}", True)
                 return
             except (httpx.TransportError, httpx.TimeoutException) as e:
-                detail_parts.append(f"{leg}:{type(e).__name__}")
+                if _is_dns_error(e):
+                    dns_legs.append(leg)
+                    detail_parts.append(f"{leg}:dns:{type(e).__name__}")
+                else:
+                    detail_parts.append(f"{leg}:{type(e).__name__}")
                 if health is not None:
                     with health_lock:
                         note_route(health, f"mrf_{leg}", False, type(e).__name__)
             except Exception as e:
-                detail_parts.append(f"{leg}:{type(e).__name__}")
+                if _is_dns_error(e):
+                    dns_legs.append(leg)
+                    detail_parts.append(f"{leg}:dns:{type(e).__name__}")
+                else:
+                    detail_parts.append(f"{leg}:{type(e).__name__}")
                 if health is not None:
                     with health_lock:
                         note_route(health, f"mrf_{leg}", False,
                                    _scrub(str(e))[:80])
         with state_lock:
-            errors.append({"ccn": r["ccn"], "class": "transport",
+            # DNS verdict (2026-11-01): if every httpx leg that failed did
+            # so on name resolution, the row's class is dns, not transport.
+            # The Mini leg's opaque failure (fetch returned None) carries
+            # no resolution signal and cannot veto a DNS verdict.
+            httpx_failed = [p.split(":", 1)[0] for p in detail_parts
+                            if not p.startswith("mini:")]
+            cls = "dns" if dns_legs and all(
+                leg in dns_legs for leg in httpx_failed) else "transport"
+            errors.append({"ccn": r["ccn"], "class": cls,
                            "detail": " ".join(detail_parts)[:160]})
 
 # PARALLEL EXECUTION: 3 workers for I/O-bound fetches (see executor below)
