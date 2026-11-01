@@ -491,8 +491,14 @@ class DetectDnsClassification(unittest.TestCase):
         self.health = {"mrf_mini": {"consec_fail": 9,
                                     "cooldown_until": time.time() + 3600,
                                     "last_ok": None, "last_fail": None}}
+        # note_route() persists the health dict to the production
+        # ROUTE_HEALTH_PATH on every call; stub the save so the tests
+        # are hermetic on any machine (CI has no such directory).
+        self._save = patch.object(hw, "save_route_health", lambda h: None)
+        self._save.start()
 
     def tearDown(self):
+        self._save.stop()
         hw.CORS_PROXY_KEY = self._key
 
     @staticmethod
