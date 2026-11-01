@@ -24,7 +24,7 @@ import unittest
 
 import httpx
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("hl_wave", HERE / "hl_wave.py")
@@ -496,8 +496,14 @@ class DetectDnsClassification(unittest.TestCase):
         # are hermetic on any machine (CI has no such directory).
         self._save = patch.object(hw, "save_route_health", lambda h: None)
         self._save.start()
+        # The DoH cross-check must never make a real network call from a
+        # test; default to "unverified" (local verdict stands).
+        self._doh = patch.object(hw, "_doh_check",
+                                 lambda host: "unverified")
+        self._doh.start()
 
     def tearDown(self):
+        self._doh.stop()
         self._save.stop()
         hw.CORS_PROXY_KEY = self._key
 
@@ -599,6 +605,216 @@ class DetectDnsClassification(unittest.TestCase):
         self.assertFalse(hw._is_dns_error(
             httpx.ConnectError("Connection refused")))
         self.assertFalse(hw._is_dns_error(ValueError("unrelated")))
+
+
+class DetectDohCrossCheck(unittest.TestCase):
+    """2026-11-01: a local DNS failure is cross-checked via DoH before
+    detect finalizes a "dns" verdict, so a local resolver/egress hiccup
+    can never park a live hospital seed as dead.
+
+    Hermetic: _doh_check / _doh_provider_result / urllib.request.urlopen
+    are stubbed in every test; no real network, no persistence.
+    """
+
+    URL = "http://deadhost.invalid/mrf.csv"
+    HOST = "deadhost.invalid"
+
+    def setUp(self):
+        self._key = hw.CORS_PROXY_KEY
+        hw.CORS_PROXY_KEY = "test-key"  # arm the proxy leg
+        self.health = {"mrf_mini": {"consec_fail": 9,
+                                    "cooldown_until": time.time() + 3600,
+                                    "last_ok": None, "last_fail": None}}
+        self._save = patch.object(hw, "save_route_health", lambda h: None)
+        self._save.start()
+
+    def tearDown(self):
+        self._save.stop()
+        hw.CORS_PROXY_KEY = self._key
+
+    # --- harness (mirrors DetectDnsClassification) ---
+    _dns_error = staticmethod(DetectDnsClassification._dns_error)
+    _Resp = DetectDnsClassification._Resp
+    _Client = DetectDnsClassification._Client
+
+    def _detect(self, client, doh):
+        with patch.object(hw, "_doh_check", doh), \
+                patch.object(hw, "log", lambda *a: None):
+            return hw.detect_changes(
+                client, [{"ccn": "192029", "url": self.URL}], {"urls": {}},
+                set(), self.health)
+
+    def _all_dns_client(self):
+        return self._Client(("raise", self._dns_error()),
+                            ("raise", self._dns_error()))
+
+    # --- detect-level verdicts ---
+    def test_local_fail_doh_alive_demotes_to_transport(self):
+        doh = Mock(return_value="alive")
+        changed, errors, resolved, dead = self._detect(
+            self._all_dns_client(), doh)
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["class"], "transport")
+        self.assertIn("doh=alive", errors[0]["detail"])
+        doh.assert_called_once_with(self.HOST)
+
+    def test_local_fail_doh_nxdomain_keeps_dns(self):
+        doh = Mock(return_value="nxdomain")
+        changed, errors, resolved, dead = self._detect(
+            self._all_dns_client(), doh)
+        self.assertEqual(errors[0]["class"], "dns")
+        self.assertIn("doh=nxdomain", errors[0]["detail"])
+
+    def test_local_fail_doh_unverified_keeps_dns(self):
+        doh = Mock(return_value="unverified")
+        changed, errors, resolved, dead = self._detect(
+            self._all_dns_client(), doh)
+        self.assertEqual(errors[0]["class"], "dns")
+        self.assertIn("doh=unverified", errors[0]["detail"])
+
+    def test_doh_alive_behind_proxy_403_is_http(self):
+        client = self._Client(("raise", self._dns_error()),
+                              ("respond", self._Resp(403)))
+        doh = Mock(return_value="alive")
+        changed, errors, resolved, dead = self._detect(client, doh)
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["class"], "http")
+        self.assertIn("status=403", errors[0]["detail"])
+        self.assertIn("doh=alive", errors[0]["detail"])
+        doh.assert_called_once_with(self.HOST)
+
+    def test_doh_nxdomain_behind_proxy_403_stays_dns(self):
+        client = self._Client(("raise", self._dns_error()),
+                              ("respond", self._Resp(403)))
+        doh = Mock(return_value="nxdomain")
+        changed, errors, resolved, dead = self._detect(client, doh)
+        self.assertEqual(errors[0]["class"], "dns")
+        self.assertIn("doh=nxdomain", errors[0]["detail"])
+
+    def test_non_dns_failure_never_calls_doh(self):
+        client = self._Client(("respond", self._Resp(403)),
+                              ("respond", self._Resp(403)))
+        doh = Mock(return_value="alive")
+        changed, errors, resolved, dead = self._detect(client, doh)
+        self.assertEqual(errors[0]["class"], "http")
+        doh.assert_not_called()
+
+    def test_dns_fail_then_proxy_200_never_calls_doh(self):
+        client = self._Client(("raise", self._dns_error()),
+                              ("respond", self._Resp(200, b"a,b\n1,2\n")))
+        doh = Mock(return_value="nxdomain")
+        changed, errors, resolved, dead = self._detect(client, doh)
+        self.assertEqual(errors, [])
+        self.assertEqual(resolved, 1)
+        doh.assert_not_called()
+
+    # --- provider combination rules ---
+    def _check_with_providers(self, results):
+        calls = []
+
+        def fake(provider, host):
+            calls.append(provider)
+            r = results[provider]
+            if isinstance(r, Exception):
+                raise r
+            return r
+
+        with patch.object(hw, "_doh_provider_result", fake):
+            return hw._doh_check(self.HOST), calls
+
+    def test_providers_disagree_prefers_alive(self):
+        verdict, calls = self._check_with_providers(
+            {"cloudflare": "nxdomain", "google": "alive"})
+        self.assertEqual(verdict, "alive")
+        self.assertEqual(calls, ["cloudflare", "google"])
+
+    def test_alive_short_circuits_second_provider(self):
+        verdict, calls = self._check_with_providers(
+            {"cloudflare": "alive", "google": "nxdomain"})
+        self.assertEqual(verdict, "alive")
+        self.assertEqual(calls, ["cloudflare"])
+
+    def test_both_nxdomain_is_nxdomain(self):
+        verdict, _ = self._check_with_providers(
+            {"cloudflare": "nxdomain", "google": "nxdomain"})
+        self.assertEqual(verdict, "nxdomain")
+
+    def test_one_nxdomain_one_unverified_is_nxdomain(self):
+        verdict, _ = self._check_with_providers(
+            {"cloudflare": "unverified", "google": "nxdomain"})
+        self.assertEqual(verdict, "nxdomain")
+
+    def test_both_unverified_is_unverified(self):
+        verdict, _ = self._check_with_providers(
+            {"cloudflare": "unverified", "google": "unverified"})
+        self.assertEqual(verdict, "unverified")
+
+    def test_provider_exception_is_unverified_not_crash(self):
+        verdict, _ = self._check_with_providers(
+            {"cloudflare": RuntimeError("boom"),
+             "google": RuntimeError("boom")})
+        self.assertEqual(verdict, "unverified")
+
+    def test_empty_host_is_unverified(self):
+        with patch.object(hw, "_doh_provider_result",
+                          side_effect=AssertionError("must not be called")):
+            self.assertEqual(hw._doh_check(""), "unverified")
+            self.assertEqual(hw._doh_check(None), "unverified")
+
+    # --- provider response parsing (urlopen stubbed) ---
+    class _FakeResp:
+        def __init__(self, body):
+            self._body = body
+
+        def read(self):
+            return self._body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def _provider_with_body(self, body):
+        def fake_urlopen(req, timeout=None):
+            if isinstance(body, Exception):
+                raise body
+            return self._FakeResp(body)
+
+        with patch.object(hw.urllib.request, "urlopen", fake_urlopen):
+            return hw._doh_provider_result("cloudflare", self.HOST)
+
+    def test_provider_noerror_a_record_is_alive(self):
+        body = json.dumps({"Status": 0, "Answer": [
+            {"name": self.HOST, "type": 1, "TTL": 300,
+             "data": "203.0.113.7"}]}).encode()
+        self.assertEqual(self._provider_with_body(body), "alive")
+
+    def test_provider_noerror_cname_is_alive(self):
+        body = json.dumps({"Status": 0, "Answer": [
+            {"name": self.HOST, "type": 5, "TTL": 300,
+             "data": "cdn.example.net."}]}).encode()
+        self.assertEqual(self._provider_with_body(body), "alive")
+
+    def test_provider_nxdomain_status3(self):
+        body = json.dumps({"Status": 3}).encode()
+        self.assertEqual(self._provider_with_body(body), "nxdomain")
+
+    def test_provider_servfail_is_unverified(self):
+        body = json.dumps({"Status": 2}).encode()
+        self.assertEqual(self._provider_with_body(body), "unverified")
+
+    def test_provider_noerror_no_answer_is_unverified(self):
+        body = json.dumps({"Status": 0}).encode()
+        self.assertEqual(self._provider_with_body(body), "unverified")
+
+    def test_provider_malformed_body_is_unverified(self):
+        self.assertEqual(self._provider_with_body(b"not json"),
+                         "unverified")
+
+    def test_provider_urlopen_raises_is_unverified(self):
+        self.assertEqual(
+            self._provider_with_body(TimeoutError("slow")), "unverified")
 
 
 if __name__ == "__main__":
