@@ -546,6 +546,16 @@ def load_index_ccns():
         return set(), 0
 
 
+def load_index_map():
+    """CCN -> priced item count (n) from the price index. {} on any read failure."""
+    try:
+        d = json.loads(INDEX_PATH.read_text())
+        return {h.get("ccn"): h.get("n") for h in d.get("hospitals", []) if h.get("ccn")}
+    except (OSError, json.JSONDecodeError) as e:
+        log(f"WARNING: could not read index ({e}); treating index as empty")
+        return {}
+
+
 # ---------------------------------------------------------------- change detection
 
 def detect_changes(client, wave, state, index_ccns, health=None):
@@ -833,17 +843,54 @@ def reparse_changed(changed, max_reparse, errors, state):
     return updated, deferred
 
 
-def verify_index_complete(pre_count, pre_ccns, updated_ccns):
-    """The index must never shrink on a targeted wave. Returns (ok, count)."""
+def verify_index_complete(pre_count, pre_ccns, updated_ccns, pre_map=None):
+    """Concurrency-aware index verification (set membership, not raw counts).
+
+    The pre-2026-10-28 guard demanded count == pre_count + new updates
+    exactly. That false-failed wave 48 (2026-10-28): the wave's own update
+    was correct, but a campaign publish landed mid-wave and grew the index
+    4358 -> 4383, so the count compare read a healthy concurrent publish as
+    a regression and the wave failed closed on nothing. Count equality is
+    the wrong invariant when two publishers share one index.
+
+    Rules instead (still fail closed on any REAL regression):
+      a) every CCN this wave updated is present, priced (n > 0);
+      b) no pre-wave CCN is lost: every pre-wave entry is still present,
+         and every entry that was priced (n > 0) before the wave is still
+         priced -- a disappearance or a priced->zero flip is a regression;
+      c) extra CCNs beyond this wave's updates (concurrent campaign
+         growth) are ACCEPTED and logged as a concurrency note.
+    `pre_map` is the pre-wave CCN -> n map (load_index_map); when omitted,
+    rule (b) degrades to membership-only. Returns (ok, count) as before.
+    """
     ccns, count = load_index_ccns()
-    new_ccns = {c for c in updated_ccns if c not in pre_ccns}
-    expected = pre_count + len(new_ccns)
+    post_map = load_index_map() if pre_map is not None else {}
+    # (a) the wave's own updates must be in the index, priced
     missing_updated = [c for c in updated_ccns if c not in ccns]
-    ok = (count == expected) and not missing_updated
+    zeroed_updated = []
+    if pre_map is not None:
+        zeroed_updated = [c for c in updated_ccns
+                          if c in ccns and not (post_map.get(c) or 0) > 0]
+    # (b) nothing that was live before the wave may be lost or zeroed
+    lost = sorted(pre_ccns - ccns)
+    zeroed = []
+    if pre_map is not None:
+        zeroed = sorted(c for c in pre_ccns
+                        if (pre_map.get(c) or 0) > 0 and c in ccns
+                        and not (post_map.get(c) or 0) > 0)
+    ok = not missing_updated and not zeroed_updated and not lost and not zeroed
     if not ok:
-        log(f"INDEX REGRESSION: pre={pre_count} now={count} expected={expected} "
-            f"missing_updated={missing_updated}")
-    return ok, count
+        log(f"INDEX REGRESSION: pre={pre_count} now={count} "
+            f"missing_updated={missing_updated} "
+            f"zeroed_updated={zeroed_updated} "
+            f"lost={lost[:10]} zeroed={zeroed[:10]}")
+        return False, count
+    # (c) concurrent growth beyond this wave's updates is fine -- note it
+    extra = sorted(ccns - pre_ccns - set(updated_ccns))
+    if extra:
+        log(f"CONCURRENCY NOTE: index grew by {len(extra)} CCN(s) beyond "
+            f"this wave's updates (concurrent campaign publish): {extra[:10]}")
+    return True, count
 
 
 # ---------------------------------------------------------------- pricing-tier validation
@@ -1872,6 +1919,7 @@ def run_chunk(args, env, std):
     state = load_state()
     health = load_route_health()
     index_ccns, pre_count = load_index_ccns()
+    pre_map = load_index_map()
     wave_no = int(state.get("waves_done", 0) or 0) + 1
     parked = []
 
@@ -1918,7 +1966,8 @@ def run_chunk(args, env, std):
         log(f"chunk dry run: {len(rows)} reparses skipped")
 
     if updated:
-        ok, _count = verify_index_complete(pre_count, index_ccns, updated)
+        ok, _count = verify_index_complete(pre_count, index_ccns, updated,
+                                           pre_map=pre_map)
         if not ok:
             # Fail closed on the DATA, not the loop: restore the index,
             # park the whole chunk, publish nothing.
@@ -2106,6 +2155,7 @@ def main():
 
     # Snapshot the index before any mutation (regression restore point).
     index_ccns, pre_count = load_index_ccns()
+    pre_map = load_index_map()
     # 2026-09-29: fail fast on unreadable/corrupt index. Treating it as empty
     # silently mis-baselines change detection (every URL looks new) and risks
     # publishing from a bad base. The Tier-3 index carries ~3,810 hospitals;
@@ -2156,7 +2206,8 @@ def main():
     updated_ccns, still_deferred = [], []
     if to_parse and not args.dry_run:
         updated_ccns, still_deferred = reparse_changed(to_parse, args.max_reparse, errors, state)
-        ok, count = verify_index_complete(pre_count, index_ccns, updated_ccns)
+        ok, count = verify_index_complete(pre_count, index_ccns, updated_ccns,
+                                          pre_map=pre_map)
         if not ok:
             try:
                 shutil.copy2(snapshot, INDEX_PATH)
