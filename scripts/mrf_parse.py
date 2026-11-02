@@ -90,6 +90,22 @@ FAST_CSV_ENGINE = os.environ.get('HPT_FAST_CSV_ENGINE', 'auto').lower()
 FAST_CSV_MIN_BYTES = int(os.environ.get('HPT_FAST_CSV_MIN_BYTES', str(2 * 1024 * 1024)))
 SIMDJSON_PARSER = simdjson.Parser() if simdjson is not None else None
 
+# The stdlib csv module caps a single field at 128 KiB by default, and
+# real MRF generators exceed it: a legitimately long notes field, or --
+# the case that forced this, CCN 231305 (Ascension Standish, 2026-11-02)
+# -- one unbalanced double-quote in the source file flips csv quote
+# parity and swallows thousands of ordinary rows into a single
+# 1,014,794-char "field" of plain chargemaster data. Under the default
+# limit the whole file is unparseable (_csv.Error: field larger than
+# field limit) and the hospital stays unpublished. Raise the cap to a
+# bounded 64 MiB: far above any real field, far below an unbounded
+# single-field memory blowup. csv.field_size_limit is process-global,
+# so setting it once here covers every csv.reader in this module --
+# delimited_rows (the tall/wide/dialect row source), the delimiter and
+# header sniffers, and stream_parse_large_csv.
+CSV_FIELD_SIZE_LIMIT = 64 * 1024 * 1024
+csv.field_size_limit(CSV_FIELD_SIZE_LIMIT)
+
 # Column name keywords → canonical field
 CODE_COL_HINTS = [
     'cpt', 'hcpcs', 'code', 'procedure code', 'service_code', 'item_code',
