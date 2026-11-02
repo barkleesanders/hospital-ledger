@@ -1028,6 +1028,64 @@ def load_json_bytes(content_bytes):
     return None
 
 
+def load_json_bytes_multidoc(content_bytes):
+    """Merge a stream of concatenated complete CMS HPT JSON documents.
+
+    Some generators emit the MRF as many complete v2/v3 documents back to
+    back — one (or a few) standard_charge_information entries per document,
+    each repeating the hospital metadata — instead of a single document
+    holding the whole array (SIH's v3.0.0 export for Harrisburg Medical
+    Center, 2026-11-02: 134,920 concatenated documents, one entry each).
+    Single-document loaders reject the trailing documents ('Extra data'),
+    so such a file parses to zero items. Merge them: metadata from the
+    first document, standard_charge_information concatenated across all.
+
+    Returns None unless the ENTIRE byte stream decodes as >= 2 top-level
+    documents, every document is an object, and >= 2 of them carry charge
+    entries — so a valid document followed by garbage, a truncated stream,
+    or an NDJSON flat-row stream keeps failing exactly as before.
+    """
+    text = None
+    for encoding in ('utf-8-sig', 'utf-8', 'cp1252', 'latin-1'):
+        try:
+            text = content_bytes.decode(encoding)
+            break
+        except (UnicodeDecodeError, ValueError):
+            continue
+    if text is None:
+        return None
+    decoder = json.JSONDecoder()
+    docs = []
+    idx = 0
+    length = len(text)
+    while True:
+        while idx < length and text[idx] in ' \t\r\n':
+            idx += 1
+        if idx >= length:
+            break
+        try:
+            doc, idx = decoder.raw_decode(text, idx)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(doc, dict):
+            return None
+        docs.append(doc)
+    if len(docs) < 2:
+        return None
+    merged_charges = []
+    contributing = 0
+    for doc in docs:
+        charges = doc.get('standard_charge_information', []) or doc.get('standard_charges', [])
+        if isinstance(charges, list) and charges:
+            contributing += 1
+            merged_charges.extend(charges)
+    if contributing < 2 or not merged_charges:
+        return None
+    merged = dict(docs[0])
+    merged['standard_charge_information'] = merged_charges
+    return merged
+
+
 def normalize_code_records(value):
     """Normalize assorted code-information shapes into dict records."""
     if value is None:
@@ -1182,6 +1240,10 @@ def parse_json_list_variant(data, max_items=200_000):
 def parse_json_v2(content_bytes, max_items=200_000):
     """CMS HPT v2.0 JSON schema."""
     data = load_json_bytes(content_bytes)
+    if data is None:
+        # A stream of concatenated complete HPT documents is not loadable
+        # as a single document; try the merging multi-document decode.
+        data = load_json_bytes_multidoc(content_bytes)
     if data is None:
         return []
     if isinstance(data, list):
