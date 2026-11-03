@@ -6,6 +6,10 @@
 //   get_hospital_prices    -> GET /api/prices/:ccn       (home-client.js renderHospitalPricePreview)
 //   navigate_to_hospital   -> /hospital/:ccn             (the site's own hospital route)
 // Spec + rules: shared/webmcp.md in the ship skill. Inventory: WEBMCP.md in this repo.
+// Usage beacon opt-in (shared/webmcp.md "Usage beacon"): the registrar POSTs
+// anonymous register/execute events (tool names + arg key names, never values)
+// to this endpoint; stored as R2 objects under webmcp-beacon/ (see WEBMCP.md).
+window.WEBMCP_BEACON_URL = "/api/webmcp-beacon";
 window.WEBMCP_TOOLS = [
   {
     name: "search_hospitals",
