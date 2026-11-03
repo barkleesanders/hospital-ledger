@@ -1025,6 +1025,67 @@ alone — session-owned controllers die at compaction.
   dump (record closure), and two non-publishers (Norwood demolished;
   East Ohio closed, domain dead).
 
+## Wave b46 lessons (2026-11-03 — targeted close-out wave)
+
+- **UHS facilities resolve in ONE Mini curl, no search needed.** Every UHS
+  facility site exposes its exact file URL in static HTML at
+  `/standard-services/` (homepages carry no links; `/price-transparency/`
+  404s): `https://uhsfilecdn.eskycity.net/bh/<EIN>_<shortname>_standardcharges.csv`
+  for behavioral, `/ac/` for acute (e.g. Valley Hospital Medical Center,
+  Las Vegas). The eskycity slug is the facility's short name. Harvest proof:
+  Canyon Ridge (054111), Quail Run (034031, published from this wave),
+  Valley Hospital Phoenix (034026) — plus Salt Lake (464013) before them.
+  The mrfdatasolutions `/payers-1` index is JS-loaded; only 3 `/bh/` URLs
+  sit in its static HTML — do not treat it as a roster source.
+- **Tavily quota died mid-day 2026-11-03 (HTTP 432 plan limit on every
+  call).** Context + tinyfish carried all 62 b46 calls and still produced
+  5 publishes. The fan-out redundancy rule is load-bearing: a dead lane is
+  a swap, never a stall — and REJECTs resting on two lanes should say so.
+- **Triage the parked-URL list by LIVE status before chasing any of it.**
+  Of the 37 URLs the fixed wave guard parked on 2026-11-03, 27 belonged to
+  hospitals already live via another (often umbrella) source — stale
+  alternate sources are noise, not gaps. Only the 10 not-live CCNs were
+  real work. Umbrella sharing explains most duplicates (210012 + 210064
+  both serve the same n=86,026 LifeBridge file).
+- **Bankrupt-system targets: verify the facility still EXISTS before
+  hunting its file.** Steward's 2024 bankruptcy closed Carney (220017) and
+  Nashoba Valley (220098) on Aug 31, 2024 and New England Sinai (222027)
+  on Apr 2, 2024 — no successor, no file will ever be posted. A closed
+  CCN is a closed disposition, not a coverage gap. Conversely, an acquired
+  facility's file lives on the ACQUIRER's pricing page under the new
+  brand: Good Samaritan Brockton (220111) publishes as
+  `272473728_BostonMedicalCenterSouth_standardcharges.csv.zip` on
+  bmchealthsystem.org (BMC acquired it Oct 2024).
+- **State-psych verified non-publishers (close them; the only lever left
+  is an enforcement complaint, per-filing approval):** WV Bateman
+  (514009, Huntington) + Sharpe (514012, Weston) — get the mapping from
+  the DB, an early brief had them swapped; FL Northeast Florida State
+  (104007); MN DHS Direct Care & Treatment — 244002 is Anoka Metro RTC
+  and 244015 is Baxter CBHH (CCN prefix 24 = Minnesota; never trust a
+  brief's state guess — DB-verify every target's name/city/state first).
+- **State-central pages are living documents — re-curl before concluding
+  absence.** The NC DSOHF price-transparency page linked NO Walter B.
+  Jones sheet in the morning and BOTH campus sheets (Lakeside + Woodside)
+  by the afternoon of the same day (344033, published). Multi-campus
+  single-CCN merge: build each campus canonical separately, then merge
+  the item arrays with an exact-duplicate dedupe (Lakeside 5 + Woodside
+  2 → 7 items pre-slim).
+- **Akamai-shielded systems (LifeBridge, Adventist HealthCare) — the fcdp
+  verdict lane.** Scripted curl gets 403/Access-Denied on the pages AND
+  on the direct file URLs. Real Chrome renders the transparency page
+  fine; extract file URLs from the DOM (both systems link per-facility
+  standardcharges CSVs), then download via in-page `fetch()` → blob →
+  programmatic download into ~/Downloads (carries the page's Akamai
+  clearance; verified on Grace 210013, 476 KB staged). Current vintages:
+  LifeBridge posts at `sites/default/files/<YYYY-MM>/` paths; Adventist
+  reuses the same `/app/files/public/<guid>/` dirs with EIN-prefixed
+  filenames.
+- **Flagged observation (unresolved):** the 617 MB Memorial Springfield
+  (140148) source built at exactly 200,000 items — smells like a parser
+  or builder cap, not a coincidence. Identity was verified and it
+  published (slim n=147,911), but before relying on giant-file builds,
+  determine whether a cap exists and whether it truncates silently.
+
 ## Self-improvement loop — every fleet failure pays rent (standing protocol)
 
 Barklee's standing rule (reaffirmed 2026-10-28): this skill keeps learning
