@@ -416,6 +416,85 @@ HL cron body carries that paragraph — a body that never mentions
 fetching still produces fetches when a worker improvises verification,
 so the ban must be explicit, not implied by the steps.**
 
+## Deepsearch discovery lane (added 2026-11-03 — the wave-5/6 engine)
+
+When the parse lanes starve (no submit-ready sources), discovery runs on a
+multi-provider deepsearch engine, NOT on a single search API. Built
+2026-11-02/03 after the wave scripts' hardwired Exa lane died
+(`NO_MORE_CREDITS`, 2026-11-02 20:33) and the campaign briefly treated one
+provider's exhaustion as a search-lane block. **Rule: a dead provider means
+swap engines, never stall** — no single provider (Exa included) is ever on
+the campaign's critical path again.
+
+**Engine facts.** Invocation is positional:
+`deepsearch -n 8 [-p <provider>] "<query>"`, JSON on stdout. The remote
+route rejects long flags (`-q`, `--max-results`, `--json` → rc=2 with empty
+stdout); keep the call shape exactly as the proven runners do. Providers
+(verified 2026-11-03): default order ≈ searxng, tavily, context
+(context.dev), tinyfish live; brave EXHAUSTED (402), jina EMPTY BALANCE,
+exa NO CREDITS. A runner must NEVER swallow call errors into empty
+results — log rc/stderr per call (a swallowed-error sweep once reported a
+clean zero-yield that was really two invocation bugs).
+
+**Failover hides the strong lanes — fan out instead.** The engine is
+failover-by-design (first success wins), so single-lane runs are answered
+almost entirely by the fastest/weakest provider. The discovery default is
+therefore a FAN-OUT: the same query to tavily + context + tinyfish in
+parallel, results merged by URL with per-lane attribution. Benchmark
+(2026-11-03, identical file-oriented query, 237 never-searched pool CCNs,
+hits = file+page URLs surfaced):
+
+| lane | targets with hits | file URLs (unique) | page URLs (unique) |
+|---|---|---|---|
+| tavily | 91 | 1 (1) | 94 (86) |
+| context | 69 | 5 (4) | 52 (31) |
+| tinyfish | 47 | 2 (1) | 32 (14) |
+| default (searxng) | 7 | 3 (3) | 7 (6) |
+
+Tavily is the page hunter, context.dev the file hunter, tinyfish a useful
+third; the union (10 files, 159 pages) held dozens of finds every single
+lane missed. The fan-out also absorbs a lane outage mid-run (tavily went
+"worker unreachable" during the state sweep; context+tinyfish carried it).
+
+**Query shapes (rotate, don't repeat).** Pass 1 (csv/json):
+`"<NAME>" <city> <state> standard charges filetype json OR csv OR xlsx
+machine readable`. Pass 2 (snippet harvest): filetype-oriented query,
+harvest file URLs from result SNIPPETS too (tavily snippets carry direct
+file links the result list misses — pass 2 out-yielded pass 1 ~10x on
+pages). Variant pass (wave 6): `... chargemaster price transparency
+filetype:xlsx OR filetype:zip` — thinner (2 publishes from 224 targets) but
+nonzero on a pool two earlier shapes had covered.
+
+**State central postings crack state psych hospitals.** State-operated
+psychiatric facilities often post through the state DMH/DHHS central site,
+not their own domain (pattern proven: TN DMH ×4, Maine DHHS, MS DMH —
+Whitfield). Sweep shape: one fan-out query per state SYSTEM naming the
+agency + flagship hospitals + "standard charges", extract the agency
+pages, grade files under every in-state pool CCN from that system.
+Enforcement complaints are not the only psych path.
+
+**Pipeline.** Search runners are resumable via a done-file (error rows
+never count as done) and emit `candidates-*.jsonl` + `pages-*.jsonl`. Then:
+page→file extraction → content-identity fetch → STRICT grader
+(state/street vetoes, umbrella-anchor rule) → umbrella reassignment
+(in-file hospital name matched to the hospital DB at token score ≥0.6,
+re-graded under the true CCN) → canonical build → store → SERIAL
+publish, byte-verified, live-index read-back. Aggregator-pointer trap: an
+MRF-index site's data.json can pass the identity grade while containing a
+pointer, not prices (items=1 priced=0 at build) — the build's priced count
+is the last gate; a priced=0 build is a REJECT, never a publish.
+
+**Ad-hoc runner duties (session waves).** (1) Re-assert the 150042
+quarantine when building ANY target pool — pool files do not encode it
+(2026-11-03 near-miss: the fan-out pool included it; grading/build gates
+caught it, its real file now sits in verdicts as a held REJECT).
+(2) Parse the live set from the index's `hospitals` LIST (see the CCN-key
+guard note in Publish doctrine) — a dict-parse silently yields an empty
+live set and duplicate work. (3) Copy the working invocation from a proven
+runner instead of re-deriving flags. (4) Detached launches only
+(setsid/nohup + log); outcomes must be recoverable from logs and done-files
+alone — session-owned controllers die at compaction.
+
 ## Method-work lessons (2026-10-28, remaining-hospitals mission)
 
 - **Dialect queue was mostly stale parses, not bad files.** Fresh Mini fetch +
