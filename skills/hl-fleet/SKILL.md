@@ -495,6 +495,19 @@ St Mary …), eyeball the raw file header and the DB city/state yourself
 before any build is published — the grader's silence is not identity
 proof.**
 
+**CMS V3.0.0 dual-header CSVs parse as 0 items (diagnosed 2026-11-03).**
+The V3 template CSV layout is: row 1 metadata header
+(`hospital_name,last_updated_on,version,…`, some names carrying embedded
+tab characters), row 2 the identity values, row 3 the DATA header
+(`Description, code|1, standard_charge|gross, …`), then data rows. The
+fleet CSV path reads row 1 as the header and produces 0 items (both
+lanes, confirmed). Lossless workaround: rewrite to a V2 single-header
+file (strip tabs from the row-3 header names, drop rows 1–2) and build
+that — the canonical records the hospital's true source URL. The V3 XLSX
+path already handles its layout. Open parser task: teach the CSV dialect
+detector this layout, with a V3 dual-header file as the regression
+fixture.
+
 **Ad-hoc runner duties (session waves).** (1) Re-assert the 150042
 quarantine when building ANY target pool — pool files do not encode it
 (2026-11-03 near-miss: the fan-out pool included it; grading/build gates
