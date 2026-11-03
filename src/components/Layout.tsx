@@ -81,6 +81,16 @@ export const Layout: FC<LayoutProps> = ({
 	children,
 }) => {
 	const DATA = summary ?? bundledSummary;
+	// WebMCP (/ship Phase 1.4w, Tier 1): every main route registers this site's
+	// tools. Definitions first (/webmcp-tools.js sets window.WEBMCP_TOOLS), then
+	// the canonical registrar (/webmcp.js), appended after the page's own scripts
+	// so page behaviour is unchanged where document.modelContext is absent.
+	const pageScripts = Array.isArray(scriptSrc)
+		? scriptSrc
+		: scriptSrc
+			? [scriptSrc]
+			: [];
+	const allScriptSrc = [...pageScripts, "/webmcp-tools.js", "/webmcp.js"];
 	const resolvedOgImage = ogImage ?? DEFAULT_OG_IMAGE;
 	const resolvedOgTitle = ogTitle ?? title;
 	return (
@@ -370,11 +380,9 @@ export const Layout: FC<LayoutProps> = ({
 					</a>{" "}
 					· © 2026 · CC0 data · No tracking
 				</footer>
-				{Array.isArray(scriptSrc) ? (
-					scriptSrc.map((src) => <script src={src} defer />)
-				) : scriptSrc ? (
-					<script src={scriptSrc} defer />
-				) : null}
+				{allScriptSrc.map((src) => (
+					<script src={src} defer />
+				))}
 				{inlineScript ? (
 					<script dangerouslySetInnerHTML={{ __html: inlineScript }} />
 				) : null}
