@@ -8,6 +8,12 @@
    NameError: RETRY_ESCALATE_ATTEMPTS. The escalation branch must run on
    the defined RETRY_MAX_ATTEMPTS constant. These tests exercise every
    early branch incl. escalation, with the publish phase stubbed.
+3. Verify/publish timeout containment (2026-11-03, wave-36 audit): a
+   subprocess.TimeoutExpired from an r2_put upload inside _publish_locked
+   must count as a failed attempt (never escape), and an exception
+   escaping run_publish_phase inside retry_pending_publish must re-park
+   the pending manifest with an ADVANCED next_retry_at instead of
+   crashing with the stale due time the wave-36 audit found.
 
 Run: ~/hospital-ledger/.venv/bin/python3 test_hl_wave_fixes.py
 """
@@ -815,6 +821,113 @@ class DetectDohCrossCheck(unittest.TestCase):
     def test_provider_urlopen_raises_is_unverified(self):
         self.assertEqual(
             self._provider_with_body(TimeoutError("slow")), "unverified")
+
+
+class PublishLockedUploadTimeout(unittest.TestCase):
+    """2026-11-03 (wave-36 audit): a hung r2_put upload inside
+    _publish_locked raised subprocess.TimeoutExpired out of the publish
+    lock; the exception escaped run_publish_phase and the post-publish
+    bookkeeping never ran. A timeout must count as a failed attempt."""
+
+    class R:
+        def __init__(self, rc):
+            self.returncode = rc
+            self.stdout = ""
+            self.stderr = ""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.out = Path(self.tmp.name)
+        (self.out / "prices").mkdir()
+        (self.out / "meta").mkdir()
+        for k in ("prices/111111.json", "prices/222222.json",
+                  "prices/index.json", "meta/summary.json",
+                  "meta/hospitals.json", "meta/manifest.json"):
+            (self.out / k).write_bytes(b'{"x": 1}')
+        self.ccns = ["111111", "222222"]
+        self._run = hw.subprocess.run
+        self._sha = hw.r2_get_sha256
+        self._sleep = hw.time.sleep
+        hw.time.sleep = lambda s: None
+        hw.r2_get_sha256 = lambda k, penv: hashlib.sha256(
+            (self.out / k).read_bytes()).hexdigest()
+
+    def tearDown(self):
+        hw.subprocess.run = self._run
+        hw.r2_get_sha256 = self._sha
+        hw.time.sleep = self._sleep
+        self.tmp.cleanup()
+
+    def test_timeout_then_success_recovers(self):
+        state = {"n": 0}
+        def run(*a, **k):
+            state["n"] += 1
+            if state["n"] == 1:
+                raise hw.subprocess.TimeoutExpired("r2_put", 600)
+            return self.R(0)
+        hw.subprocess.run = run
+        ok, msg = hw._publish_locked(self.out, self.ccns, {})
+        self.assertTrue(ok, msg)
+
+    def test_persistent_timeout_returns_failure_not_raise(self):
+        calls = {"n": 0}
+        def run(*a, **k):
+            calls["n"] += 1
+            raise hw.subprocess.TimeoutExpired("r2_put", 600)
+        hw.subprocess.run = run
+        ok, msg = hw._publish_locked(self.out, self.ccns, {})
+        self.assertFalse(ok)
+        self.assertIn("prices/111111.json", msg)
+        self.assertIn("timed out", msg)
+        self.assertEqual(calls["n"], 3)  # 3 attempts on the first key, then stop
+
+
+class RetryPendingPublishException(unittest.TestCase):
+    """2026-11-03 (wave-36 audit): an exception escaping the publish
+    phase inside retry_pending_publish crashed the entry point after the
+    attempt bump but without advancing next_retry_at. It must re-park
+    with an advanced backoff and exit 0 (no strike)."""
+
+    CCN = "010126"  # price file exists in ~/hospital-ledger/public/data/prices
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.pending_path = Path(self.tmp.name) / "hl_pending_publish.json"
+        self.failures = []
+        self._orig = {k: getattr(hw, k) for k in
+                      ("PENDING_PATH", "run_publish_phase", "record_success",
+                       "record_failure", "load_state", "load_index_ccns",
+                       "load_route_health", "save_route_health")}
+        hw.PENDING_PATH = self.pending_path
+        hw.record_success = lambda std: None
+        hw.record_failure = lambda *a, **k: self.failures.append(a)
+        hw.load_state = lambda: {"waves_done": 0, "unpublished": []}
+        hw.load_index_ccns = lambda: (set(), 3823)
+        hw.load_route_health = lambda: {}
+        hw.save_route_health = lambda h: None
+        self.args = argparse.Namespace(dry_run=False, no_publish=False)
+
+    def tearDown(self):
+        for k, v in self._orig.items():
+            setattr(hw, k, v)
+        self.tmp.cleanup()
+
+    def test_publish_exception_reparks_with_advanced_retry(self):
+        self.pending_path.write_text(json.dumps(
+            {"publish_ccns": [self.CCN], "attempts": 2,
+             "next_retry_at": 0, "ts": "2026-11-03T00:00:00Z"}))
+        def boom(*a, **k):
+            raise hw.subprocess.TimeoutExpired("r2_put", 600)
+        hw.run_publish_phase = boom
+        before = time.time()
+        rc = hw.retry_pending_publish(self.args, {}, {})
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.failures, [])  # transport class: no strike
+        parked = json.loads(self.pending_path.read_text())
+        self.assertEqual(parked["publish_ccns"], [self.CCN])
+        self.assertEqual(parked["attempts"], 3)
+        self.assertEqual(parked["reason"], "publish-exception")
+        self.assertGreater(parked["next_retry_at"], before + 60)
 
 
 if __name__ == "__main__":

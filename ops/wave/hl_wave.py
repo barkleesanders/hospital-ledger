@@ -1509,12 +1509,25 @@ def _publish_locked(out, updated_ccns, penv):
         local = out / k
         last_err = ""
         for attempt in range(3):
-            r = subprocess.run([VENV_PY, "scripts/r2_put.py", str(local), k],
-                               cwd=str(ROOT), env=penv, capture_output=True,
-                               text=True, timeout=600)
-            if r.returncode == 0:
+            try:
+                r = subprocess.run([VENV_PY, "scripts/r2_put.py", str(local), k],
+                                   cwd=str(ROOT), env=penv, capture_output=True,
+                                   text=True, timeout=600)
+            except subprocess.TimeoutExpired as e:
+                # 2026-11-03 (wave-36 audit): a hung PUT is a transport
+                # failure, not a crash. Before this catch, TimeoutExpired
+                # escaped _publish_locked -- publish()'s finally released
+                # the lock, but the exception then escaped run_publish_phase
+                # entirely, so the bookkeeping never completed (pending not
+                # re-parked, next_retry_at left stale). A timeout now counts
+                # as a failed attempt, exactly like a nonzero exit, so the
+                # caller parks through the normal path.
+                r = None
+                last_err = f"r2_put upload timed out after {e.timeout}s"
+            if r is not None and r.returncode == 0:
                 break
-            last_err = (r.stdout + r.stderr)[-300:]
+            if r is not None:
+                last_err = (r.stdout + r.stderr)[-300:]
             log(f"publish upload {k} failed (attempt {attempt + 1}/3): "
                 f"{last_err[-120:]}")
             if attempt < 2:
@@ -1781,9 +1794,24 @@ def retry_pending_publish(args, env, std):
     index_ccns, pre_count = load_index_ccns()
     health = load_route_health()
     retry_args = argparse.Namespace(dry_run=False, no_publish=False)
-    pub = run_publish_phase(retry_args, env, state, std, ccns, [],
-                            index_ccns, pre_count, [], health,
-                            state.get("waves_done", 0) + 1)
+    try:
+        pub = run_publish_phase(retry_args, env, state, std, ccns, [],
+                                index_ccns, pre_count, [], health,
+                                state.get("waves_done", 0) + 1)
+    except Exception as exc:
+        # 2026-11-03 (wave-36 audit): an exception escaping the publish
+        # phase used to crash this entry point AFTER the attempt count was
+        # bumped above but WITHOUT advancing next_retry_at -- the pending
+        # manifest stayed stale-due and the bookkeeping never ran. Convert
+        # it to the same re-park a returned deferral gets (advanced
+        # backoff, attempts preserved) and exit 0: transport owns
+        # recovery, no strike. Mirrors the chunk-mode guard.
+        detail = f"{type(exc).__name__}: {exc}"[:300]
+        log(f"retry-pending: publish phase raised {detail} -- re-parking")
+        park_for_retry(ccns, state.get("waves_done", 0) + 1,
+                       "publish-exception", detail, attempts + 1)
+        save_route_health(health)
+        return 0
     save_route_health(health)
     status = pub.get("status")
     if status == "published":
@@ -1968,14 +1996,26 @@ def run_publish_phase(args, env, state, std, updated_ccns, unpublished,
     # Pre-publish check: 403 = credential rejection (terminal, needs a human).
     # Any other check failure is treated as transport: the attempt loop below
     # (with backoff + health gate) makes the final call and defers on failure.
-    chk = subprocess.run([VENV_PY, "scripts/r2_put.py", "--check"],
-                         cwd=str(ROOT), env=penv,
-                         capture_output=True, text=True, timeout=60)
-    chk_out = (chk.stdout or "") + (chk.stderr or "")
-    if chk.returncode != 0 and "403" in chk_out:
-        return _fail("r2-credential-rejected", chk_out[-300:])
-    if chk.returncode != 0:
-        log("R2 pre-check failed (transport suspected); proceeding to publish attempts")
+    try:
+        chk = subprocess.run([VENV_PY, "scripts/r2_put.py", "--check"],
+                             cwd=str(ROOT), env=penv,
+                             capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        # 2026-11-03 (wave-36 audit): a hung pre-check is transport, not a
+        # credential verdict -- a timeout produced no output at all, so no
+        # 403 can hide in it. This exact TimeoutExpired escaped the publish
+        # phase on 2026-10-25 and lost the in-memory park. Treat it like
+        # any other non-403 check failure: the attempt loop below (with
+        # backoff + health gate) makes the final call.
+        chk = None
+        log("R2 pre-check timed out (transport suspected); "
+            "proceeding to publish attempts")
+    if chk is not None:
+        chk_out = (chk.stdout or "") + (chk.stderr or "")
+        if chk.returncode != 0 and "403" in chk_out:
+            return _fail("r2-credential-rejected", chk_out[-300:])
+        if chk.returncode != 0:
+            log("R2 pre-check failed (transport suspected); proceeding to publish attempts")
     ok, msg = _publish_with_retry(out, publish_ccns, penv, health)
     log(f"publish: {msg}")
     if not ok:
@@ -2495,9 +2535,26 @@ def main():
             log(f"adopting {len(_add)} CCNs from pending publish manifest")
             unpublished = list(dict.fromkeys(unpublished + _add))
     env = dict(os.environ)
-    pub = run_publish_phase(args, env, state, std, updated_ccns, unpublished,
-                            index_ccns, pre_count, errors, health,
-                            state["waves_done"] + 1)
+    try:
+        pub = run_publish_phase(args, env, state, std, updated_ccns, unpublished,
+                                index_ccns, pre_count, errors, health,
+                                state["waves_done"] + 1)
+    except Exception as exc:
+        # 2026-11-03 (wave-36 audit): never let a publish-phase exception
+        # (e.g. a subprocess timeout on a sick egress) kill the wave
+        # mid-bookkeeping. Park the whole publish set with an advanced
+        # next_retry_at -- the same state the phase's own _park writes --
+        # and report the wave as deferred so the retry loop owns recovery.
+        detail = f"{type(exc).__name__}: {exc}"[:300]
+        log(f"wave: publish phase raised {detail} -- parking the publish set")
+        _set = list(dict.fromkeys(updated_ccns + unpublished))
+        state["unpublished"] = list(dict.fromkeys(
+            (state.get("unpublished") or []) + _set))
+        save_state(state)
+        park_for_retry(_set, state["waves_done"] + 1, "publish-exception",
+                       detail, (load_pending() or {}).get("attempts", 0))
+        pub = {"status": "deferred", "reason": "publish-exception",
+               "detail": detail, "publish_ccns": _set}
     save_route_health(health)
     status = pub.get("status")
     if status == "failed":
