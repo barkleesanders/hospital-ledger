@@ -174,6 +174,57 @@ app.get("/api/prices/:ccn", pricesHandler);
 app.get("/api/payer/:slug", payerHandler);
 app.get("/api/procedure/:code", procedureHandler);
 
+// WebMCP usage beacon (ship skill shared/webmcp.md, "Usage beacon"): the
+// registrar in public/webmcp.js POSTs one anonymous event per tool
+// registration and per tool execution so real agent usage is measurable —
+// tool execution happens in the visitor's browser and is otherwise
+// invisible in server logs. Whitelisted fields only, never argument
+// values; always 204, bad input is dropped silently. Events land as
+// per-event objects under webmcp-beacon/ in HL_MRF_PARSED (read-back in
+// WEBMCP.md).
+app.post("/api/webmcp-beacon", async (c) => {
+	try {
+		const ct = c.req.header("content-type") ?? "";
+		if (ct.includes("application/json")) {
+			const raw = await c.req.text();
+			if (raw.length <= 2048) {
+				const b = JSON.parse(raw) as Record<string, unknown>;
+				const event = b.event === "register" || b.event === "execute" ? b.event : null;
+				if (event) {
+					const str = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : null);
+					const strArr = (v: unknown) =>
+						Array.isArray(v)
+							? v.filter((x) => typeof x === "string").slice(0, 32).map((x) => (x as string).slice(0, 128))
+							: [];
+					const tool = str(b.tool, 128);
+					if (event === "register" || tool) {
+						const ts = new Date().toISOString();
+						const payload = {
+							ts,
+							event,
+							tool,
+							tools: strArr(b.tools),
+							argKeys: strArr(b.argKeys),
+							path: str(b.path, 512),
+							ua: (c.req.header("user-agent") ?? "").slice(0, 512),
+						};
+						const rand = Math.random().toString(36).slice(2, 10);
+						const key = `webmcp-beacon/${ts.slice(0, 10)}/${ts.replace(/[:.]/g, "-")}-${event}-${tool ?? "register"}-${rand}.json`;
+						c.executionCtx.waitUntil(
+							c.env.HL_MRF_PARSED.put(key, JSON.stringify(payload), {
+								httpMetadata: { contentType: "application/json" },
+							}).then(() => {}).catch(() => {}),
+						);
+					}
+				}
+			}
+		}
+	} catch {
+		/* the beacon endpoint never surfaces an error */
+	}
+	return new Response(null, { status: 204 });
+});
+
 // Legacy /api/{hospitals,summary}.json shorthands → /data fallback.
 app.get("/api/hospitals.json", (c) => c.redirect("/data/hospitals.json", 301));
 app.get("/api/summary.json", (c) => c.redirect("/data/summary.json", 301));

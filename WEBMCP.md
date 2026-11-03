@@ -28,6 +28,33 @@ without `document.modelContext` are untouched.
 No Sensitive tools. Definitions: `public/webmcp-tools.js`; registrar:
 `public/webmcp.js` (canonical drop-in from the ship skill, byte-identical).
 
+## Usage beacon
+
+The registrar is opted in via `window.WEBMCP_BEACON_URL =
+"/api/webmcp-beacon"` in `public/webmcp-tools.js`. It fires one `register`
+event per page load that registers tools and one `execute` event per tool
+call (tool name + argument *key names* only — never values). The Worker
+endpoint `POST /api/webmcp-beacon` (`src/index.tsx`) validates +
+whitelists the payload, always returns 204, and stores each event as a
+JSON object in the already-bound `HL_MRF_PARSED` bucket under
+`webmcp-beacon/<YYYY-MM-DD>/<ts>-<event>-<tool>-<rand>.json`, with server
+timestamp + User-Agent. No new store was added.
+
+Read events back (from the Mac mini, via the cf wrapper):
+
+```sh
+# list today's events
+~/tools/cf-wrapper/cf-auth.sh r2 objects list --bucket-name hl-mrf-parsed \
+  --prefix "webmcp-beacon/$(date +%F)/" --per-page 100
+# read one event
+~/tools/cf-wrapper/cf-auth.sh r2 objects get "<key>" --bucket-name hl-mrf-parsed
+# or with wrangler:
+npx wrangler r2 object get hl-mrf-parsed/<key>
+```
+
+Counts = number of objects per day prefix, split by the `-register-` /
+`-execute-` infix in the key.
+
 ## Verification record
 
 - Pre-deploy: `node <ship>/tools/webmcp-check.mjs --source . --require 1`
@@ -40,3 +67,13 @@ No Sensitive tools. Definitions: `public/webmcp-tools.js`; registrar:
 - Post-deploy (after this PR is merged and shipped, not part of the PR):
   `webmcp-check.mjs --live https://hospitalledger.com --require 1`, then
   re-run the harness against the served files.
+
+## Origin-trial enrollment status
+
+Per the Phase 1.4w "enabled" standard (2026-11-03), this origin needs a
+Chrome WebMCP origin-trial token embedded in the served head.
+**Status: NOT YET ENROLLED** — enrollment happens in Google's Origin
+Trials portal (interactive, account sign-in) and has not been done for
+hospitalledger.com / www.hospitalledger.com yet. Tools are reachable
+today in WebMCP-native browsers (ChatGPT desktop). When enrolled, record
+here: origins, enrollment date, token expiry (tied to the trial end).
