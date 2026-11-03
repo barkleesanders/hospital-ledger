@@ -1076,7 +1076,15 @@ alone — session-owned controllers die at compaction.
   fine; extract file URLs from the DOM (both systems link per-facility
   standardcharges CSVs), then download via in-page `fetch()` → blob →
   programmatic download into ~/Downloads (carries the page's Akamai
-  clearance; verified on Grace 210013, 476 KB staged). Current vintages:
+  clearance; verified on Grace 210013, 476 KB staged). **DOWNLOAD RULE
+  (learned the same day, cost one timeout cycle): Chrome silently
+  swallows programmatic downloads after the first on a tab — the fetch
+  reports `done:<size>` but no file lands and no error shows anywhere.**
+  One download per tab: open a FRESH tab per file, kick the fetch there,
+  and verify the staged size equals the reported blob size. Fort
+  Washington (210060) + Adventist Rehab (213029) both no-landed on a
+  shared tab and staged instantly on fresh tabs; all five fcdp targets
+  published 2026-11-03 (index 5,035→5,040; priced 5,020→5,025). Current vintages:
   LifeBridge posts at `sites/default/files/<YYYY-MM>/` paths; Adventist
   reuses the same `/app/files/public/<guid>/` dirs with EIN-prefixed
   filenames.
