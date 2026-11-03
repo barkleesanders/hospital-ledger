@@ -495,6 +495,15 @@ St Mary …), eyeball the raw file header and the DB city/state yourself
 before any build is published — the grader's silence is not identity
 proof.**
 
+**UHS behavioral-health CDN pattern (proven 2026-11-03).** UHS behavioral
+facilities post MRFs at
+`uhsfilecdn.eskycity.net/bh/<EIN>_<shortname>_standardcharges.csv`, and
+the facility's own price-transparency page HTML embeds the full file URL
+(grep the page for `uhsfilecdn`). When a stored source for a UHS facility
+is junk (one pointed at a jobs page), go to the facility site's
+standard-services/price-transparency page and grep — do not trust the
+stored source.
+
 **CMS V3.0.0 dual-header CSVs parse as 0 items (diagnosed 2026-11-03).**
 The V3 template CSV layout is: row 1 metadata header
 (`hospital_name,last_updated_on,version,…`, some names carrying embedded
