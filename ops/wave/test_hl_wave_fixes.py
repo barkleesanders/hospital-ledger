@@ -888,16 +888,24 @@ class RetryPendingPublishException(unittest.TestCase):
     attempt bump but without advancing next_retry_at. It must re-park
     with an advanced backoff and exit 0 (no strike)."""
 
-    CCN = "010126"  # price file exists in ~/hospital-ledger/public/data/prices
+    CCN = "010126"
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.pending_path = Path(self.tmp.name) / "hl_pending_publish.json"
         self.failures = []
         self._orig = {k: getattr(hw, k) for k in
-                      ("PENDING_PATH", "run_publish_phase", "record_success",
-                       "record_failure", "load_state", "load_index_ccns",
-                       "load_route_health", "save_route_health")}
+                      ("PENDING_PATH", "ROOT", "run_publish_phase",
+                       "record_success", "record_failure", "load_state",
+                       "load_index_ccns", "load_route_health",
+                       "save_route_health")}
+        # Hermetic ROOT: the CCN's price file must exist under
+        # ROOT/public/data/prices or the retry treats it as vanished
+        # (CI has no ~/hospital-ledger tree).
+        hw.ROOT = Path(self.tmp.name) / "root"
+        price_dir = hw.ROOT / "public/data/prices"
+        price_dir.mkdir(parents=True)
+        (price_dir / f"{self.CCN}.json").write_bytes(b'{"x": 1}')
         hw.PENDING_PATH = self.pending_path
         hw.record_success = lambda std: None
         hw.record_failure = lambda *a, **k: self.failures.append(a)
