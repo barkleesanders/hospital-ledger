@@ -109,6 +109,28 @@ it:
   store canonical), aggregate-shrink guard, R2 base sync before patching,
   no-regression validation vs that base, r2_put upload (meta/index keys
   last), per-key byte-verify, never delete R2 objects, 150042 refused.
+  **CCN key guard (2026-11-03):** every store canonical key and registry CCN
+  must match `^\d{6}$` before any publish treats it as a hospital. A wave-4
+  litter file `45188E.json.gz` sat in the store for days; on 2026-11-03 the
+  campaign driver published it as a live index entry — a phantom duplicate
+  of Ennis Regional (true CCN 450833, identical n=19,042) that inflated the
+  live count 4,995 → 4,996. Remedy: rename in store to
+  `45188E.json.gz.QUARANTINE-malformed-key` (never delete), then remove the
+  phantom from the published index (mechanics below). Any publisher/driver
+  path that derives publish sets from the store or registry must filter
+  non-`^\d{6}$` keys out and log them as litter, never publish them.
+  Guards shipped 2026-11-03: the publisher FATAL-refuses any non-6-digit
+  publish argument (alongside the 150042 refusal), and the registry queue
+  drops non-CCN rows with a stderr note. Phantom removal mechanics: the
+  index is a PATCH accumulation over the published base (a no-regression
+  validation forbids count drops), so removal means editing the published
+  index + summary objects directly (byte-verify after; the summary's
+  standardized_* and cpt_* fields are exact sums over the index — recompute
+  and assert), deleting the CCN's price file from the local publish tree so
+  no patch resurrects it, and leaving its data object orphaned (never
+  delete). Index JSON shape: `{"hospitals": [ {ccn, n, ...}, ... ]}` — a
+  LIST under `hospitals`, not a CCN-keyed dict; parse it that way in every
+  ad-hoc check (the dict-parse silently yields an empty live set).
   A fresh tree must sync `meta/hospitals.json` from R2 before patch_index —
   site_data_metrics reads it (dry-run FATAL 2026-10-28 taught this).
 - **Heavy slim (>1 GB uncompressed canonical) → Daytona first.**
