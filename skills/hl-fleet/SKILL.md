@@ -230,6 +230,28 @@ does not speed a batch — batches run continuously once launched — it caps
 the idle gap between a batch ending/dying and the next one starting; that
 gap is why hourly starved a 65-deep queue and 10 minutes replaced it.
 
+**Wave-guard answer taxonomy (2026-11-03, wave-51 debug — do not regress):**
+the daily wave's pervasive-probe guard once failed any wave with
+resolved < 50%, conflating target answers with transport collapse. Wave 51
+(and an Oct 25 wave before it) died at resolved 20/50 while *answered* was
+50/50: the edge leg flaked (502/EdgeBlocked), the proxy leg returned 403
+for a window rich in stale 2021-era URLs, and a real-Chrome fetch proved
+the origin itself answers 404 for those paths — the files are gone; the
+transport was never down. Part of the storm was also transient (Northern
+Light 403'd on every route in the morning, 200 on all routes by noon).
+The guard now computes answered = resolved + http/too_large-class errors
+(a leg DID receive an HTTP response) and fails the wave only when
+answered < 50%; HTTP-answered failures park to
+`hidden_files/hl_blocked_urls.tsv` (ts, ccn, url, detail) as the
+browser-verdict (fcdp) lane's worklist, and probe error records carry the
+URL. Rule of thumb: **a 403 is an ANSWER — classify who is speaking
+(origin vs proxy vs shield) before treating any error class as a fleet
+outage; only no-response-from-any-leg is transport evidence.** Verified
+live the same day: the relaunched wave 51 completed on the identical
+window (checked 50, resolved 31, answered 50/50, 19 parked, 5 newly dead,
+watermark 1620→1670, streak reset to 0). Backup:
+`hl_wave.py.bak-20261103-answerguard`.
+
 **Parallel-parse contract (Barklee, 2026-10-30 — this SUPERSEDES the old
 "never run two fleet batches at once" limit; the never-two-publishes rule
 stands unchanged):** up to 3 controllers run concurrently, ONLY on disjoint

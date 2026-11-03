@@ -772,7 +772,7 @@ def detect_changes(client, wave, state, index_ccns, health=None):
                                         "via": via,
                                         "dns_legs": list(dns_legs)})
                 else:
-                    errors.append({"ccn": r["ccn"], "class": "http",
+                    errors.append({"ccn": r["ccn"], "class": "http", "url": url,
                                    "detail": f"status={sc} via={via}"})
                 return False
             # 200: stream, hash incrementally, enforce the byte cap mid-stream.
@@ -852,7 +852,7 @@ def detect_changes(client, wave, state, index_ccns, health=None):
                       f"dns-fail={'+'.join(p['dns_legs'])} doh={v}")
             cls = "http" if v == "alive" else "dns"
             with state_lock:
-                errors.append({"ccn": p["ccn"], "class": cls,
+                errors.append({"ccn": p["ccn"], "class": cls, "url": url,
                                "detail": detail})
 
         def handle2(resp, via):
@@ -2264,6 +2264,40 @@ def run_chunk(args, env, std):
 
 # ---------------------------------------------------------------- main
 
+def park_blocked_urls(blocked):
+    """Append HTTP-answered probe failures to hl_blocked_urls.tsv -- the
+    browser-verdict (fcdp) lane's worklist -- deduped by URL. These are URLs
+    where a fetch leg DID receive an HTTP response (usually a bot-shield 403
+    standing in for a stale/removed file; a real browser often sees the true
+    404), so they are target-side facts, not transport failures. Never
+    raises: parking must not fail a wave."""
+    try:
+        path = GOAL / "hl_blocked_urls.tsv"
+        seen = set()
+        new_file = True
+        if path.exists() and path.stat().st_size > 0:
+            new_file = False
+            for line in path.read_text().splitlines()[1:]:
+                parts = line.split("\t")
+                if len(parts) >= 3:
+                    seen.add(parts[2])
+        rows = []
+        for e in blocked:
+            u = e.get("url") or ""
+            if not u or u in seen:
+                continue
+            seen.add(u)
+            rows.append("\t".join([now_iso(), e.get("ccn", ""), u,
+                                   (e.get("detail") or "").replace("\t", " ")[:120]]))
+        if rows:
+            with path.open("a") as f:
+                if new_file:
+                    f.write("ts\tccn\turl\tdetail\n")
+                f.write("\n".join(rows) + "\n")
+    except OSError:
+        pass
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--wave-size", type=int, default=50)
@@ -2365,12 +2399,33 @@ def main():
         f"errors={len(errors)} dead={len(dead)}")
 
     # Pervasive probe failure: do not advance the watermark; fail the wave.
-    if wave_urls and resolved / len(wave_urls) < 0.5:
+    # Taxonomy (2026-11-03, wave-51 debug): this guard exists to catch OUR
+    # transport collapsing, not targets answering badly. An "http" or
+    # "too_large" error means a leg DID receive an HTTP response -- the
+    # fleet reached the internet and the origin (or its bot shield)
+    # answered. Only transport/dns-class failures (no leg produced any
+    # response) count toward pervasive. Wave 51 died at resolved=20/50
+    # while answered was 50/50: the edge leg was flaky (502/EdgeBlocked),
+    # the proxy leg answered 403 for a window rich in stale 2021-era URLs,
+    # and a real-Chrome fetch proved the origin itself answers 404 for
+    # those paths -- the files are gone; the transport was never down.
+    # HTTP-answered failures are parked to hl_blocked_urls.tsv for the
+    # browser-verdict (fcdp) lane instead of burning the stop streak.
+    answered = resolved + sum(1 for e in errors
+                              if e.get("class") in ("http", "too_large"))
+    if wave_urls and answered / len(wave_urls) < 0.5:
         save_state(state)  # persist per-URL outcomes, but keep pos
         save_route_health(health)  # persist what the fetch legs just learned
         return record_failure("pervasive-probe-failure", 2, std,
                               {"checked": len(wave_urls), "resolved": resolved,
+                               "answered": answered,
                                "errors": [e["detail"] for e in errors[:5]]})
+    _blocked = [e for e in errors if e.get("class") == "http"]
+    if _blocked:
+        park_blocked_urls(_blocked)
+        log(f"answered={answered}/{len(wave_urls)}; {len(_blocked)} "
+            f"HTTP-answered failures parked to hl_blocked_urls.tsv "
+            f"(browser-verdict lane)")
 
     # Reparse: deferred first, then newly changed, then forced (forced always runs).
     to_parse = list(deferred) + changed
