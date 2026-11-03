@@ -67,3 +67,13 @@ Counts = number of objects per day prefix, split by the `-register-` /
 - Post-deploy (after this PR is merged and shipped, not part of the PR):
   `webmcp-check.mjs --live https://hospitalledger.com --require 1`, then
   re-run the harness against the served files.
+
+## Origin-trial enrollment status
+
+Per the Phase 1.4w "enabled" standard (2026-11-03), this origin needs a
+Chrome WebMCP origin-trial token embedded in the served head.
+**Status: NOT YET ENROLLED** — enrollment happens in Google's Origin
+Trials portal (interactive, account sign-in) and has not been done for
+hospitalledger.com / www.hospitalledger.com yet. Tools are reachable
+today in WebMCP-native browsers (ChatGPT desktop). When enrolled, record
+here: origins, enrollment date, token expiry (tied to the trial end).
