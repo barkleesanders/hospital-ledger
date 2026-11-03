@@ -504,18 +504,21 @@ is junk (one pointed at a jobs page), go to the facility site's
 standard-services/price-transparency page and grep — do not trust the
 stored source.
 
-**CMS V3.0.0 dual-header CSVs parse as 0 items (diagnosed 2026-11-03).**
-The V3 template CSV layout is: row 1 metadata header
-(`hospital_name,last_updated_on,version,…`, some names carrying embedded
-tab characters), row 2 the identity values, row 3 the DATA header
-(`Description, code|1, standard_charge|gross, …`), then data rows. The
-fleet CSV path reads row 1 as the header and produces 0 items (both
-lanes, confirmed). Lossless workaround: rewrite to a V2 single-header
-file (strip tabs from the row-3 header names, drop rows 1–2) and build
-that — the canonical records the hospital's true source URL. The V3 XLSX
-path already handles its layout. Open parser task: teach the CSV dialect
-detector this layout, with a V3 dual-header file as the regression
-fixture.
+**CMS V3.0.0 tab-laden CSV headers fooled the delimiter sniffer — FIXED
+in the parser 2026-11-03 (454093).** Root cause was NOT the V3
+dual-header layout (metadata row + identity row + data header on row 3
+— the header finder handles that): V3 CSV headers embed literal TAB
+characters inside comma-delimited field names
+(`license_number|<TAB>TX`, trailing-tab names like `median_amount<TAB>`),
+and the delimiter sniffer's tab-preference branch split the metadata
+line on tabs, found header keywords inside the resulting comma-joined
+fat cells, and declared the whole file TSV — collapsing a 65-row file
+to 2 rows and 0 items on both lanes. The parser now skips tab-hit lines
+whose cells contain runs of commas, with regression tests; the original
+file parses directly to its 9 priced items. The V3 XLSX path was never
+affected. Lesson: a "0 items on both lanes" parse failure is a diagnosis
+job, not a retry job — read the file's raw bytes and the reader's
+intermediate state (rows read, sniffed delimiter) before touching lanes.
 
 **Ad-hoc runner duties (session waves).** (1) Re-assert the 150042
 quarantine when building ANY target pool — pool files do not encode it
