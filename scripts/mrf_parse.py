@@ -197,6 +197,14 @@ def sniff_delimiter(text):
         if '\t' not in line:
             continue
         cells = next(csv.reader([line], delimiter='\t'))
+        # CMS V3.0.0 CSV headers embed literal tabs inside comma-delimited
+        # field names (e.g. "license_number|<TAB>TX", trailing-tab column
+        # names). Tab-splitting such a line yields a few fat cells that are
+        # themselves comma-joined field lists -- not a TSV header. A real
+        # TSV header's cells do not contain runs of commas (2026-11-03,
+        # 454093 Sunrise Canyon: tab sniff collapsed a 65-row file to 2).
+        if any(cell.count(',') >= 2 for cell in cells):
+            continue
         non_empty = sum(1 for cell in cells if str(cell).strip())
         score = header_signal_count(cells)
         if non_empty >= 3 and score >= 2:
