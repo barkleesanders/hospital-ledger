@@ -72,8 +72,13 @@ Counts = number of objects per day prefix, split by the `-register-` /
 
 Per the Phase 1.4w "enabled" standard (2026-11-03), this origin needs a
 Chrome WebMCP origin-trial token embedded in the served head.
-**Status: NOT YET ENROLLED** — enrollment happens in Google's Origin
-Trials portal (interactive, account sign-in) and has not been done for
-hospitalledger.com / www.hospitalledger.com yet. Tools are reachable
-today in WebMCP-native browsers (ChatGPT desktop). When enrolled, record
-here: origins, enrollment date, token expiry (tied to the trial end).
+**Status: ENROLLED 2026-11-03** — both origins registered in Google's
+Origin Trials portal for the WebMCP trial; both tokens are embedded as
+`<meta http-equiv="origin-trial">` tags in the shared `<head>`
+(`src/components/Layout.tsx`), so every page serving the registrar
+carries both (each browser applies the token matching its origin).
+
+- `https://hospitalledger.com` — registration `-9129517724307816447`
+- `https://www.hospitalledger.com` — registration `6056620219185496065`
+- Token expiry: **2027-03-29** (trial-bound); Chrome range: **149–162**.
+  Re-enroll or renew before the expiry if the trial is extended.
