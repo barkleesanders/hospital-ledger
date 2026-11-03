@@ -921,9 +921,10 @@ class RetryPendingPublishException(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_publish_exception_reparks_with_advanced_retry(self):
-        self.pending_path.write_text(json.dumps(
-            {"publish_ccns": [self.CCN], "attempts": 2,
-             "next_retry_at": 0, "ts": "2026-11-03T00:00:00Z"}))
+        # Seed via the module's own writer (PENDING_PATH is redirected
+        # to the temp dir in setUp).
+        hw.save_pending({"publish_ccns": [self.CCN], "attempts": 2,
+                         "next_retry_at": 0, "ts": "2026-11-03T00:00:00Z"})
         def boom(*a, **k):
             raise hw.subprocess.TimeoutExpired("r2_put", 600)
         hw.run_publish_phase = boom
