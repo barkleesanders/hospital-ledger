@@ -482,7 +482,18 @@ re-graded under the true CCN) → canonical build → store → SERIAL
 publish, byte-verified, live-index read-back. Aggregator-pointer trap: an
 MRF-index site's data.json can pass the identity grade while containing a
 pointer, not prices (items=1 priced=0 at build) — the build's priced count
-is the last gate; a priced=0 build is a REJECT, never a publish.
+is the last gate; a priced=0 build is a REJECT, never a publish. Aggregator
+records are leads, never evidence: cross-matching an MRF index against the
+pool produced 4 grader RIGHTs of which 2 were same-name cross-state
+impostors (a CA-licensed file for Springfield IL's Memorial Medical
+Center; a Virginia file for Burke SD's Community Memorial) — both passed
+on name-only identity because the fetched head carried no contradicting
+state evidence, and both were caught only by manually reading the file
+header (`license_number|CA`) and the DB city/state before publishing.
+**Rule: for generic hospital names (Memorial / Community / Union /
+St Mary …), eyeball the raw file header and the DB city/state yourself
+before any build is published — the grader's silence is not identity
+proof.**
 
 **Ad-hoc runner duties (session waves).** (1) Re-assert the 150042
 quarantine when building ANY target pool — pool files do not encode it
