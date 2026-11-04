@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "name": "Hospital Ledger",
+  "origin": "https://hospitalledger.com",
+  "description": "A free public database of every U.S. hospital's federally-mandated price transparency machine-readable file. Built from CMS data + live verification. CC0 licensed.",
+  "webmcp": {
+    "feature": "WebMCP",
+    "api": "document.modelContext",
+    "originTrialExpiry": "2027-03-29"
+  },
+  "tools": [
+    {
+      "name": "search_hospitals",
+      "description": "Search U.S. hospitals by name, city, or CCN in the Hospital Ledger dataset and return matching hospitals with city, state, type, live price-file status, and their Hospital Ledger URL.",
+      "class": "answer",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Hospital name, city, or CCN fragment, e.g. 'Alaska Native' or 'Anchorage'"
+          },
+          "state": {
+            "type": "string",
+            "description": "Optional 2-letter state filter, e.g. 'AK'"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "name": "get_procedure_prices",
+      "description": "Compare published prices for one CPT or HCPCS procedure code across U.S. hospitals — gross, cash, and min/max negotiated prices plus site-wide median cash price — from Hospital Ledger's cross-hospital procedure index.",
+      "class": "answer",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "CPT or HCPCS code, e.g. '99213' (office visit) or '45378' (colonoscopy)"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
+    },
+    {
+      "name": "get_hospital_prices",
+      "description": "Return a hospital's published standardized price rows (code, description, gross, cash, and min/max negotiated prices) from Hospital Ledger, by the hospital's 6-character CCN.",
+      "class": "answer",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ccn": {
+            "type": "string",
+            "description": "Hospital CCN, 6 characters, e.g. '020026'"
+          }
+        },
+        "required": [
+          "ccn"
+        ]
+      }
+    },
+    {
+      "name": "navigate_to_hospital",
+      "description": "Navigate the visitor's browser to a hospital's Hospital Ledger page, by its 6-character CCN. Only internal /hospital/<ccn> paths are used.",
+      "class": "action",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ccn": {
+            "type": "string",
+            "description": "Hospital CCN, 6 characters, e.g. '020026'"
+          }
+        },
+        "required": [
+          "ccn"
+        ]
+      }
+    }
+  ],
+  "docs": "/llms.txt"
+}

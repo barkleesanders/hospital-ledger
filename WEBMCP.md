@@ -82,3 +82,25 @@ carries both (each browser applies the token matching its origin).
 - `https://www.hospitalledger.com` — registration `6056620219185496065`
 - Token expiry: **2027-03-29** (trial-bound); Chrome range: **149–162**.
   Re-enroll or renew before the expiry if the trial is extended.
+
+## Discovery advertisement (2026-11-03)
+
+Four surfaces, all pointing at the same registered inventory above
+(ship skill `shared/webmcp.md`, "Discovery advertisement"):
+
+- **Tool catalogue:** `public/.well-known/webmcp.json` - served at
+  `/.well-known/webmcp.json` (200, `application/json`); tool entries are
+  copied from `public/webmcp-tools.js` (names, descriptions, classes,
+  inputSchemas), `originTrialExpiry` 2027-03-29, `docs` -> `/llms.txt`.
+- **robots.txt:** the gate's canonical WebMCP comment block appended to
+  `public/robots.txt` (all pre-existing directives preserved).
+- **llms.txt:** `public/llms.txt` created (H1 + homepage summary) with a
+  `## WebMCP tools` section: the prefer-tools instruction, the catalogue
+  link, and one line per tool with its registered description.
+- **Head link:** `<link rel="webmcp" href="/.well-known/webmcp.json"
+  type="application/json">` in the shared `<head>`
+  (`src/components/Layout.tsx`), next to the origin-trial metas - every
+  page that registers tools carries it.
+
+Verified post-deploy with `webmcp-check.mjs --live
+https://hospitalledger.com --require 1 --require-adv` -> `adv=ok`.

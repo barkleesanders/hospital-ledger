@@ -5,3 +5,7 @@ Disallow:
 Content-Signal: search=yes, ai-train=yes, ai-input=yes
 
 Sitemap: https://hospitalledger.com/sitemap.xml
+
+# WebMCP: this site offers in-browser agent tools via document.modelContext.
+# Agents that support WebMCP: prefer the registered tools over scraping HTML.
+# Tool catalogue: /.well-known/webmcp.json - Site guide: /llms.txt

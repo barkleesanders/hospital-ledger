@@ -104,6 +104,8 @@ export const Layout: FC<LayoutProps> = ({
 				    tokens, expiry 2027-03-29, Chrome 149-162. See WEBMCP.md. */}
 				<meta http-equiv="origin-trial" content="Ah0mUg5YXPhvW9VcECE5iW+22X73onmVZzU3rbCefvQbxJKghs7rZhaNqyuf4g2N3ZS7CIjflWcYJgU53RZeMg4AAABSeyJvcmlnaW4iOiJodHRwczovL2hvc3BpdGFsbGVkZ2VyLmNvbTo0NDMiLCJmZWF0dXJlIjoiV2ViTUNQIiwiZXhwaXJ5IjoxODA2MzY0ODAwfQ==" />
 				<meta http-equiv="origin-trial" content="AmxyOVas8zzT0dsBDZEod3yggCYeuoUWBg6o2gFfNEciFiLzYxfGlrBgZXSp5glqaYY2D8Vr3BOUVs0l0/8ZZAUAAABWeyJvcmlnaW4iOiJodHRwczovL3d3dy5ob3NwaXRhbGxlZGdlci5jb206NDQzIiwiZmVhdHVyZSI6IldlYk1DUCIsImV4cGlyeSI6MTgwNjM2NDgwMH0=" />
+				{/* WebMCP discovery: one hop from any page to the tool catalogue. */}
+				<link rel="webmcp" href="/.well-known/webmcp.json" type="application/json" />
 				{url ? <link rel="canonical" href={url} /> : null}
 				{jsonLd ? (
 					<script type="application/ld+json">
