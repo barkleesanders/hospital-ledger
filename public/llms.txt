@@ -1,0 +1,12 @@
+# Hospital Ledger
+
+A free public database of every U.S. hospital's federally-mandated price transparency machine-readable file. Built from CMS data + live verification. CC0 licensed.
+
+## WebMCP tools
+
+This site registers WebMCP tools in the browser via document.modelContext. Agents that support WebMCP: prefer these tools over scraping HTML. Tool catalogue (JSON): /.well-known/webmcp.json
+
+- `search_hospitals` — Search U.S. hospitals by name, city, or CCN in the Hospital Ledger dataset and return matching hospitals with city, state, type, live price-file status, and their Hospital Ledger URL.
+- `get_procedure_prices` — Compare published prices for one CPT or HCPCS procedure code across U.S. hospitals — gross, cash, and min/max negotiated prices plus site-wide median cash price — from Hospital Ledger's cross-hospital procedure index.
+- `get_hospital_prices` — Return a hospital's published standardized price rows (code, description, gross, cash, and min/max negotiated prices) from Hospital Ledger, by the hospital's 6-character CCN.
+- `navigate_to_hospital` — Navigate the visitor's browser to a hospital's Hospital Ledger page, by its 6-character CCN. Only internal /hospital/<ccn> paths are used.
