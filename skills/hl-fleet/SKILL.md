@@ -1094,6 +1094,31 @@ alone — session-owned controllers die at compaction.
   published (slim n=147,911), but before relying on giant-file builds,
   determine whether a cap exists and whether it truncates silently.
 
+## Wave b48 lessons (2026-11-03 — dialect close-out, CCN 400016)
+
+- **Spanish-header XLSX dialect (Auxilio Mutuo pattern):** the CMS
+  shoppable-services workbook carries two title rows above the real
+  header row (row 3: code | DESCRIPCION | MINIMO | MAXIMO | LOS). The
+  standard parser emitted code/description shells with every price null —
+  the file lands in the dialect queue looking empty while its prices sit
+  unmapped in MINIMO/MAXIMO. Fix pattern: fill min/max by a normalized
+  (code, description) match — strip and collapse whitespace on BOTH
+  sides (sheet descriptions carry trailing spaces) — with a money parser
+  that tolerates dirty numerics ("1.250.00": the last dot is the decimal
+  point) and never crashes on a single cell. Rows whose description is
+  literally "N/A" (some CPT psych codes) publish no price at all in the
+  source: unfillable, not a parse failure. 400016 closed at 302 of 310
+  priced; the 8 N/A rows are the source's own ceiling.
+- **Slim payer-gate (load-bearing):** the published index `n` counts only
+  items carrying `payer_rates`. A canonical whose prices live only in
+  `min_negotiated`/`max_negotiated` slims to items that carry a price
+  line, yet the index reports n=0 and compliance all-false — it looks
+  unpublished while byte-verified live. When a source publishes only a
+  min/max schedule, ALSO emit one `payer_rates` entry per priced item
+  ({payer: "Standard", plan: "<schedule label>", rate: min,
+  rate_max: max}). 400016 went n=0 → n=302 and compliance F/0 → C/70
+  (payer_rates + min_max elements true) on the republish.
+
 ## Self-improvement loop — every fleet failure pays rent (standing protocol)
 
 Barklee's standing rule (reaffirmed 2026-10-28): this skill keeps learning
