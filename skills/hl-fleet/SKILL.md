@@ -1119,6 +1119,17 @@ alone — session-owned controllers die at compaction.
   rate_max: max}). 400016 went n=0 → n=302 and compliance F/0 → C/70
   (payer_rates + min_max elements true) on the republish.
 
+- **Wave self-publish race (2026-11-03, wave 53):** a wave that publishes
+  from VM-side working files (hlfleet.py publish on the VM) can produce an
+  interim index claiming CCNs live that never entered the Mini store; the
+  wave's own later segment — or any publish_mini run — rebuilds the index
+  from the store and silently drops them. Wave 53 reported 5 LifeBridge
+  CCNs published (live 5,031); the settled store-derived index read 5,028
+  with four of the five absent everywhere. Rule: a CCN is published only
+  when its canonical is in the Mini store and a publish_mini index shows
+  it — verify wave claims against the settled index before reporting
+  counts, and never let a wave publish outside the Mini lane.
+
 ## Self-improvement loop — every fleet failure pays rent (standing protocol)
 
 Barklee's standing rule (reaffirmed 2026-10-28): this skill keeps learning
