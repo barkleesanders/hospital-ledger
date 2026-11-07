@@ -34,7 +34,13 @@ export type ProcedureSlide = {
 //   curl https://hospitalledger.com/api/cpt-index | python3 scripts/compute_carousel_stats.py
 // Last refreshed: 2026-05-18 from production cpt-index (min/max/hospitals);
 // medians re-verified 2026-10-28 against /api/procedure/:code stats
-// (gross_p50). NOTE: /api/cpt-index now serves a top-25 sample per code, so
+// (gross_p50), and again 2026-11-06: every median below equals the API's
+// gross_p50 exactly and every hospitals count equals hospital_count.
+// BASIS WARNING: the procedure PAGES headline cash-basis stats
+// (cash_min / cash_p50 / cash_max) — different numbers from this carousel's
+// gross-charge p5/p50/p95 by design. Do not "correct" one from the other;
+// the carousel carries a visible basis note for readers.
+// NOTE: /api/cpt-index now serves a top-25 sample per code, so
 // compute_carousel_stats.py can no longer recompute p5/p95 — those await a
 // full-rows source.
 export const PROCEDURE_SLIDES: ProcedureSlide[] = [
@@ -163,6 +169,12 @@ export const ProcedureCarousel: FC<{ slides?: ProcedureSlide[] }> = ({
 					</a>
 				))}
 			</section>
+
+			<p class="mt-3 text-xs text-zinc-500">
+				Figures are gross charges, 5th–95th percentile across indexed
+				hospitals. Each procedure page shows the cash-price median for the
+				same code.
+			</p>
 
 			<button
 				type="button"
