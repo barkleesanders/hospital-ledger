@@ -27,7 +27,7 @@ function datasetDescription(D: Summary): string {
 		`verification of the hospital's machine-readable file URL, plus CMS enforcement history ` +
 		`(${n(D.enforcement_actions_total)} actions). Includes ${n(D.standardized_price_rows)} ` +
 		`standardized price rows across ${n(D.standardized_price_hospitals)} hospitals and ` +
-		`${n(D.cpt_indexed_rows)} CPT-indexed rows. Public domain, no signup, no tracking.`
+		`${n(D.cpt_indexed_rows)} CPT-indexed rows. Public domain, no signup, no cookies.`
 	);
 }
 
@@ -292,7 +292,7 @@ export const Layout: FC<LayoutProps> = ({
 				<meta property="og:image:height" content="630" />
 				<meta
 					property="og:image:alt"
-					content="Hospital Ledger — what every U.S. hospital actually charges"
+					content="Hospital Ledger — what U.S. hospitals actually charge"
 				/>
 
 				{/* Twitter / X */}
@@ -384,7 +384,7 @@ export const Layout: FC<LayoutProps> = ({
 					<a href="/" class="hover:text-zinc-300">
 						Hospital Ledger
 					</a>{" "}
-					· © 2026 · CC0 data · No tracking
+					· © 2026 · CC0 data · No cookies, no accounts
 				</footer>
 				{allScriptSrc.map((src) => (
 					<script src={src} defer />

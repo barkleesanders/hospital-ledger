@@ -36,7 +36,7 @@ their 2026-05-19 snapshot; re-derive them with the queries in [Verify](#verify).
 | Payer-negotiated rate cells | **147.1 M** | sum of `n_rates` in `data/_payer_raw.jsonl` |
 | Hospitals with at least one payer-rate row | **2,923** | distinct CCN in `_payer_raw.jsonl` |
 | CCN × raw-payer-string rows | **72,951** | line count of `_payer_raw.jsonl` |
-| Canonical payer brands surfaced on site | **200 featured** (21,803 raw) | `/api/payers-index` |
+| Canonical payer brands surfaced on site | **200 featured** (21,668 raw) | `/api/payers-index` |
 | CMS enforcement records loaded | **11,440** | `cms_enforcement` table |
 | Enforcement actions linked to required hospitals | **8,642** | `summary.json#enforcement_actions_total` |
 | Raw MRF data downloaded & parsed | **~5.8 GB gzipped** (originally ~107 GB raw) | `data/parsed/*.json.gz` |
