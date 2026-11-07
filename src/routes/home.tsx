@@ -971,7 +971,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 								</li>
 								<li>Ingest CMS enforcement (warning / CAP / CMP / closure)</li>
 								<li>Build cross-hospital CPT / HCPCS price index</li>
-								<li>SSR site + Cloudflare Pages + JSON API</li>
+								<li>SSR site on a Cloudflare Worker + R2 data + JSON API</li>
 							</ol>
 						</div>
 						<div class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4">
@@ -1028,7 +1028,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						>
 							github.com/barkleesanders/hospital-ledger
 						</a>{" "}
-						— 59 pipeline scripts, ~19,400 lines of Python, ~8,400 lines of
+						— 78 pipeline scripts, ~26,100 lines of Python, ~12,000 lines of
 						TypeScript. AGPLv3 code, CC0 data.{" "}
 						<span class="text-zinc-500">
 							No tracking. No signup. Free forever.
