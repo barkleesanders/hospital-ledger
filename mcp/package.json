@@ -7,7 +7,7 @@
 		"zod": "^4.6.6"
 	},
 	"description": "MCP server + CLI for HospitalLedger hospital price-transparency data",
-	"license": "MIT",
+	"license": "AGPL-3.0-only",
 	"name": "hospital-ledger-mcp",
 	"scripts": {
 		"build": "../node_modules/.bin/esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.js && ../node_modules/.bin/esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/cli.js && printf '#!/usr/bin/env node\\n' | cat - dist/server.js > dist/server.tmp && mv dist/server.tmp dist/server.js && printf '#!/usr/bin/env node\\n' | cat - dist/cli.js > dist/cli.tmp && mv dist/cli.tmp dist/cli.js && chmod +x dist/server.js dist/cli.js",
