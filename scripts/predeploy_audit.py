@@ -94,6 +94,38 @@ def _summary() -> dict:
     return _SUMMARY_CACHE
 
 
+_PAYERS_INDEX_CACHE: dict | None = None
+_CPT_INDEX_CACHE: dict | None = None
+
+
+def _payers_index() -> dict:
+    """Live /api/payers-index: {featured: [...], long_tail_count, total}."""
+    global _PAYERS_INDEX_CACHE
+    if _PAYERS_INDEX_CACHE is not None:
+        return _PAYERS_INDEX_CACHE
+    if OFFLINE:
+        raise SkipClaim("--offline: live payers-index unavailable")
+    try:
+        _PAYERS_INDEX_CACHE = _fetch_json(f"{LIVE_BASE}/api/payers-index")
+    except Exception as e:
+        raise SkipClaim(f"live payers-index fetch failed: {e}")
+    return _PAYERS_INDEX_CACHE
+
+
+def _cpt_index() -> dict:
+    """Live /api/cpt-index: {code: [...]} — key count = distinct code count."""
+    global _CPT_INDEX_CACHE
+    if _CPT_INDEX_CACHE is not None:
+        return _CPT_INDEX_CACHE
+    if OFFLINE:
+        raise SkipClaim("--offline: live cpt-index unavailable")
+    try:
+        _CPT_INDEX_CACHE = _fetch_json(f"{LIVE_BASE}/api/cpt-index")
+    except Exception as e:
+        raise SkipClaim(f"live cpt-index fetch failed: {e}")
+    return _CPT_INDEX_CACHE
+
+
 # A full-sized local file can still be stale: the laptop's 2026-09-11 extract
 # has 68,528 rows (past the 10k floor) while the README's 72,951 came from the
 # 2026-09-27 VM run. Trust it only if it is no older than the canonical
@@ -253,10 +285,48 @@ CLAIMS: list[Claim] = [
         r'<td class="py-2 pr-3">([\d,]+) raw rows</td>',
         lambda: f"{_payer_stats()['rows']:,}",
     ),
+    Claim(
+        "README: canonical payer brands featured",
+        "README.md",
+        r"Canonical payer brands surfaced on site \| \*\*(\d+) featured\*\*",
+        lambda: str(len(_payers_index()["featured"])),
+    ),
+    Claim(
+        "README: canonical payer brands raw total",
+        "README.md",
+        r"featured\*\* \(([\d,]+) raw\)",
+        lambda: f"{_payers_index()['total']:,}",
+    ),
+    Claim(
+        "README: distinct CPT/HCPCS codes in cross-hospital index",
+        "README.md",
+        r"Distinct CPT / HCPCS codes in the cross-hospital index \| \*\*([\d,]+)\*\*",
+        lambda: f"{len(_cpt_index()):,}",
+    ),
+    Claim(
+        "home.tsx: CPT index size narrative",
+        "src/routes/home.tsx",
+        r"a ([\d,]+)-code CPT\s+index",
+        lambda: f"{len(_cpt_index()):,}",
+    ),
 ]
 
 
 SKIPPED: list[tuple[Claim, str]] = []
+
+
+# Strings that must never (re)appear in user-facing copy. "No tracking" is
+# false: the site runs self-hosted cookieless analytics (Traks) + a WebMCP
+# usage beacon — the honest claim is "No cookies". "Cloudflare Pages" is the
+# retired host (the site is a Worker + R2). Added 2026-11-06 full-site audit.
+FORBIDDEN: list[tuple[str, str]] = [
+    ("src/routes/home.tsx", "No tracking"),
+    ("src/components/Layout.tsx", "No tracking"),
+    ("README.md", "No tracking"),
+    ("public/llms.txt", "No tracking"),
+    ("src/routes/home.tsx", "Cloudflare Pages"),
+    ("README.md", "Cloudflare Pages"),
+]
 
 
 def audit_source() -> list[tuple[Claim, str, str, int]]:
@@ -285,6 +355,20 @@ def audit_source() -> list[tuple[Claim, str, str, int]]:
         if claimed != expected:
             line_no = text[: m.start()].count("\n") + 1
             stale.append((claim, claimed, expected, line_no))
+    for where, bad in FORBIDDEN:
+        fpath = ROOT / where
+        if fpath.exists():
+            ftext = fpath.read_text()
+            if bad in ftext:
+                line_no = ftext[: ftext.find(bad)].count("\n") + 1
+                stale.append(
+                    (
+                        Claim(f"FORBIDDEN string: {bad!r}", where, "", lambda: ""),
+                        bad,
+                        "(absent)",
+                        line_no,
+                    )
+                )
     return stale
 
 

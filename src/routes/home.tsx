@@ -33,13 +33,17 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 	const coverage = priceCoverage(SITE_COUNTS);
 	const parsedMrfOutputs =
 		SITE_COUNTS.standardized_price_index_hospitals ?? 4427;
+	const parseHours = Math.round((parsedMrfOutputs * 77) / 60);
+	const findHours = Math.round((cmsRequiredTotal * 5) / 60);
+	const totalHours =
+		parseHours + findHours + 120 + 250 + 50 + 30 + 10 + 40 + 300;
 	const standardizedPriceRows = SITE_COUNTS.standardized_price_rows ?? 75126977;
 	const cptIndexedRows = SITE_COUNTS.cpt_indexed_rows ?? 15830405;
 	const updatedDate = SITE_COUNTS.generated_at.slice(0, 10);
 	return (
 		<Layout
 			title="Hospital Ledger — what the law required, what hospitals delivered"
-			description="A free public database of every U.S. hospital's federally-mandated price transparency machine-readable file. Built from CMS data + live verification. CC0 licensed."
+			description={`A free public database of U.S. hospital price transparency — standardized prices from ${fmt(standardizedPriceHospitals)} hospitals' federally-mandated machine-readable files, verified live. Built from CMS data. CC0 licensed.`}
 			ogTitle="Hospital Ledger"
 			url={url}
 			scriptSrc={["/cpt-names.js", "/home-client.js", "/procedure-carousel.js"]}
@@ -54,7 +58,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						<span>Hospital Ledger</span>
 						<span class="text-zinc-600">·</span>
 						<span class="text-zinc-500">
-							Free forever · No signup · No tracking
+							Free forever · No signup · No cookies
 						</span>
 					</div>
 
@@ -512,8 +516,8 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 							<p class="text-zinc-400">
 								Type a procedure name (<em>"MRI knee"</em>), a CPT code (
 								<code class="mono text-emerald-300">73721</code>), an insurer,
-								or a hospital. We match it against every U.S. hospital's
-								published price file.
+								or a hospital. We match it against {fmt(standardizedPriceHospitals)} U.S. hospitals'
+								published price files.
 							</p>
 						</div>
 						<div>
@@ -650,7 +654,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 					</div>
 					<h2 class="serif text-2xl sm:text-3xl md:text-4xl mb-3">
 						Three days to launch. Rebuilt deeper.{" "}
-						<em class="text-emerald-300">~3 person-years</em> of human work —
+						<em class="text-emerald-300">~{Math.round(totalHours / 2080)} person-years</em> of human work —
 						updated daily.
 					</h2>
 					<p class="text-zinc-300 max-w-3xl leading-relaxed">
@@ -709,7 +713,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 										<td class="py-2 pr-3">
 											~77 min avg (90% × 66 min clean + 10% × 180 min hard)
 										</td>
-										<td class="py-2 pr-3 text-right text-emerald-300">4,747</td>
+										<td class="py-2 pr-3 text-right text-emerald-300">{fmt(parseHours)}</td>
 									</tr>
 									<tr>
 										<td class="py-2 pr-3">
@@ -717,7 +721,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 										</td>
 										<td class="py-2 pr-3">{fmt(cmsRequiredTotal)} hospitals</td>
 										<td class="py-2 pr-3">~5 min / hospital</td>
-										<td class="py-2 pr-3 text-right text-emerald-300">385</td>
+										<td class="py-2 pr-3 text-right text-emerald-300">{fmt(findHours)}</td>
 									</tr>
 									<tr>
 										<td class="py-2 pr-3">
@@ -781,7 +785,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 										<td class="py-2 pr-3">
 											Design + build the SSR site, API, search, charts
 										</td>
-										<td class="py-2 pr-3">11 pages, 8 endpoints</td>
+										<td class="py-2 pr-3">7 page types, 10 API endpoints</td>
 										<td class="py-2 pr-3">solo full-stack dev</td>
 										<td class="py-2 pr-3 text-right text-emerald-300">300</td>
 									</tr>
@@ -792,16 +796,16 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 											≈ 2,080 hr / person-year (full-time)
 										</td>
 										<td class="py-2 pr-3 text-right text-emerald-300">
-											~5,930
+											~{fmt(totalHours)}
 										</td>
 									</tr>
 								</tbody>
 							</table>
 						</div>
 						<p class="mt-3 text-xs text-zinc-500">
-							≈ <span class="text-emerald-300">2.85 person-years</span> at 40
+							≈ <span class="text-emerald-300">{(totalHours / 2080).toFixed(2)} person-years</span> at 40
 							hr/week fully-utilized, or roughly{" "}
-							<span class="text-emerald-300">5–6 calendar years</span> for one
+							<span class="text-emerald-300">{Math.floor(totalHours / 1040)}–{Math.ceil(totalHours / 1040)} calendar years</span> for one
 							analyst working a sustainable 20 hr/week on the side. And that is
 							just the build — keeping it current never ends: the pipeline
 							re-checks dozens of hospitals every night and re-verifies
@@ -824,10 +828,10 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 									If a contracting firm built it
 								</div>
 								<div class="mt-2 text-xl sm:text-3xl font-semibold tab-num text-zinc-100">
-									~$593,000
+									~${fmt(Math.round((totalHours * 100) / 1000) * 1000)}
 								</div>
 								<div class="text-xs text-zinc-500 mt-2 leading-relaxed">
-									5,930 hr × $100/hr — the midpoint of published US healthcare
+									{fmt(totalHours)} hr × $100/hr — the midpoint of published US healthcare
 									data-analyst freelance rates ($93–$160/hr per{" "}
 									<a
 										class="underline hover:text-zinc-300"
@@ -843,7 +847,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 										goLance 2026
 									</a>
 									). Senior healthcare specialists quote ~$200/hr — that's a
-									$1.18M build.
+									${(totalHours * 200 / 1000000).toFixed(2)}M build.
 								</div>
 							</div>
 							<div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
@@ -1031,7 +1035,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						— 78 pipeline scripts, ~26,100 lines of Python, ~12,000 lines of
 						TypeScript. AGPLv3 code, CC0 data.{" "}
 						<span class="text-zinc-500">
-							No tracking. No signup. Free forever.
+							No cookies. No signup. Free forever.
 						</span>
 					</p>
 				</section>
