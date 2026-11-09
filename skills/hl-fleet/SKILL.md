@@ -1,17 +1,7 @@
 ---
-name: hl-fleet
+name: local-hl-fleet
 description: Hospital Ledger free-compute fleet — route MRF fetch/parse jobs across Modal, Daytona, the Mini, the VM, and Oracle instead of one lane at a time. Use for HL ingest waves, discovery-pool (D1/D2/D3) ingestion, big-ZIP canonical builds, and any "parallelize the hospital work" request.
 ---
-
-> **Public edition.** This file is the public copy of the Hospital Ledger
-> fleet operating skill, kept in this repository at the maintainer's
-> direction. The canonical internal edition lives in the maintainer's
-> skill registry; the two are kept in sync on every substantive update,
-> and repo updates land by pull request. Infrastructure identifiers
-> (cloud org IDs, database UUIDs, host addresses, credential file
-> paths) are redacted in this edition — everything about how the work
-> is done is intact.
-
 
 # HL Fleet — free-compute lanes for Hospital Ledger
 
@@ -25,15 +15,17 @@ copy — the Mini is where lane controllers + credentials live).
 | Lane | Shape | Money | Use for |
 |---|---|---|---|
 | **Modal** | fetch + parse in containers, `.starmap` parallel | $30/mo Starter credits, recurring forever; workspace `barkleesanders` | Default lane. Open egress (fetched Sitecore CDN fine). Proof: 013029+013030, 22k items each, ~48s incl. image build. |
-| **Daytona** | **parse-only** — sources fetched on the Mini, staged into the sandbox | **$1,100 prepaid credit, never expires** (Tier 2, region us, auto top-up OFF, no card on file) | High-RAM parsing (huge ZIPs/CSVs) once staged. Parses took ~2s for 4–7 MB CSVs; sandbox cold start ~50s. |
+| **Daytona** | **parse-only** — sources fetched on the Mini, staged into the sandbox | **$1,100 prepaid credit, never expires** (org "Personal", Tier 2, region us, auto top-up OFF, no card on file) | High-RAM parsing (huge ZIPs/CSVs) once staged. Parses took ~2s for 4–7 MB CSVs; sandbox cold start ~50s. |
 | **Mini** | staging fetcher + controller host + **the publisher** (since 2026-10-28) | — | Healthy egress when the VM proxy degrades; owns all lane credential files; runs `publish_mini.py` from the Share publish tree (see Publish doctrine). |
 | **VM (Muse)** | small local chunks via `hl_wave.py` (the daily wave only) | — | **OUT of the fleet publish path since 2026-10-28** (was "sole publisher" Oct 26/27 — SUPERSEDED, see Publish doctrine). Never let a lane touch R2. |
+| **InstaBox box1** | free Firecracker microVM (4 vCPU / 8 GiB / 20 GiB at `/data`), own NAT egress, driven from the Mini via `instabox` CLI / SSH alias `instabox-box1` | Free (key expires 2026-12-06; 100 GiB/mo egress) | **Standing campaign lane (Barklee directive 2026-11-08)**: probe shards, cms-hpt sweeps, and egress-fallback batch execution whenever the VM's own egress is degraded. Guarded shard pattern + full mechanics: skill `local-instabox`. |
 | **Oracle micro** | VM.Standard.E2.1.Micro, 1 GB RAM, RUNNING | Always Free | Fetch-relay / scheduler class only — too small to parse. Original SSH keypair is lost; access needs console recovery if ever wanted. |
 | **Oracle A1** | VM.Standard.A1.Flex 2 OCPU / 12 GB (of the 4/24 Always-Free allowance) | Always Free | Not yet landed: `~/oci-a1-retry/oci-a1-retry.py` retries every 30 min via launchd `com.barklee.oci-a1-retry` (re-armed 2026-10-27; San Jose capacity is the blocker since Sep 2026). On SUCCESS.json, provision per `provision-hermes-a1.sh` and add as a persistent lane. |
 
 E2B Hobby stood up 2026-10-27: account via Google sign-in (WorkOS had an
 existing identity for the email; the GitHub button routes elsewhere), workspace
-"Personal Workspace", API key vaulted on the Mini (0600). Hobby terms as displayed: 20 concurrent sandboxes, 1 h max session,
+"Personal Workspace", API key `hl-fleet` vaulted at Mini `~/hl-fleet/e2b.env`
+(0600). Hobby terms as displayed: 20 concurrent sandboxes, 1 h max session,
 8 vCPU / 8 GiB max, 10 GB disk; no numeric credit balance is shown anywhere.
 Proof sandbox ran clean. Use for short jobs only (1 h cap).
 Codespaces (120 core-h/mo) is the one lane NOT stood up: the Mini's `gh` token
@@ -43,6 +35,36 @@ the segmented code input drops JS-set values — it wants real key events; two
 device codes were burned 2026-10-27). Finish it with a human at the Mini
 Chrome: `gh auth refresh -h github.com -s codespace`, type the code, scroll
 to the button, click. Full survey: `~/workspace/hl-gap-research/free-vm-survey.md`.
+
+## InstaBox box1 lane — how the campaign uses it (Barklee directive 2026-11-08)
+
+box1 is wired into the campaign as the **independent-egress batch lane**. Its NAT
+egress does not ride the Muse VM's runtime gateway, so when the VM leg is
+degraded (the Oct 28–Nov 8 failure class), egress-bound batch work runs on
+box1 instead of dying on the VM: cms-hpt sweeps, probe shards, rediscovery
+pre-passes. Standing uses:
+
+- **cms-hpt sweep shards**: fetch `/cms-hpt.txt` (apex + www) for a target
+  domain list, extract `mrf-url:` pointers. Output is POINTER-class only —
+  every pointer still passes the Mini probe gate before acceptance.
+- **Probe shards**: the guarded shard pattern from the `local-instabox` skill
+  (10-item chunks, per-chunk checkpoint files, STOP file, idempotent writes,
+  verify-before-merge). Proven ~169 URLs/min; parallel capacity on top of the
+  Mini lane, not a replacement for it.
+- **Egress-fallback execution**: batch jobs shaped like the weekly cms-hpt
+  harvest (many small fetches, mergeable results) may run on box1 when the VM
+  egress canary is down; the merge/verify step still runs on the VM/Mini.
+
+Hard constraints: window guard before every launch (`instabox get box1
+--json`; state running AND ≥20 min left in the run window — the box hard-pauses
+at 8h and cools down, so jobs must be chunk-resumable); ALL state under
+`/data` (persistent), never the 16 GiB root; NO credentials, API keys, or PHI
+on the box (keys stay on the Mini — box jobs are credential-free fetches);
+agent key expires **2026-12-06** (renewal is a Barklee dashboard approval);
+Mini keepalive (`com.barklee.instabox-keepalive`) is what keeps it up — never
+move keepalive duty onto the box itself. Access: Mini `instabox exec box1 --
+'<cmd>'` or SSH alias `instabox-box1` (refresh certs with `instabox ssh-cert
+box1`).
 
 ## Hard-won lane facts (do not re-derive)
 
@@ -68,8 +90,8 @@ to the button, click. Full survey: `~/workspace/hl-gap-research/free-vm-survey.m
   `<ccn>.json.gz` via `remote_build.py` (same logic as build_canonical_mini.py,
   incl. the ZIP inner-CSV declared-date probe). Item counts + `source_updated`
   in the RESULT line are the acceptance check.
-- Credentials live ONLY as 0600 env files on the Mini (per-lane files;
-  paths in fleet records). Never print their values in chat, memory, or logs;
+- Credentials live ONLY as 0600 env files on the Mini: `~/hl-fleet/modal.env`,
+  `~/hl-fleet/daytona.env`. Never print their values in chat, memory, or logs;
   never copy them to the VM (the VM's PyPI route was degraded anyway — the SDK
   venv is Mini-side at `~/hl-fleet/.venv`).
 
@@ -114,20 +136,21 @@ it:
   litter file `45188E.json.gz` sat in the store for days; on 2026-11-03 the
   campaign driver published it as a live index entry — a phantom duplicate
   of Ennis Regional (true CCN 450833, identical n=19,042) that inflated the
-  live count 4,995 → 4,996. Remedy: rename in store to
-  `45188E.json.gz.QUARANTINE-malformed-key` (never delete), then remove the
-  phantom from the published index (mechanics below). Any publisher/driver
+  live count 4,995 → 4,996. Remedy followed the 254009 doctrine: rename in
+  store to `45188E.json.gz.QUARANTINE-malformed-key` (never delete), then
+  the next publish's rebuilt index drops the phantom. Any publisher/driver
   path that derives publish sets from the store or registry must filter
   non-`^\d{6}$` keys out and log them as litter, never publish them.
-  Guards shipped 2026-11-03: the publisher FATAL-refuses any non-6-digit
-  publish argument (alongside the 150042 refusal), and the registry queue
+  Guards shipped 2026-11-03: publish_mini FATAL-refuses any non-6-digit
+  publish argument (alongside the 150042 refusal), and registry_queue.py
   drops non-CCN rows with a stderr note. Phantom removal mechanics: the
-  index is a PATCH accumulation over the published base (a no-regression
-  validation forbids count drops), so removal means editing the published
-  index + summary objects directly (byte-verify after; the summary's
+  index is a PATCH accumulation over the R2 base (the no-regression
+  validation forbids count drops), so removal means editing the R2
+  `prices/index.json` + `meta/summary.json` objects directly (r2_put with
+  the `~/hospital-ledger.env` env, byte-verify after; summary's
   standardized_* and cpt_* fields are exact sums over the index — recompute
-  and assert), deleting the CCN's price file from the local publish tree so
-  no patch resurrects it, and leaving its data object orphaned (never
+  and assert), deleting the CCN's price file from the local publish TREE so
+  no patch resurrects it, and leaving its R2 data object orphaned (never
   delete). Index JSON shape: `{"hospitals": [ {ccn, n, ...}, ... ]}` — a
   LIST under `hospitals`, not a CCN-keyed dict; parse it that way in every
   ad-hoc check (the dict-parse silently yields an empty live set).
@@ -154,13 +177,33 @@ it:
   SUCCESS, byte-verify OK, live 4,397 → 4,398 (coverage gen 18:53:19Z). The
   050390 dry-run before it reproduced live counts exactly (4,397 → 4,397).
 
+**Boundary — no external contact (standing):** this skill authorizes NO
+outreach of any kind: no emailing or calling hospitals, hospital IT, or
+vendors about files, walls, 403s, or anything else, and no filings. A
+contact need that surfaces during fleet work is recorded in the campaign
+state and escalated — never improvised from inside a fleet run.
+
 ## Routing rules
 
 1. Default bulk ingest → Modal (fetch+parse in one hop, parallel by `.starmap`).
 2. Files too big for the VM parser (the ~870 MB IU-class CSVs) or RAM-bound →
-   Daytona staged parse (12 GB-class sandboxes; raise memory on the create call).
+   Daytona staged parse (dedicated 8 GiB sandbox; raise MEMORY on the create
+   call — disk stays ≤10 GB, the per-sandbox cap; sizing is by effective
+   size, see the parallel-parse contract).
 3. Hosts that block datacenter egress (403-class) → Mini fetch first (its
    residential-class egress + real Chrome are the trusted path), then stage.
+   CLIENT DOCTRINE (2026-11-08): a 403 can fingerprint the HTTP CLIENT, not
+   the leg or the user-agent — WAFs key on the TLS/HTTP stack, so the same
+   URL from the same machine can 403 under a Python library (httpx) and
+   serve 200 under curl. Before changing legs, A/B on the SAME leg varying
+   ONLY the client: fleet library → curl → real Chrome. The fleet fetch
+   standard is curl: 3 attempts with backoff (10s/20s), the final attempt
+   with a full Chrome user-agent (some hosts are UA-gated even for curl).
+   Evidence: batch 66 lost 8 jobs to 403s under httpx that all served under
+   curl probes; batches 67–68 on the curl fetcher converted 8 of 8. Confirm
+   any client-swap success by re-running the ORIGINAL client once — walls
+   also lift on their own (the transient class), and a lesson written on a
+   confound teaches the wrong fix.
 4. Publishing is ALWAYS the Mini home lane under the publish lock with
    byte-verification (`publish_mini.py` — see Publish doctrine above; the
    VM `hlfleet publish` path is retired). A lane result is never "live" until
@@ -256,7 +299,20 @@ watermark 1620→1670, streak reset to 0). Backup:
 "never run two fleet batches at once" limit; the never-two-publishes rule
 stands unchanged):** up to 3 controllers run concurrently, ONLY on disjoint
 CCN partitions recorded in the state file's `active_partitions` (batch,
-lane, log, full CCN list, launched_at) BEFORE launch; in-flight CCNs are
+lane, log, full CCN list, launched_at) BEFORE launch. Disjointness is
+VERIFIED, never assumed: before the partitions are recorded, a mechanical
+check over the partition files themselves must show (1) every pairwise CCN
+intersection is empty, (2) the union equals the intended target set — or,
+for a deliberate subset, the unassigned remainder is named and counted —
+and (3) the partition sizes sum to the union size. The check's output is
+saved with the partition record. The check runs over the exact jobs TSVs
+that will be launched, and the CCN lists recorded in `active_partitions`
+must be those same lists — a partition recorded from one file and launched
+from another is unverified. Build partitions in ONE pass from one
+authoritative list object: serialize only after every transform (sort,
+filter, dedupe) is final — writing the file before the final sort is the
+exact defect that, on 2026-11-08, double-assigned 56 CCNs and silently
+dropped 56 more. In-flight CCNs are
 excluded from queue derivation; a finished/dead partition's unlanded CCNs
 recycle through re-derivation, never a named relaunch. The Daytona
 controller is a worker pool (parallel sandboxes inside one controller,
@@ -270,8 +326,18 @@ local constraints are Mini-side: staging lives on `/Volumes/Share/hl-fleet/
 staging` (moved off the ~11 GiB-free internal disk in the pool build), and
 fetches are capped per-host (2 concurrent per hostname — hospital CDNs 403
 readily) with a ~24 global fetch cap. Interim rule while staging was still
-internal: only one ZIP/XLSX chunk at a time. Big sources (>100 MB staged)
-get a dedicated 8 GiB sandbox (the exit-137 OOM class). E2B fills a slot via
+internal: only one ZIP/XLSX chunk at a time. Big sources get a dedicated
+8 GiB sandbox, routed by EFFECTIVE size, not staged size (the exit-137 OOM
+class): effective size is the file's own size for a plain file, and for a
+ZIP the sum of its members' uncompressed sizes — the controller reads the
+central directory at staging time. >100 MB effective → dedicated sandbox.
+A parse that dies exit 137 in a shared sandbox retries once in a dedicated
+sandbox before the job is recorded as an error. Precedence when the size
+figures in this skill seem to conflict: per-sandbox DISK is capped at
+10 GB (hard — creation fails above it); MEMORY is what you raise — the
+dedicated class is 8 GiB, the shared pool sandbox is 4 GiB. (Codifies the
+2026-11-08 fix: 309801's ZIP was 29.6 MB staged but 1,247 MB decompressed
+and OOM-died under the old staged-size rule.) E2B fills a slot via
 `e2b_controller.py` under the same jobs-TSV/SUMMARY contract when present.
 
 **Modal workspace can die mid-batch (2026-10-27 23:41 PDT):** batch 3
@@ -283,7 +349,25 @@ Cause unverified — Starter-credit exhaustion is the leading hypothesis
 (fresh $30 lands Nov 1). Driver protocol: a batch log with a terminal
 error and no live controller process = DEAD batch; publish what landed,
 set `modal_disabled` in the campaign state, and relaunch the remainder on
-Daytona the same run. Never relaunch blindly into a disabled lane.
+Daytona the same run — mechanically the contract's recycle, not a named
+relaunch: remove the partition record and the driver top-up re-derives the
+remainder into a Daytona chunk in the same run. Never relaunch blindly
+into a disabled lane.
+
+**Wedged controller — alive but silent (2026-11-08):** the DEAD test above
+needs a terminal error AND a dead process; a controller can also wedge —
+process alive, log silent (the batch-61/67 stuck-worker signature). Rule:
+if a controller's log has produced no new RESULT or SUMMARY line for
+>60 minutes with jobs outstanding, first identify the in-flight job and
+its source class — a multi-GB source legitimately parses long, and the
+controller's own sandbox-create timeouts are the usual wedge signature
+(they point at tier-pool pressure, not a sick lane). If no legitimate long
+job explains the silence, the batch is WEDGED: kill the controller and
+handle the partition exactly as DEAD for collection — publish what landed
+serially, remove the partition record, and let the unlanded CCNs recycle
+through re-derivation. Sandbox-create timeouts across MULTIPLE controllers
+at once mean tier-pool exhaustion: do not launch more controllers until
+slots actually free.
 
 **Daytona sandbox disk hygiene (fixed 2026-10-28, batch 5 post-mortem):**
 the controller uploaded each job's staged source into ONE long-lived sandbox
@@ -318,7 +402,27 @@ file-class first, then ZIP, then XLSX). Equivalence gate PASSED zero-diff
 2026-10-30 after the 7 adjudicated not-found stale ACCEPT rows (070020,
 100287, 219801, 21C0001564, 281353, 370243, 39013F) were deleted from
 b1–b3 (backups .bak-20261030-notfound7); the importer's hardcoded
-NOT_FOUND_7 keeps their stage='not_found' across refreshes. The registry
+NOT_FOUND_7 keeps their stage='not_found' across refreshes. **Refresh
+race (learned 2026-11-07):** a refresh snapshots its sources at START but
+the driver's change-trigger compares verdict-file mtimes against the
+refresh's COMPLETION time — a verdict batch written mid-refresh (b62,
+written 09:42 during the 09:36–09:48 refresh) is shadowed: the registry
+lands without it while looking current, and no new refresh triggers.
+Symptom: a valid ACCEPT batch exists on disk but its CCNs never appear in
+registry_queue.py output. Fix when suspected: verify with a local
+`import_registry.build_rows()` computation (pure, uses the on-disk
+snapshots), then launch a fresh detached refresh — never trust the
+recorded refreshed_at alone. **Launch-hold gate (2026-11-08):** no parse
+batch launches while (a) a registry refresh is in flight, or (b) any
+verdict b-file on disk is not yet VERIFIED absorbed. Absorption is proven
+positively — the file's CCNs appear in a local `build_rows()` computation,
+or in `registry_queue.py` output after the refresh lands — never inferred
+from `registry_refreshed_at` or from a refresh having completed after the
+file was written. Batch 63 is the standing example: launched against a
+mid-refresh registry, it produced zero publishable jobs. If a batch was
+already launched from a stale derivation, do not recall it (its jobs are
+valid ACCEPTs) — record the staleness in the campaign state, let the fresh
+refresh land, and re-derive the queue from there. The registry
 universe is the UNION set (hospitals table ∪ verdict CCNs ∪ live-index
 CCNs) = **5,968 rows** — the staging hospitals table alone (5,426) misses
 446 live-index CCNs and 324 ACCEPTs; the 5,426-based headline arithmetic
@@ -396,7 +500,7 @@ few more from its own verify hosts. Two wording-level fixes failed first
 (job-body HARD RULE rewrite; deleting the job) because the mechanism was
 never the worker's wording at all. **CODE FIX (shipped 2026-11-01):**
 `cms_hpt_expand.py`, `cms_hpt_harvester.py`, and `promote_discoveries.py`
-now load HL_FETCH_PROXY/HL_FETCH_TOKEN from the fleet env file on the Mini (the
+now load HL_FETCH_PROXY/HL_FETCH_TOKEN from `~/hospital-ledger.env` (the
 file `hl_wave.py` reads; `.bak-20261101-edge` backups alongside) and build
 every client with `hl_edge.httpx_kwargs(...)` — the VM only ever connects
 to hospitalledger.com. Proof: `test_hl_edge.py` 10/10 in a sanitized env;
@@ -438,25 +542,42 @@ HL cron body carries that paragraph — a body that never mentions
 fetching still produces fetches when a worker improvises verification,
 so the ban must be explicit, not implied by the steps.**
 
+## cms-hpt FIRST — the hospital's own pointer file (Barklee directive 2026-11-07)
+
+Before ANY discovery spend on an unpriced hospital — no deepsearch query, no
+Firecrawl credit, no scrape — fetch the hospital's own **cms-hpt.txt** at its
+website root (try apex AND www; follow redirects). Its `mrf-url:` line names
+the machine-readable file directly: the hospital's own file knows where to
+look. Probe-gate every pointer like any other candidate. Evidence
+(2026-11-07): the Firecrawl sweep's only 4 wins (240004 Hennepin, 330229
+Brooks-TLC, 360058 Mercer County, 520066 Mercy Health — 7 verified URLs) plus
+the experiment's UAMS verification ALL came from cms-hpt pointers at zero
+credit cost; /map's contribution was confirmations, not finds. Full playbook,
+lane order, and measured limits: skill `local-hl-firecrawl-discovery`
+(~/workspace/custom-skills/local-hl-firecrawl-discovery/SKILL.md). Discovery
+bottleneck after this rule is domain derivation, not search: a hospital with
+no known domain gets a domain hunt first, not a search-engine query.
+
 ## Deepsearch discovery lane (added 2026-11-03 — the wave-5/6 engine)
 
-When the parse lanes starve (no submit-ready sources), discovery runs on a
-multi-provider deepsearch engine, NOT on a single search API. Built
+When the parse lanes starve (no submit-ready sources), discovery runs on the
+Mini's multi-provider deepsearch engine, NOT on a single search API. Built
 2026-11-02/03 after the wave scripts' hardwired Exa lane died
 (`NO_MORE_CREDITS`, 2026-11-02 20:33) and the campaign briefly treated one
 provider's exhaustion as a search-lane block. **Rule: a dead provider means
 swap engines, never stall** — no single provider (Exa included) is ever on
 the campaign's critical path again.
 
-**Engine facts.** Invocation is positional:
-`deepsearch -n 8 [-p <provider>] "<query>"`, JSON on stdout. The remote
-route rejects long flags (`-q`, `--max-results`, `--json` → rc=2 with empty
-stdout); keep the call shape exactly as the proven runners do. Providers
-(verified 2026-11-03): default order ≈ searxng, tavily, context
-(context.dev), tinyfish live; brave EXHAUSTED (402), jina EMPTY BALANCE,
-exa NO CREDITS. A runner must NEVER swallow call errors into empty
-results — log rc/stderr per call (a swallowed-error sweep once reported a
-clean zero-yield that was really two invocation bugs).
+**Engine facts.** Entry point is the absolute path
+`~/workspace/tools/deepsearch.sh` (bare `deepsearch` is NOT on the VM PATH).
+Invocation is positional: `deepsearch.sh -n 8 [-p <provider>] "<query>"`,
+JSON on stdout. The remote route rejects long flags (`-q`, `--max-results`,
+`--json` → rc=2 with empty stdout); keep the call shape exactly as the
+runners do. Providers (verified 2026-11-03): default order ≈ searxng,
+tavily, context (context.dev), tinyfish live; brave EXHAUSTED (402), jina
+EMPTY BALANCE, exa NO CREDITS. A runner must NEVER swallow call errors into
+empty results — log rc/stderr per call (a swallowed-error sweep once
+reported a clean zero-yield that was really two invocation bugs).
 
 **Failover hides the strong lanes — fan out instead.** The engine is
 failover-by-design (first success wins), so single-lane runs are answered
@@ -495,52 +616,60 @@ agency + flagship hospitals + "standard charges", extract the agency
 pages, grade files under every in-state pool CCN from that system.
 Enforcement complaints are not the only psych path.
 
-**Pipeline.** Search runners are resumable via a done-file (error rows
-never count as done) and emit `candidates-*.jsonl` + `pages-*.jsonl`. Then:
-page→file extraction → content-identity fetch → STRICT grader
-(state/street vetoes, umbrella-anchor rule) → umbrella reassignment
-(in-file hospital name matched to the hospital DB at token score ≥0.6,
-re-graded under the true CCN) → canonical build → store → SERIAL
-publish, byte-verified, live-index read-back. Aggregator-pointer trap: an
-MRF-index site's data.json can pass the identity grade while containing a
-pointer, not prices (items=1 priced=0 at build) — the build's priced count
-is the last gate; a priced=0 build is a REJECT, never a publish. Aggregator
-records are leads, never evidence: cross-matching an MRF index against the
-pool produced 4 grader RIGHTs of which 2 were same-name cross-state
-impostors (a CA-licensed file for Springfield IL's Memorial Medical
-Center; a Virginia file for Burke SD's Community Memorial) — both passed
-on name-only identity because the fetched head carried no contradicting
-state evidence, and both were caught only by manually reading the file
-header (`license_number|CA`) and the DB city/state before publishing.
-**Rule: for generic hospital names (Memorial / Community / Union /
-St Mary …), eyeball the raw file header and the DB city/state yourself
-before any build is published — the grader's silence is not identity
-proof.**
+**Pipeline (Mini, w5 staging `discovery-wave-20261102/w5/`).** Search
+runners live VM-side in `w5-ds/` (`ds_fanout.py`, `ds_run6.py`,
+`ds_sweep.py` patterns): resumable via a done-file (error rows never count
+as done), outputs `candidates-*.jsonl` + `pages-*.jsonl`. Then on the Mini:
+`ds_extract.py` (page → file links, records keyed `page` + `ccn`/`ccns`) →
+`../scripts/meta_fetch_slow.py` (content identity) → `grade_w5.py` (STRICT
+grader: state/street vetoes, umbrella-anchor rule) → umbrella reassignment
+(in-file hospital name matched to DB at token score ≥0.6, re-graded under
+the true CCN) → `~/hl-fleet/build_canonical_mini.py` → copy canonicals to
+the store → `publish_mini.py` SERIAL, byte-verified, live-index read-back.
+Aggregator-pointer trap: an MRF-index site's data.json can pass the
+identity grade while containing a pointer, not prices (140148, items=1
+priced=0 at build) — the build's priced count is the last gate; a priced=0
+build is a REJECT, never a publish. Aggregator records are leads, never
+evidence: cross-matching an MRF index against the pool produced 4 grader
+RIGHTs of which 2 were same-name cross-state impostors (a CA-licensed
+Sutter file for Springfield IL's Memorial Medical Center; a Virginia file
+for Burke SD's Community Memorial) — both passed on name-only identity
+because the fetched head carried no contradicting state evidence, and both
+were caught only by manually reading the file header (`license_number|CA`)
+and the DB city/state before publishing. **Rule: for generic hospital
+names (Memorial / Community / Union / St Mary …), eyeball the raw file
+header and the DB city/state yourself before any build is published — the
+grader's silence is not identity proof.**
 
-**UHS behavioral-health CDN pattern (proven 2026-11-03).** UHS behavioral
-facilities post MRFs at
-`uhsfilecdn.eskycity.net/bh/<EIN>_<shortname>_standardcharges.csv`, and
-the facility's own price-transparency page HTML embeds the full file URL
-(grep the page for `uhsfilecdn`). When a stored source for a UHS facility
-is junk (one pointed at a jobs page), go to the facility site's
-standard-services/price-transparency page and grep — do not trust the
-stored source.
+**UHS behavioral-health CDN pattern (proven 2026-11-03, 464013 + 504014).**
+UHS behavioral facilities post MRFs at
+`uhsfilecdn.eskycity.net/bh/<EIN>_<shortname>_standardcharges.csv`, and the
+facility's own price-transparency page HTML embeds the full file URL
+(Salt Lake Behavioral Health's page — served from its rebranded
+stronghope.com domain — carried `271365684_salt-lake_standardcharges.csv`
+in the static HTML; grep the page for `uhsfilecdn`). When a registry
+source for a UHS facility is junk (464013's pointed at a jobs page), go to
+the facility site's standard-services/price-transparency page and grep —
+do not trust the stored source.
 
 **CMS V3.0.0 tab-laden CSV headers fooled the delimiter sniffer — FIXED
-in the parser 2026-11-03 (454093).** Root cause was NOT the V3
-dual-header layout (metadata row + identity row + data header on row 3
-— the header finder handles that): V3 CSV headers embed literal TAB
-characters inside comma-delimited field names
+in the parser 2026-11-03 (PR #40, merge 84d0595; 454093).** Root cause
+was NOT the V3 dual-header layout (metadata row + identity row + data
+header on row 3 — find_header_row handles that): V3 CSV headers embed
+literal TAB characters inside comma-delimited field names
 (`license_number|<TAB>TX`, trailing-tab names like `median_amount<TAB>`),
-and the delimiter sniffer's tab-preference branch split the metadata
-line on tabs, found header keywords inside the resulting comma-joined
-fat cells, and declared the whole file TSV — collapsing a 65-row file
-to 2 rows and 0 items on both lanes. The parser now skips tab-hit lines
-whose cells contain runs of commas, with regression tests; the original
-file parses directly to its 9 priced items. The V3 XLSX path was never
-affected. Lesson: a "0 items on both lanes" parse failure is a diagnosis
-job, not a retry job — read the file's raw bytes and the reader's
-intermediate state (rows read, sniffed delimiter) before touching lanes.
+and sniff_delimiter's tab-preference branch split the metadata line on
+tabs, found header keywords inside the resulting comma-joined fat cells,
+and declared the whole file TSV — collapsing a 65-row file to 2 rows and
+0 items on both lanes. The parser now skips tab-hit lines whose cells
+contain runs of commas; regression tests in
+tests/test_mrf_parse_v3_tab_sniff.py; the original 454093 source parses
+directly to its 9 priced items (the earlier V2-transform build produced
+identical output, so the published canonical stands). The V3 XLSX path
+was never affected (NC state files). Lesson: a "0 items on both lanes"
+parse failure is a diagnosis job, not a retry job — read the file's raw
+bytes and the reader's intermediate state (rows read, sniffed delimiter)
+before touching lanes.
 
 **Ad-hoc runner duties (session waves).** (1) Re-assert the 150042
 quarantine when building ANY target pool — pool files do not encode it
@@ -1189,7 +1318,7 @@ Seeded lessons (each already cost us once; each maps to a fix above):
   weekly harvest's direct probing carded Barklee in bursts — including
   after its cron job was deleted, which proved the script (not the worker)
   was the source. Two wording fixes failed before the root cause landed.
-  Fix: all three scripts load the edge config from the fleet env file on the Mini
+  Fix: all three scripts load the edge config from `~/hospital-ledger.env`
   and build clients with `hl_edge.httpx_kwargs(...)`; verified by smoke
   test (zero new cards) + `test_hl_edge.py` 10/10. Full protocol in the
   Campaign driver section ("First-seen-domain approval cards").
@@ -1329,3 +1458,19 @@ ACCEPTs removed from b1 (4) + b3 (2) under .bak-20261102-sweep.
 A parallel sibling sweep ran Alaska (020xxx) batches + registry
 b18–b21 from staging/integrity/ (retired after D1 ingest); overlap
 with this sweep's 220 was zero.
+
+## Repo mirror — public edition in barkleesanders/hospital-ledger (standing rule, 2026-11-02)
+
+Public editions of this skill and of `local-hl-parser-improvement` live in
+the public repo at `skills/hl-fleet/SKILL.md` and
+`skills/hl-parser-improvement/SKILL.md` (landed via PR #34, merge commit
+`f41d163`; `skills/README.md` documents the arrangement for readers). On
+every substantive edit to either canonical skill, refresh the repo copy in
+the same pass: apply the same edit, re-apply the standing redactions
+(cloud org IDs, database UUIDs, host addresses including the Oracle micro
+IP, credential file paths — the public copy must stay clean under a
+UUID / non-loopback-IP pattern scan), land it via branch → PR → green
+checks → merge, and verify the merged tree contains the update. The
+canonical internal editions stay in the agentprofile skill registry; the
+repo copies are the public mirror Barklee directed on 2026-11-02 so the
+skill travels with the code and contributors can run the same playbook.
