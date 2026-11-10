@@ -1933,6 +1933,125 @@ A parallel sibling sweep ran Alaska (020xxx) batches + registry
 b18–b21 from staging/integrity/ (retired after D1 ingest); overlap
 with this sweep's 220 was zero.
 
+## Hospital-submitted intake lane (added 2026-11-10 — hospitals submit their own file)
+
+The second intake door beside the harvester: a hospital that cannot
+easily post a standard file (or whose posted file the fleet cannot
+reach) submits its machine-readable file directly at
+`hospitalledger.com/submit`, linked from the home page's "For
+hospitals" section. Shipped 2026-11-10 (PR #68, merge `18c145c`,
+Worker version `ca5cd91a`). The honesty rule is load-bearing and is
+stated on the page: **submitting here does not by itself meet the CMS
+requirement — the file has to live on the hospital's own website.**
+What the hospital gets back is (a) a plain-language validation report
+against the CMS v3.0.0 template expectations and (b) a normalized
+CMS-template file to post on its own site. No outreach ever: passive
+inbound only.
+
+**Architecture.** The Worker takes the intake only: chunked multipart
+upload (16 MiB parts, R2 multipart via the binding — real MRFs run
+past 1 GB; the ceiling is R2's 10,000-part limit, ≈160 GiB) into
+bucket `hl-mrf-parsed` under `submissions/<id>/` (submission.json,
+raw object, report.json/.md, normalized/<file>). The raw access token
+is returned once and stored only as its SHA-256; every status,
+download, and verify call is token-gated. Verification of control is
+the **site token**: the submitter publishes the record's
+`verify_token` line at `/.well-known/hospital-ledger-verification.txt`
+(or `/hospital-ledger-verification.txt`) on the hospital's domain and
+the Worker fetches it (same-host redirects only, 64 KiB cap, IP-literal
+hosts rejected). Email verification was not built (it would add a
+mail-sender surface).
+
+**Processing.** `scripts/process_submissions.py` in the repo is the
+source of truth; the running copy is `~/hl-fleet/process_submissions.py`
+— keep them byte-identical (sha-verify after any copy). Run it on the
+Mini: `cd ~/hl-fleet && python3 process_submissions.py`
+(`--dry-run-listing` proves the listing path without publishing). It
+claims records in status `uploaded` (plus the re-arm case: processed +
+listing awaiting_processing + verified), downloads the raw object,
+verifies byte size and SHA-256, and refuses to run at all if the
+payload parser's sha ≠ the pinned loud-cap build. It parses with the
+fleet parser in memory (3 GiB ceiling, derived from the largest
+fleet-handled raw ≈2.4 GB against the Mini's 16 GB RAM; above it the
+record fails loudly), runs the fleet validation checks plus the
+official CMS validator when the file is ≤200 MB and the CLI is
+available, writes the report + normalized file back to the record's
+prefix, and then applies the listing gates.
+
+**The listing gates (all must pass; every refusal carries its reason
+on the record).** (1) submitter opted in; (2) site-token verification
+is `verified`; (3) the in-file identity gate returns VERIFIED —
+`identity_gate()` reuses `publish_mini._name_consistent` against the
+registry row + `mrf_seed` entity names for the claimed CCN, requires
+state/city/license corroboration, and returns MISMATCH naming the true
+owner when the header names a different registry hospital; (4)
+source-count completeness reconciles exactly (source entries ==
+parsed items); (5) priced items > 0; (6) no store canonical exists —
+a submission never replaces a harvested listing; (7) the verified
+domain is among the domains on file for the CCN in `mrf_seed`
+(fail closed when the fleet has none); (8) CCN 150042 is refused
+unconditionally. On a full pass: a verdict-batch ACCEPT is written to
+`~/hl-fleet/verdicts/` AND `~/hl-fleet/verdicts-pending-vm/` (the VM
+registry import picks batches up from the pending dir — carry them
+across with the usual sync and confirm absorption before trusting
+submit-ready math), quoting the in-file identity and carrying
+"hospital-submitted via submission <id>" provenance; the canonical is
+seeded in the fleet's exact shape with `source_url` pointing at the
+public status page (`/submit/status/<id>`) — that URL is the
+provenance a reader sees; the publisher's own preflight
+(`canonical_ok` + `key_refusal`) runs in-process; then
+`publish_mini.py <ccn>` runs serially (lock rc 9 → `publish_deferred`,
+canonical + verdict stay in place for the re-run).
+
+**Fleet-wide contracts this lane proved the hard way (live E2E,
+2026-11-10).**
+- `publish_mini._name_consistent(header, candidates)` tokenizes
+  candidates with a lowercase-only regex: **candidates must arrive
+  pre-lowercased** (its own callers pass `_identity_candidates`
+  output). Registry names are uppercase — passing them raw makes
+  every comparison silently False. The first live submission (a real
+  Good Samaritan file under its own true CCN) failed as MISMATCH for
+  exactly this reason; the unit suite's double had lowercased for the
+  caller and hid it. Any future double of a fleet function must copy
+  the real contract, quirks included.
+- Real CMS v3.0.0 headers vary: `hospital_address` may be a **list of
+  strings** (Tenet) and the license lives under
+  **`license_information`** — extract both shapes, and parse
+  city/state/zip out of address text for corroboration.
+- Normalization must conserve facts: payer rows are keyed by the full
+  tuple (payer, plan, rate, methodology) — keying by (payer, plan)
+  overwrote recurrences and dropped 629,649 → 392,050 rows on the
+  test file. The conservation law is distinct-fact equality (0
+  missing, 0 invented); exact duplicates inside one charge group may
+  dedupe, and the report's duplicate-groups finding discloses them.
+
+**Known limits, stated plainly.** Suffixed (federal) CCNs are absent
+from the Mini publish-tree registry DB, so their submissions process
+fully but identity-verify as UNVERIFIABLE and are never listed until
+that DB carries them — fail closed by design. XLSX submissions whose
+workbooks carry no identity header likewise land UNVERIFIABLE.
+`mrf_seed` in the publish-tree DB currently points CCN 100287 at the
+wrong hospital's domain (goodsamsanjose.com) — the domain-binding gate
+therefore refuses a genuine 100287 listing until the seed is corrected
+through the normal harvest/verdict path; do not hand-edit the seed as
+a shortcut. The two CodeQL `py/clear-text-storage-sensitive-data`
+alerts on the processor (verdict-row write, report write) are
+dismissed false positives with the justification on the record: the
+verdict row quotes the hospital's own public file header by design,
+and the report is the submitter's own, in the private bucket behind
+the token gate.
+
+**Live proof set (2026-11-10).** 97 MB real Tenet JSON under its true
+CCN: upload SHA-256 byte-exact, identity VERIFIED, completeness
+26,527 == 26,527, all 187,289 distinct payer facts conserved in the
+normalized file, listing held at `awaiting_verification` (submitter
+not site-verified). The same file claimed under the sibling Good
+Samaritan's CCN: MISMATCH naming the true owner. 186 MB UHS CSV:
+SHA exact, completeness 210,460 == 210,460. Verified-listing
+composition (scratch store/verdicts/registry, real publish_mini):
+verdict written, canonical seeded, preflight clean,
+`publish_mini.py --dry-run` completed.
+
 ## Repo mirror — public edition in barkleesanders/hospital-ledger (standing rule, 2026-11-02)
 
 Public editions of this skill and of `local-hl-parser-improvement` live in
