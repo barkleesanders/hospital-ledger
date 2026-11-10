@@ -1369,7 +1369,10 @@ alone — session-owned controllers die at compaction.
 Evidence: `~/workspace/hl-fleet/chrome-lane-20261109/RUN-NOTE.md` +
 `UNKNOWNS.md` (U1–U9). The 24-row worklist closed 19 published / 3
 wall-holds / 2 dead-source REJECTs (live 5,534 → 5,553 priced; publish
-SUCCESS, byte-verify OK, 23 keys). Authorization: Barklee, 2026-11-09
+SUCCESS, byte-verify OK, 23 keys). A computer-use follow-up the same
+evening resolved the two SiteGround CAPTCHA wall-holds (live 5,555
+priced / 5,558 total — see the SiteGround bullet), leaving 040088 as
+the sole remaining wall-hold. Authorization: Barklee, 2026-11-09
 ~19:15 PT. Lane = Mini real Chrome (Default profile) via fcdp over SSH,
 plus fleet-sanctioned routes only (Mini curl, cms-hpt, Wayback, Firecrawl
 cloud /map) — no agent web tools touched any HL URL. Parses used the
@@ -1390,17 +1393,37 @@ controller layout.
   under one EIN (360086 Springfield vs Urbana Hospital, EIN 310785684) —
   take only the file whose slug NPI suffix AND in-file type_2_npi +
   location_name match the target CCN.
-- **SiteGround sgcaptcha has TWO flavors, per-site not per-network (U2).**
-  Classify the flavor from the challenge page before spending lane time:
+- **SiteGround sgcaptcha has TWO flavors, per-site not per-network (U2) —
+  and which flavor a site shows is RISK-SCORE dependent, not a fixed
+  site property.** Classify the flavor from the challenge page before
+  spending lane time:
   (a) **JS-check** — auto-clears in real Chrome; open the file URL and the
   download proceeds (the five PR Metropolitano sites 400106, 400117,
   400126, 400130, 404007; SUN Delaware's captcha also cleared this way).
   (b) **Textual image CAPTCHA** ("Robot Challenge Screen",
-  `/.well-known/captcha/`) — human-only hold; do not burn lane time
-  retrying (451338 Culberson, 451347 Coleman County — screenshots in the
-  run's staging evidence/; Wayback had no captures for either). This
-  refines the older SiteGround bullet in Method-work lessons, which
-  predates the textual flavor.
+  `/.well-known/captcha/`) — a hold, but do NOT park it as human-only on
+  first sight: the textual flavor is risk-score dependent. At 19:26 it
+  presented for 451338 Culberson; at ~20:12 the same URL in a fresh
+  real-Chrome tab showed only the JS-check interstitial, which
+  auto-cleared — **0 CAPTCHA attempts were needed for either 451338 or
+  451347** (computer-use addendum in the run note, Barklee-directed
+  ~20:11). Rule: before parking a textual-CAPTCHA case as a human-only
+  hold, re-open the URL in real Chrome on a later run — the textual
+  flavor may not present. If it presents AND persists across a later
+  re-open, it stays a hold (or a computer-use solve at Barklee's
+  direction, as he ordered that evening). **Read the site's cms-hpt.txt
+  in the browser while you're there:** behind the cleared check, both
+  recorded file URLs were dead (451338 origin 404; 451347 superseded),
+  and each facility's own cms-hpt declared the current MRF on the
+  operator's UNWALLED file host **hospitalpricetransparencyfiles.com**
+  (operator: Preferred Hospital Leasing) — plain Mini curl then served
+  both with full in-file identity (451338 Culberson 260/260 → live
+  n=256; 451347 Coleman County 727/727 → live n=724; b70 ACCEPTs).
+  Generalized: small operators increasingly park MRFs on shared
+  unwalled transparency-file hosts declared in cms-hpt — a walled
+  facility URL whose cms-hpt points elsewhere is a re-point, not a
+  wall. This refines the older SiteGround bullet in Method-work
+  lessons, which predates the textual flavor.
 - **In-page fetch→blob is the large-file / fingerprint-wall technique
   (U6, U7).** When a direct Chrome download stalls mid-file (MyMichigan
   230239 died at 11,396,358 of 68,882,196 B) or the wall is
