@@ -1471,6 +1471,104 @@ controller layout.
   otherwise the identity gate (in-file header/metadata vs registry
   record) applies as usual and the file does not stage.
 
+### Round 2 (2026-11-09 evening — the harvest-walled set + b72's walled retry rows)
+
+Evidence: `~/workspace/hl-fleet/chrome-lane2-20261109/RUN-NOTE.md` +
+`UNKNOWNS.md`. Worklist 45 rows (the 21 both-passes-walled harvest
+candidates + 24 registry wall-class retry rows the b72 pass left
+untouched): **39 published** (serial `publish_mini.py`, two runs, both
+SUCCESS + byte-verify OK; live 5,565 → 5,604 total, 5,562 → 5,601
+priced), 1 identity EXCLUDED (420057 — recorded file was McLeod
+Regional's; McLeod's cms-hpt lists no Darlington MRF → b73 REJECT),
+5 remainder left by lane degradation (below), NOT by source verdicts.
+Verdicts: b73 (39 ACCEPT + 3 REJECT). Per host, the system's cms-hpt
+was read IN-BROWSER first (15 snapshots saved as staging evidence);
+every file passed the in-file identity gate before parsing.
+
+- **Download route order: direct tab navigation first; fetch→blob→
+  a.click degrades after ~2 downloads per tab.** Chrome silently blocks
+  later programmatic (blob-anchor) downloads from the same page — the
+  click returns and nothing lands. Direct navigation to the file URL
+  was the reliable download route all round. fetch→blob does NOT
+  degrade as a measurement: it stayed byte-exact as a **size oracle**
+  (expected-length checks for 270012, the three Cottage files 050357 /
+  050396 / 051331, and 030138) even on tabs where its download path was
+  already blocked. Rule: navigate to download; blob-fetch to size-verify;
+  when blob downloads stop landing, change route or tab — never keep
+  clicking the anchor.
+- **CDP `Network.loadNetworkResource` + IO.read is a working exfil
+  route for in-browser bytes — chunk small.** For 140100 the blob
+  fetched fine in-tab (241,774,876 B, HTTP 200) but no download path
+  survived; the CDP resource pipeline worked mechanically, and the
+  binding constraint is transport: the fcdp CLI truncates large raw
+  responses and read chunks >1 MiB died. The staged retry
+  (`/tmp/lane2_cdp_pull.py` on the Mini) chunks at 256 KiB — prescribed,
+  not yet proven end-to-end (the working tab wedged on held blob memory
+  first). Plan chunk sizes around the ~1 MiB raw-output ceiling
+  whenever pulling bytes or large results through the fcdp CLI.
+- **Loopback-POST exfil can be intercepted — an unexpected responder is
+  a STOP, not a retry.** 140100 attempt 1 (no-cors POST to a Mini
+  loopback receiver): nothing arrived. Attempt 2 (CORS mode): answered
+  `{"success":false}` by something that was NOT the receiver — suspect
+  the origin's service worker (or edge) intercepting the page's
+  fetches. A response from an endpoint you did not stand up means the
+  route is compromised on that origin; abandon it for that origin
+  rather than re-shaping the request.
+- **Identity gate, round 2 — the pointer label never outranks the
+  file.** (a) **A system cms-hpt can double-label one file for two
+  facilities:** Forrest Health's cms-hpt labels the Perry County file
+  as Pearl River's too; the in-file location (Perry County General
+  Hospital, Richton MS) decided — accepted for 250783 only. When the
+  pointer's label and the file disagree, the file wins. (b) **A
+  harvest-misattached file may belong to a real sibling CCN — re-home
+  it, don't just reject it:** the file the harvest attached to 22001F
+  (Bedford VA) was Centra's Bedford Memorial Hospital file; b71
+  REJECTed it for the VA CCN and round 2 published it under its correct
+  CCN 490088 (55,653 items → live n=14,329; b73 ACCEPT). Same shape at
+  270012: the pending-file pointer was Benefis Community Care's file;
+  benefis.org cms-hpt read in-browser declared Benefis Hospitals Inc's
+  file for the CCN — that file was fetched and published instead (b73
+  REJECT for the wrong URL + ACCEPT for the correct one). (c)
+  **Pointers change FORM, not identity:** 090003's pointer filename
+  changed to the EIN form (`53-0196961_…`) and 470005's gained a
+  `Patient%20and%20Visitors/` path segment — SAME UUID in both cases.
+  Compare the UUID before declaring a pointer new, moved, or dead; a
+  form-changed pointer is the same file wearing a new label.
+- **SharePoint sharing links get REVOKED at origin — revoked =
+  re-derive, not a wall (refines round 1's U3 bullet).** 450018 UTMB's
+  recorded link answers "Sorry, you cannot access this document" in
+  Chrome; utmb.edu cms-hpt already declared a NEW sharing link (b73
+  REJECT for the revoked URL; the replacement was re-derived but its
+  download stalled mid-file when the lane degraded — identity
+  unverified, no ACCEPT written). A revoked link means the pointer
+  rotated: re-read cms-hpt in-browser and take the current link.
+- **fcdp extension tombstone after an outage — recover manually; never
+  swap shared tooling mid-lane.** Lane start found the extension's
+  Default-profile registration a tombstone
+  (`{"disable_reasons":[16777216]}` only); the fleet applet
+  (`~/tools/fcdp/Load-fcdp-Default.app`) did not land its steps. What
+  worked: AppleScript opened chrome://extensions in a new window,
+  JS-clicked `#loadUnpacked`, System Events drove the file picker to
+  `~/tools/fcdp/extension` — then `fcdp tabs` answered. Corollary: at
+  ~22:26 a PARALLEL lane replaced the fcdp bridge build mid-flight
+  (stale vendor build → current build, per that lane's own write-back);
+  the extension never reconnected to the new bridge ("no extension
+  connected"), Chrome's AppleScript interface wedged (even "make new
+  window" timed out), and one SharePoint download stalled mid-file.
+  This lane banked everything SSH-side (builds + both publishes + b73)
+  and stopped with an explicit 5-row remainder (140100, 450018, 500064,
+  079801, 451310 — exact state in UNKNOWNS.md) rather than hammering a
+  degraded browser. Rule: lanes sharing the Mini's Chrome do NOT swap
+  shared tooling (bridge builds, extension state) while another lane is
+  mid-run.
+- **OPEN FLAG — possible mrf_parse row cap at 200,000 (unproven).**
+  030138's 427,924,852 B JSON parsed to EXACTLY 200,000 items (200,000
+  priced) — a suspiciously round ceiling. Live slim n=6,904 either way,
+  so user-facing impact is unproven in both directions. Do NOT treat
+  parse counts from very large files as complete until mrf_parse has
+  been checked for a row limit; recorded here as an open flag, not a
+  finding.
+
 ## Self-improvement loop — every fleet failure pays rent (standing protocol)
 
 Barklee's standing rule (reaffirmed 2026-10-28): this skill keeps learning
