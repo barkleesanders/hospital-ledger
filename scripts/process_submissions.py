@@ -300,16 +300,43 @@ def extract_identity_json(data):
     out["hospital_name"] = (
         data.get("hospital_name") or data.get("reporting_entity_name") or "")
     addr = data.get("hospital_address")
+    if isinstance(addr, list):
+        # Tenet-style serialization: a list of address strings (or of
+        # address dicts). Flatten to text and parse like a string.
+        parts = []
+        for entry in addr:
+            if isinstance(entry, dict):
+                if not out.get("city"):
+                    out["address"] = entry
+                    out["city"] = entry.get("city", "")
+                    out["state"] = entry.get("state", "")
+                    out["zip"] = entry.get("zip_code") or entry.get("zip") or ""
+                parts.append(", ".join(
+                    str(entry.get(k, "")) for k in
+                    ("street", "city", "state", "zip_code") if entry.get(k)))
+            elif entry:
+                parts.append(str(entry))
+        addr = "; ".join(p for p in parts if p)
     if isinstance(addr, dict):
         out["address"] = addr
         out["city"] = addr.get("city", "")
         out["state"] = addr.get("state", "")
         out["zip"] = addr.get("zip_code") or addr.get("zip") or ""
-    elif isinstance(addr, str):
+    elif isinstance(addr, str) and addr:
         out["address_text"] = addr
-    lic = data.get("license_number")
+        # "1309 N Flagler Dr, West Palm Beach, FL 33401" — corroboration
+        # needs city/state/zip even when the address arrives as text.
+        m = re.search(r",\s*([^,]{2,60}?)\s*,\s*([A-Z]{2})\s+(\d{5})"
+                      r"(?:-\d{4})?\s*$", addr)
+        if m:
+            out.setdefault("city", m.group(1).strip())
+            out.setdefault("state", m.group(2))
+            out.setdefault("zip", m.group(3))
+    # The CMS v3.0.0 template names the block license_information;
+    # older files put a bare license_number at the top level.
+    lic = data.get("license_information") or data.get("license_number")
     if isinstance(lic, dict):
-        out["license"] = lic.get("license_number", "")
+        out["license"] = str(lic.get("license_number", "") or "")
         out["license_state"] = lic.get("state", "")
     elif lic:
         out["license"] = str(lic)
@@ -391,19 +418,21 @@ def identity_gate(extracted, claimed_name, db, ccn, pm):
         # metadata cells counts as the file naming the facility.
         joined = " ".join(extracted["meta_cells"])
         for cand in candidates:
-            if pm._name_consistent(joined, [cand]):
+            if pm._name_consistent(joined, [cand.lower()]):
                 name_in_file = cand
                 break
     if not name_in_file:
         return ("UNVERIFIABLE",
                 "the file carries no in-file hospital identity (no JSON header "
                 "name, no CSV metadata naming the facility)")
-    if not any(pm._name_consistent(name_in_file, [c]) for c in candidates):
+    if not any(pm._name_consistent(name_in_file, [c.lower()])
+               for c in candidates):
         # Name a different facility? Check whether it matches ANOTHER
         # registry row — that is the mis-seed signature.
         others = db.execute("SELECT ccn, name FROM hospitals").fetchall()
         for other in others:
-            if other["ccn"] != ccn and pm._name_consistent(name_in_file, [other["name"]]):
+            if other["ccn"] != ccn and pm._name_consistent(
+                    name_in_file, [other["name"].lower()]):
                 return ("MISMATCH",
                         f"the file's own header names '{name_in_file}', which is "
                         f"{other['name']} (CCN {other['ccn']}), not the claimed "
@@ -685,7 +714,15 @@ def build_normalized(header, items, registry_name, fallback_updated):
               it.get("min_negotiated"), it.get("max_negotiated"))
         charge = grp["charges"].setdefault(ck, {"payers": {}})
         for pr in (it.get("payer_rates") or []):
-            pk = (pr.get("payer") or "", pr.get("plan") or "")
+            # Keyed by the full fact tuple: a payer row is dropped only
+            # when it is an exact duplicate. Keying by (payer, plan)
+            # alone silently overwrote rows whose rate or methodology
+            # differed — real files repeat a payer under several
+            # methodologies (fee schedule vs percentage of charges).
+            pk = (pr.get("payer") or "", pr.get("plan") or "",
+                  pr.get("rate_dollar"), pr.get("methodology") or "")
+            if pk in charge["payers"]:
+                continue
             entry = {"payer_name": pr.get("payer") or ""}
             if pr.get("plan"):
                 entry["plan_name"] = pr["plan"]
