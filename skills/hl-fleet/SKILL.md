@@ -223,12 +223,44 @@ state and escalated — never improvised from inside a fleet run.
    touching state if the set is still incomplete. Recovery from any
    mid-publish death = re-run `hlfleet publish <ccns>`; it is resumable by
    construction. Pre-patch copy: `hlfleet.py.bak-20261027` (VM workspace).
-7. **Mini disk is the fleet's real capacity limit**: the Mini sits at ~99%
-   full (3.2 GB free of 228 GB on 2026-10-27) and batch 2b died with ENOSPC
-   writing results. Check `df` before launching batches; results dirs and
-   staging are the fleet's own footprint (~1 MB per canonical). The big
-   reclaim lever is `~/Library/Developer` (~12 GB) — Barklee's call, never
-   automatic.
+7. **Space gating is COMPUTED-NEED, never a hard-coded GiB gate (Barklee
+   directive 2026-11-09 — this supersedes the fixed 5 GiB floor / 10 GiB
+   proceed line that gated fleet launches from 2026-10-27 to 2026-11-09).**
+   The old gate dated from when the results store lived on the Mini's
+   internal disk (batch 2b died with ENOSPC writing results, 2026-10-27);
+   the store moved to Share the same day, but the gate was never re-scoped,
+   and by Nov 2026 it was blocking launches whose real internal footprint
+   is ~0.05 GiB while the internal volume drained for unrelated reasons
+   (macOS update staging, swap). Doctrine: before any fleet operation,
+   CALCULATE the space the operation itself needs, on the volume it will
+   actually write to, and gate on that figure — `~/tools/disk-preflight/
+   disk-preflight.sh` in computed-need mode (`DISK_PREFLIGHT_NEED_GB=<n>`;
+   proceed when free ≥ need + `DISK_PREFLIGHT_RESERVE_GB`, default reserve
+   1 GiB; exit 20 only when the computed need genuinely does not fit;
+   default mode with NEED unset is unchanged for non-fleet callers).
+   The fleet's computed needs (measured 2026-11-09: total HL internal
+   footprint ≈206 MB — ~/hl-fleet 152 MB code/venv/logs + ~/hl-counts-lane
+   54 MB; staging, results store and publish tree are all on Share):
+   - **Lane launch (Daytona/E2B/Modal):** internal need 0.5 GiB (controller,
+     venv, logs, jobs TSV). Staging need lands on Share: chunk jobs ×
+     0.25 GiB, checked against `df /Volumes/Share` (normally TiBs free).
+   - **Publish (publish_mini):** internal need 0.5 GiB; Share need =
+     the publish set's canonical sizes × 2 (tree seed + slim output),
+     summed from the store files themselves.
+   - **Mini-local heavy work (local duckdb parse, local slim):** need =
+     the source's EFFECTIVE size × 1.5 on the volume holding the work dir
+     (Share by default) — never borrow the 0.5 GiB launch figure.
+   - **Mid-run adjustment:** a controller whose staged/working volume
+     drops below its remaining computed need stops taking NEW jobs,
+     finishes or recycles the in-flight one, and records the shortfall —
+     it never writes until ENOSPC. A batch that dies on a genuine
+     computed-need shortfall recycles through re-derivation like any
+     other dead partition.
+   The Mini's internal volume can still be a MACHINE-health problem
+   (swap balloon, update staging) — that is reported as Mini health,
+   never as a fleet gate. Reclaim of Mini internal space (caches,
+   ~/Library/Developer, snapshots) remains Barklee's call, never
+   automatic, and is no longer on the fleet's critical path.
 8. **Fleet storage lives on the external drive** (moved 2026-10-27 at
    Barklee's direction): the canonical store is `/Volumes/Share/hl-fleet/`
    on the Mini's 8 TB external (APFS "Share" volume, ~4.2 TB free; the
@@ -467,7 +499,10 @@ kept) — duplicate rows leave the winning URL to implementation chance
 Verified 2026-10-27 23:45 PDT: 205 ACCEPT-not-live = 25 already-parsed +
 180 submit-ready (136 file / 27 ZIP / 17 XLSX); batch 3 = the 136 file-class.
 
-**Launch mechanics (Mini):** disk-preflight first; scp the jobs TSV to
+**Launch mechanics (Mini):** disk-preflight first — in COMPUTED-NEED mode
+(`DISK_PREFLIGHT_NEED_GB=0.5` for a lane launch; see Routing rule 7 — the
+fixed 5/10 GiB gate was abolished 2026-11-09, and a driver body that still
+gates launches on a hard-coded GiB figure is stale); scp the jobs TSV to
 Mini `~/hl-fleet/`; launch `nohup ~/hl-fleet/.venv/bin/python3 hlfleet.py
 submit batchN-jobs.tsv --lane modal > d1-batch-modal-N.log 2>&1 < /dev/null &`
 — macOS has NO `setsid` (a setsid launch attempt died instantly 2026-10-27);
