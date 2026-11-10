@@ -1,6 +1,6 @@
 # Hospital Ledger
 
-A free public database of U.S. hospital price transparency machine-readable files — where each hospital published one, whether it is live, and what is in it. Built from CMS data + live verification. CC0 licensed.
+A free public database of U.S. hospital price transparency machine-readable files — where each hospital published one, whether it is live, and what is in it. Built by standardizing the files hospitals publish — our registry tracks more facilities than CMS's own published hospital list — plus live verification. CC0 licensed.
 
 ## WebMCP tools
 
