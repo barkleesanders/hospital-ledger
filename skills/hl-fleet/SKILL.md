@@ -527,6 +527,14 @@ hand applies it identically. Holds change only by Barklee's adjudication:
 a fresh ACCEPT row, a plausible URL, or an appearance in registry_queue
 output never reopens one. CCN 150042's quarantine is separate and
 absolute.
+**SUPERSEDED as the list of record (wave 11d, 2026-11-10):** the
+eleven above are the founding entries. The ONE source of truth is
+now the shared holds file `~/workspace/hl-fleet/adjudicated_holds.txt`
+(Mini copy byte-identical; **57 CCNs** after wave 12, sha256
+`6a0007f8…`), read by the driver at both points above AND by
+publish_mini's Gate 1, which fails closed if the file is unreadable.
+Any inline list — including this paragraph's — is a cache, never the
+authority. See Gate 3 in the Waves 11–12 section.
 **Registry-refresh silent deaths — root-caused + fixed 2026-11-02:**
 detached `import_registry.py` processes on the VM die silently at random
 ages (no traceback; the launching agent session's lifecycle reaps them —
@@ -853,7 +861,11 @@ alone — session-owned controllers die at compaction.
   SOURCE's own counts (e.g. streaming entry count vs canonical items)
   — a discrepancy is a defect to surface, not a rounding difference,
   and a publish reporting SUCCESS proves the publish mechanics only,
-  never completeness. Worked example, the 030138/330046 pair:
+  never completeness. (The completeness proof itself is a FULL
+  source-count comparison — a sampled tail proof certifies nothing;
+  wave 12 corrected two "harmless" calls made on tail samples. See
+  the completeness-proof standard in the Waves 11–12 section.)
+  Worked example, the 030138/330046 pair:
   identical symptom (a parse landing at exactly 200,000 items),
   opposite harm — 030138 lost nothing; 330046 (Mount Sinai combined
   file) silently lost 33,203 distinct priced items (16.6%) while its
@@ -864,6 +876,11 @@ alone — session-owned controllers die at compaction.
   observed source, 605,874 entries); mrf_parse.py sha256
   `1858d1b82091bb278105e7106ac2298729ed964847b41f8a2a4d2949ee184526`;
   pre-change backup `mrf_parse.py.bak-20261109-cap2m`.
+  **(Updated 2026-11-10: the production parser is the wave-6
+  loud-cap build, sha256 `0bbace6d…` — where the cap binds it RAISES
+  `SourceTruncatedError` ahead of every swallow point; see the
+  loud-cap swallow-guard entry in the Waves 11–12 section. The
+  `1858d1b8…` build above was the wave-4 cap-raise only.)**
 - **OOM class:** Mini-local duckdb parses with DUCKDB_MEMORY_LIMIT=6GB +
   TMPDIR on the external volume cleared 3-5.3 GB tall ZIPs. For giant
   JSON, install ijson on the Mini and use stream_parse_large_json over a
@@ -901,6 +918,12 @@ alone — session-owned controllers die at compaction.
   dispatch — the parser itself stays unmodified. 210055 took the wide
   branch (CMS v3 All-Payers / HSCRC single-rate): 200,000 items, all
   priced. Work dir kept at `/Volumes/Share/hl-fleet/work-210055/`.
+  **CORRECTED 2026-11-10 (wave 12): that 200,000-item build was the
+  old cap's truncation, not the file's content — a full source-count
+  comparison proved 160,302 distinct keys missing. Rebuilt from
+  source with the loud-cap parser and republished (n_total_raw now
+  397,061; slim n unchanged at 3,922 by the display-row design). See
+  the completeness-proof standard in the Waves 11–12 section.**
 - **Payer-dense faithful chunked route (469810, wave 4, 2026-11-09):**
   when a payer-dense source defeats single-pass parsing, do NOT cap
   it — chunk it faithfully: extract with DuckDB using the parser's own
@@ -1680,7 +1703,9 @@ every file passed the in-file identity gate before parsing.
   source's own entry count. The cap now stands at
   `SOURCE_ROW_CAP = 2_000_000` (parser sha256
   `1858d1b82091bb278105e7106ac2298729ed964847b41f8a2a4d2949ee184526`,
-  backup `mrf_parse.py.bak-20261109-cap2m`). Standing rule: never
+  backup `mrf_parse.py.bak-20261109-cap2m`; superseded as the
+  production build by the wave-6 loud-cap parser, sha256
+  `0bbace6d…`, 2026-11-10 — see the Waves 11–12 section). Standing rule: never
   treat a parse count as complete on the publish's say-so — run the
   completeness check (source counts vs canonical items; see "No
   arbitrary silent limits" in the Method-work lessons). A count
@@ -1932,6 +1957,350 @@ ACCEPTs removed from b1 (4) + b3 (2) under .bak-20261102-sweep.
 A parallel sibling sweep ran Alaska (020xxx) batches + registry
 b18–b21 from staging/integrity/ (retired after D1 ingest); overlap
 with this sweep's 220 was zero.
+
+## Waves 11–12 — the integrity remediation program (2026-11-10)
+
+Wave 8's full-catalog integrity recheck (all live entries re-graded
+against source-side evidence) found 18 confirmed mis-seeds live, 22
+suspects, and a structural root cause: **the builder stamps the target
+CCN's name into each canonical, so every later "identity check" that
+reads the canonical's name is circular — it verifies the stamp, not
+the file.** Waves 11–12 (Barklee 2026-11-10 05:45: "Remediate fully…
+keep doing this in waves until everything is completed") adjudicated
+every flagged CCN, built the six gates below so the failure classes
+cannot recur silently, and closed with a reconciliation census.
+Working records: `~/workspace/hl-fleet/remediation-wave11-20261110/`
+(STATE.md, disposition-ledger-wave11.csv, final-census/) and
+`~/workspace/hl-fleet/remediation-wave12-20261110/` (STATE.md).
+**Final live state: 5,571 total / 5,568 priced / 86,804,396 rows**,
+reconciled to the item from the wave-11 baseline (5,608 / 5,605) at
+every hop. Census scope, stated honestly: store-backed identity
+classification covers 1,786 live entries (873 VERIFIED, 116
+SHARED-EXPLAINED, 303 PROGRAM-OR-UNION, 493 UNVERIFIABLE — unproven,
+not suspect — and 1 MISMATCH, the 154057 finding below); the other
+3,777 pre-fleet entries are verified at index level only. Never quote
+store percentages against the full catalog.
+
+### The takedown route — how a confirmed mis-seed is unpublished
+
+`publish_mini.py` refuses the empty-canonical route (anti-regression
+FATAL) — that refusal is correct and is never worked around. The
+proven route (wave 7, reused 11a / 11e / 12):
+
+1. **Evidence first:** preserve the live record's evidence (gzipped
+   summary evidence in the wave work dir) before touching anything.
+2. **Reproduce before editing:** independently recompute the live
+   summary from the index and assert it reproduces every summary
+   field field-for-field. If the reproduction does not match, stop —
+   you do not understand the state you are about to edit.
+3. **Edit the two R2 index objects directly** (`meta/summary.json`,
+   `prices/index.json`) under your OWN publish lock, verified by
+   process observation — never remove or reuse another run's lock
+   (see Lock discipline below) — and byte-verify both objects after
+   the r2_put.
+4. **Quarantine, never delete:** the wrong store canonical is renamed
+   `*.json.gz.QUARANTINE-misseed-<date>` in the store; its R2 price
+   objects are orphaned. No R2 deletes, ever.
+5. Close the registry side the same pass: a REJECT verdict in the
+   next b-file quoting the identity evidence, and the CCN added to
+   the holds file (Gate 3) so no lane can re-seed it.
+
+### Identity doctrine — the file's own header is the only identity
+
+- A canonical's `hospital_name` is the builder's stamp of the seeding
+  decision. It is NEVER identity evidence — for the target CCN or
+  against it. Identity comes from the source file's own header
+  (name / address / NPI / EIN / license), read directly, or it does
+  not exist.
+- **Cluster attribution (wave 5 method):** when one combined/system
+  file serves a cluster, attribute per facility from the file's own
+  evidence — each member's header identity matched against the
+  registry record — never from the pointer's label, the cms-hpt
+  label, or the URL slug alone. Pointer labels lie, including
+  cms-hpt double-labels (round-2 lesson); slug tokens are leads.
+- **Hold-release standard:** a held CCN is released only on header
+  evidence recorded in the wave STATE *before* any publish runs —
+  the release adjudication (source fetched, header quoted, registry
+  match shown) precedes the publish, never follows it. The 14
+  wave-11 releases and 10 wave-12 reassignments below all meet this
+  standard; anything that cannot is documented NO_FILE / closed,
+  not published on hope.
+- **Bundle-member src-identity is a tooling artifact:** Phase-2
+  tooling reads a fixed member of a shared bundle (the CHHS bundle
+  behind 050145 / 050546 reads as "California Rehabilitation
+  Institute" regardless of target). Never treat a bundle's
+  src-identity as facility evidence in either direction.
+- **Pointer-vintage vs source-vintage (F4):** cms-hpt pointer files
+  rotate; a header probe of the CURRENT pointer file can differ from
+  the canonical's own source file in license number and upload date
+  (name / address / NPI agree). Adjudications rest on the canonicals'
+  own source headers, re-fetched at adjudication time — the wave-11e
+  probes were pointer-vintage, and wave 12 re-based its
+  adjudications on the source files themselves.
+
+### Suffixed-CCN publish guard (wave 10, Barklee decision 2026-11-10 00:28)
+
+The 2026-11-03 `^\d{6}$` key guard (Publish doctrine) did its
+anti-phantom job but left legitimate letter-suffixed CCNs with no
+sanctioned publish route — it FATAL-refused 29002E's wave-9 re-parse
+(Spring Valley Hospital Medical Center subunit, Las Vegas NV;
+published at n=10,420 once the guard was amended). The amended guard,
+live in publish_mini.py: a key is admissible iff `^\d{6}$`, OR
+`^\d{5}[A-Z]$` AND the winning registry verdict for that CCN is
+ACCEPT with checkable identity evidence AND the store canonical's
+identity is token-consistent with that evidence. Every missing piece
+fails closed, with the reason in the FATAL line. Proven by harness
+10/10 (45188E refused on evidence, not on a hardcoded name). The
+guard reads the Mini verdict mirror `~/hl-fleet/verdicts/` (a mirror
+of the VM verdict TSVs) — **refresh the mirror whenever new verdict
+batches land**; a stale mirror makes the guard judge on old evidence
+(b83 verified mirrored, sha-checked, 2026-11-10). `registry_queue.py`
+carries the same admissibility rule; `legacy_submit_ready` is
+intentionally untouched.
+
+### Loud-cap swallow guard (wave 6 — a raise nobody hears is not loud)
+
+The production parser is the wave-6 loud-cap build:
+`~/hl-fleet/payload/mrf_parse.py` sha256 `0bbace6d…`,
+`SOURCE_ROW_CAP = 2_000_000`. Where the cap binds it raises
+`SourceTruncatedError` — and the raise is placed AHEAD of every
+blanket `except: return []` swallow point in the file (xlsx,
+xls_legacy, spreadsheetml, and ZIP paths). Lesson, general form: a
+loud failure is only loud if nothing downstream catches it quietly;
+when you add a raise to this parser, audit every bare-except on every
+path the raise can traverse. Backup:
+`mrf_parse.py.bak-20261109-loudcap` (payload dir). Proofs at ship:
+controls 054123 (9,193) and 110043 (31,163) byte-identical to the
+pre-fix parser; boundary exactness at the cap; the 469810 chunked
+route byte-identical.
+
+### Completeness-proof standard (wave 12 — CORRECTS the wave-6 residue call)
+
+**A sampled tail-distinctness proof certifies NOTHING about
+completeness.** Wave 6 examined the tails of the exactly-200,000
+`items_seen` files and called 210006 / 210055 harmless; wave 12's
+full-parse comparisons proved that wrong for both:
+
+- **210006 UMMC** — source 408,326 items / 341,047 distinct
+  (code, description) keys vs canonical 200,000 / 173,768:
+  **167,279 distinct keys were missing.** Rebuilt from source
+  (header identity: Baltimore, NPI 1801334040) and republished.
+- **210055 UM Laurel** — source 397,061 / 330,729 vs canonical
+  200,000 / 170,427: **160,302 distinct keys missing.** Same repair
+  (Laurel MD, NPI 1720099286).
+- **140100** — zero distinct loss, proven the same way: full parse
+  of the Wayback capture of its exact source URL (same
+  2025-12-31 vintage) gives 343,925 items / 13,904 distinct ==
+  the canonical's 13,904 distinct, missing 0, extra 0. No action.
+
+The display slim `n` for the two UMMS hospitals is unchanged by
+design (8,964 / 3,922 — one display row per charge code), but
+`n_total_raw` now reads 408,326 / 397,061 and their slim price
+aggregates derive from the complete sources. Standing rule:
+completeness is proven ONLY by a full source-count comparison
+(source entry count and distinct-key count vs the canonical's) —
+the Method-work "No arbitrary silent limits" completeness check,
+with sampling explicitly demoted to a screening signal. Any older
+completeness claim resting on a sampled tail proof is UNVERIFIED
+until re-proven by full comparison. The fleet's exactly-200,000
+signature set is now settled by full comparisons (030138, 140100
+clean; 210006, 210055 repaired; the wave-5/6 recoveries rebuilt).
+
+### The six gates (wave 11d — all live, shas are the builds of record)
+
+- **Gate 1 — publish-time identity gate.** `publish_mini.py`
+  `identity_gate()` runs on EVERY publish (Mini sha `afd339ca…`;
+  the VM copy is converged). It refuses on: the shared holds file
+  (a missing/unreadable holds file FAILS CLOSED — this closed the
+  wave-11a gap where the publisher had no hold list), a REJECT-URL
+  match, an EIN contradiction, a city/state contradiction, a total
+  name contradiction. Identity precedence: the canonical's
+  `source_identity` (Gate 2) → URL slug → the winning verdict's
+  quoted header evidence. **Documented narrowing (Barklee-flagged,
+  standing):** a legacy canonical with NO recoverable identity
+  evidence passes with a loud warning — refusing the whole
+  unverifiable legacy class (~513 at wave 8) would halt the
+  campaign; every POSITIVE contradiction refuses. **F3 (wave 12):**
+  the gate's registry-identity lookup misses mrf_seed-only CCNs
+  (all 10 wave-12 owners + 210006 logged "no registry identity
+  row" and skipped the R3/R4 checks; the holds check and R0/R2
+  still ran). Same narrowing family; a mis-seed INTO an
+  mrf_seed-only CCN would get no R3/R4 scrutiny today.
+- **Gate 2 — builders stamp `source_identity`.** Both builders
+  extract the file's own header identity at build time and stamp it
+  ALONGSIDE the target name (never instead of it):
+  `payload/remote_build.py` sha `bbdc314f…`,
+  `build_canonical_mini.py` sha `6f21e044…` (the 11d build; see the
+  F2 note for its current sha). Proven field-for-field against
+  header reads. **F2 hazard — FIXED 2026-11-10 (write-back #5):**
+  `build_canonical_mini.py` loaded its parser from
+  `~/hl-stamp-test/scripts/mrf_parse.py` — a stale pre-fix copy
+  (sha `62aa34be…`, no loud cap, 478 diff lines vs production) —
+  so any build through the unpatched builder would have silently
+  truncated again. The loader now points at the production payload
+  parser (sha `0bbace6d…`); post-fix builder sha `f59545ef…`,
+  backup `build_canonical_mini.py.bak-20261110-f2fix`,
+  smoke-proven (the builder's own loader resolves to the payload
+  module, SOURCE_ROW_CAP=2,000,000 and SourceTruncatedError
+  present, end-to-end build clean). Rule: builders load the
+  PAYLOAD parser, never a repo-tree copy — repo copies drift
+  behind the payload (see the bundle note below).
+- **Gate 3 — one holds file.** `~/workspace/hl-fleet/
+  adjudicated_holds.txt` (Mini copy `~/hl-fleet/
+  adjudicated_holds.txt`, byte-identical) is the ONE source of
+  truth, read by both the campaign driver (queue subtraction +
+  publish guard) and publish_mini's Gate 1. It supersedes every
+  inline hold list in any job body — inline lists are caches,
+  never the authority. Current state: **57 CCNs**, sha256
+  `6a0007f8…` (the 11 Nov-9 adjudications + 13 wave-11
+  confirmed-closed/NO_FILE + 13 b81-closed suspects + 19 wave-11e
+  federal closures + 154057). CCN 150042's quarantine is separate
+  and absolute and is NOT in the file. Holds change only by
+  Barklee adjudication recorded in a wave STATE.
+- **Gate 4 — sticky REJECTs in the importer.**
+  `import_registry.py` sha `39d4715a…`: a bare ACCEPT no longer
+  overrides an identity-bearing REJECT for the same CCN. Replay
+  proof: the historical corpus through batch b55 now resolves
+  030078 to its b51 REJECT — the exact mechanism that once let a
+  bare ACCEPT re-seed a taken-down hospital is dead.
+- **Gate 5 — one token, one facility (harvester).**
+  `cms_hpt_harvester.py` sha `8634f603…` (fleet copies): a
+  cms-hpt token claimed by ≥2 facilities (the Craneware key
+  82f7c2f5, dbTomah) is diverted to header-confirmation-only —
+  it can no longer auto-attribute to every claimant. Shared
+  tokens are recorded in `db/cms_hpt_shared_tokens.json`.
+  Single-claim controls are unaffected. (promote_discoveries.py
+  no longer exists on the VM; the harvester is the living
+  matching layer.)
+- **Gate 6 — federal exclusion at verdict/import time** (same
+  importer build as Gate 4): a federal-class ACCEPT carrying a
+  civilian file is demoted unless the verdict detail carries
+  quoted in-file civilian identity evidence — the **escape
+  hatch**, flagged for a second look; Gate 1 still blocks such
+  files at publish. Corpus effect at ship: 20 ACCEPT→REJECT
+  demotions (registry ACCEPT 1,814 → 1,794, exactly): 39013F's
+  bare ACCEPT (see Corrections) + the 19 live federal CCNs that
+  became wave 11e.
+
+### Standing adjudication state after waves 11–12
+
+- **Taken down and closed (REJECT verdicts stand):** the 18 wave-8
+  confirmed mis-seeds (b78), the 20 wave-11c confirmed-wrong
+  suspects (b81), the 19 wave-11e federal closures (b82), and
+  154057 (b83) — 58 takedowns across the program; every one is in
+  the holds file or covered by a closure verdict.
+- **Released on header evidence, live with their OWN files (14):**
+  520066 (n=22,818), 050471 PIH Health Good Samaritan Los Angeles
+  (18,982), 131303 (6,067), 224045 (5), 230223 (14,195), 361327
+  (17,203, cleared — combined file names it), 490032 VCU (48,968,
+  cleared — header address is the registry address), 140064
+  (18,340), 194082 / 194085 / 194109 (3 each), 452096 (806),
+  453312 (34,648, via its own Craneware key), 673059 (2,184).
+- **Corrected in place:** 050380 Good Samaritan Hospital, San Jose
+  — seeded with its own Tenet file (the blob wave 6 had wrongly
+  published under 050471), live n=66,511; 290007 UMC Southern
+  Nevada — reassigned from under 29004F/299800, live n=29,385;
+  132002 — legacy n=65 index-only entry replaced by its own file,
+  n=4,398 (wave 12).
+- **154057 Options Behavioral Health System (Indianapolis IN) —
+  NO_FILE, closed.** Its live canonical was the Mercyhealth
+  Janesville file (md5-identical to 520066's canonical; attached
+  by a b2 bare bulk ACCEPT; wave 8's foreign-token heuristic
+  missed it because the slug token is concatenated — see
+  Corrections). The facility itself was shut down by its operator
+  (Acadia Healthcare); its domain is NXDOMAIN; no own file exists.
+- **Registry after b83:** 5,984 rows, ACCEPT 1,803, live 5,568,
+  submit_ready 8. Store-but-not-live is exactly three by design:
+  084001 + 154064 (the correctly-zero dialect pair) + 254009
+  (held, canonical retained).
+
+### Reassignment method (wave 12 — recovering a file's true owner)
+
+When a takedown's quarantined canonical provably belongs to a
+different, not-live CCN: build the owner's canonical as a
+field-corrected copy of the quarantined one, with the item stream
+proven identical TWO independent ways; stamp `source_identity`
+from the owner's own source file RE-FETCHED at adjudication time
+(never from the quarantined copy's stamp); record the adjudication
+ACCEPT quoting the header evidence; publish serially via
+publish_mini; the check is landing at exactly the census-predicted
+n. Wave-12 results (all at predicted n): 052036 → 14,685,
+152007 → 14,331, 182001 → 14,493, 332006 → 2,560, 352004 → 4,459,
+362033 → 14,596, 372004 → 3,630, 392027 → 15,359, 452023 → 15,496,
+plus 132002 in place (above). Two cases stayed research-only:
+**14034F's owner is resolved to 142008** (mrf_seed slug
+`844178881_chicago-north_standardcharges.csv` vs 142009's Lakeshore
+slug — documented, not published), and **31001F's owner is
+unresolved** (the file is Kindred Hospital East New Jersey,
+Passaic; no Passaic/East New Jersey CCN exists in mrf_seed, and
+312020 is Morris County — a different facility).
+
+### Lock discipline + importer hardening (waves 10–11)
+
+- **Never remove a lock file that is not yours.** In wave 10 an
+  agent ran `rm -f publish.lock` while wave 6's 050471 publish was
+  live. The serial invariant held in fact (verified by process
+  observation) — by luck, not by right. A lock's presence is
+  settled by observing the holding PROCESS; a stale-looking lock
+  with no live process is reported, and removal is a decision,
+  never a reflex.
+- **Importer single-instance flock + visibility logging**
+  (2026-11-10): concurrent registry refreshes once shared one
+  staging table and one log; the loser's INSERTs died with HTTP
+  400 "no such table" after the winner's swap, silently. The
+  importer now takes an flock on `.import_registry.lock` — a
+  second launch prints LOCKED and exits 3 in ~1 s; the campaign
+  driver treats exit 3 as benign. Every run prints a START line,
+  every failed D1 attempt, and tracebacks to stdout: a refresh is
+  never silent again. This extends the 2026-11-02 silent-deaths
+  entry in the Campaign driver section.
+- **Refresh race, restated:** a verdict batch written mid-refresh
+  is shadowed by that refresh. Absorption is proven via a local
+  `build_rows()` computation (build_rows ACCEPT count == D1
+  read-back), never from timestamps or a refresh's exit code.
+
+### Corrections of record (waves 11–12)
+
+- **39013F — resolved.** Its b47 bare ACCEPT is demoted by Gate 6;
+  the stage stays not_found. The long-queued adjudication is
+  closed registry-side; no scrub of the verdict files is needed.
+- **45188E — never a CMS-issued CCN.** The Ennis Regional file
+  belongs to 450833 (re-keyed per the CMS seed in discovery-wave-4;
+  the 45188E-keyed ACCEPT row was the malformed-source artifact).
+  45188E's registry stage is corrected off submit_ready, and the
+  wave-10 guard refuses it on evidence. Do not "fix" 45188E into a
+  real queue row; the CCN does not exist.
+- **100287 — seed is wrong, fail-closed on purpose.** The
+  production `mrf_seed` points 100287 at goodsamsanjose.com (a
+  different hospital's domain). The CCN is live with its own file
+  (Hyve Healthcare host, n=18,443); the seed correction is queued
+  for the normal verdict path — never hand-edit the seed (see
+  also the intake lane's domain-binding note).
+- **Concatenated-slug blind spot (the 154057 mechanism):**
+  foreign-token heuristics that tokenize the source slug miss a
+  slug that is ONE concatenated token (`mercyjanesvillehospital`)
+  — no token boundary, no foreign token, no flag. Heuristics must
+  ALSO match the full slug against registry names. Wave 8's sweep
+  classified 154057 UNVERIFIABLE for exactly this reason while it
+  served another hospital's file live.
+- **Suffixed CCNs and the publish-tree registry DB:** suffixed
+  CCNs are absent from the Mini publish-tree registry DB, so their
+  hospital submissions process fully but can never
+  identity-verify or list from that DB (see the intake lane's
+  Known limits) — a coverage gap in the DB, not a verdict on the
+  facilities.
+
+### Flagged deploy step — pipeline-bundle rebuild (do not improvise)
+
+The Gate 5 harvester change lives in the fleet copies
+(sha `8634f603…`); the repo copy (`~/hospital-ledger/scripts/
+cms_hpt_harvester.py`, sha `f4856e09…`) is still pre-Gate-5.
+Before the pipeline bundle is next distributed, it must be rebuilt
+and re-sha'd per the repo's AGENTS.md so the bundle carries the
+Gate 5 build — a flagged deploy step for the bundle's own cycle.
+Do NOT hand-copy the harvester into the repo or the bundle from a
+fleet session; that is how copies diverge silently (the F2
+stale-parser hazard was the same shape).
 
 ## Hospital-submitted intake lane (added 2026-11-10 — hospitals submit their own file)
 
