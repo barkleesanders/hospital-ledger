@@ -780,7 +780,9 @@ alone — session-owned controllers die at compaction.
   /price-transparency/ page from inside the tab and extract the current
   file link (monthly WP upload rotation changes both folder and filename,
   e.g. Caribbean's "standarcharges1.csv" typo is real). Wayback works too
-  when the PT page is archived (050543 chcm.us).
+  when the PT page is archived (050543 chcm.us). **2026-11-09 refinement:**
+  sgcaptcha comes in two flavors (JS-check vs textual CAPTCHA) — see
+  Chrome-lane lessons (2026-11-09) below before spending lane time.
 - **Verifier misattribution is a class, not noise:** same-name/wrong-hospital
   ACCEPTs (Rochester Regional's shared RGH tall file seeded to 5 sibling
   CCNs; UMMS x4; Florida AHCA MiamiDade xlsx x4; San Jose page for FL/NY
@@ -1361,6 +1363,90 @@ alone — session-owned controllers die at compaction.
   when its canonical is in the Mini store and a publish_mini index shows
   it — verify wave claims against the settled index before reporting
   counts, and never let a wave publish outside the Mini lane.
+
+## Chrome-lane lessons (2026-11-09 — the walled-file lane, run end-to-end)
+
+Evidence: `~/workspace/hl-fleet/chrome-lane-20261109/RUN-NOTE.md` +
+`UNKNOWNS.md` (U1–U9). The 24-row worklist closed 19 published / 3
+wall-holds / 2 dead-source REJECTs (live 5,534 → 5,553 priced; publish
+SUCCESS, byte-verify OK, 23 keys). Authorization: Barklee, 2026-11-09
+~19:15 PT. Lane = Mini real Chrome (Default profile) via fcdp over SSH,
+plus fleet-sanctioned routes only (Mini curl, cms-hpt, Wayback, Firecrawl
+cloud /map) — no agent web tools touched any HL URL. Parses used the
+adopted payload parser (bbca5ce1…), staged as `scripts/` per the
+controller layout.
+
+- **Mercy / Bon Secours `.ashx` 404 = slug rotation, NOT a wall (U1, U8).**
+  Sitecore media-library slugs rotate when files are re-published; the old
+  slug redirects to the site's /404 page, so a staged "portal HTML" body
+  can literally be the 404 page (byte sizes match — check that signature
+  before calling anything a wall). Rule: before queueing any Mercy / Bon
+  Secours case for the Chrome lane, re-derive the current slug from the
+  hospital's cms-hpt.txt — cms-hpt is the system's own pointer file, and
+  plain Mini curl then serves the file as text/csv with no browser at
+  all. 9 hospitals recovered this way: 361306, 360001, 360016, 360056,
+  360086, 490059, 490069, 490092, 490094. **Same-EIN sibling
+  disambiguation (U9):** one system's cms-hpt can list two facilities
+  under one EIN (360086 Springfield vs Urbana Hospital, EIN 310785684) —
+  take only the file whose slug NPI suffix AND in-file type_2_npi +
+  location_name match the target CCN.
+- **SiteGround sgcaptcha has TWO flavors, per-site not per-network (U2).**
+  Classify the flavor from the challenge page before spending lane time:
+  (a) **JS-check** — auto-clears in real Chrome; open the file URL and the
+  download proceeds (the five PR Metropolitano sites 400106, 400117,
+  400126, 400130, 404007; SUN Delaware's captcha also cleared this way).
+  (b) **Textual image CAPTCHA** ("Robot Challenge Screen",
+  `/.well-known/captcha/`) — human-only hold; do not burn lane time
+  retrying (451338 Culberson, 451347 Coleman County — screenshots in the
+  run's staging evidence/; Wayback had no captures for either). This
+  refines the older SiteGround bullet in Method-work lessons, which
+  predates the textual flavor.
+- **In-page fetch→blob is the large-file / fingerprint-wall technique
+  (U6, U7).** When a direct Chrome download stalls mid-file (MyMichigan
+  230239 died at 11,396,358 of 68,882,196 B) or the wall is
+  client-fingerprint (Akamai, Sucuri CloudProxy, Cloudflare — scripted
+  clients 403 regardless of UA), fetch the file URL with `fetch()` from
+  inside an already-loaded tab on the hospital's own origin — the page's
+  clearance carries — assemble a blob, download it, and **size-verify
+  byte-exact** against the expected length before trusting the bytes.
+  Proven: 230239 (68,882,196 B, Akamai), 500008 UWMC (77,795,301 B,
+  Akamai), 070007 L+M (102,659,995 B, Cloudflare — cms-hpt at the
+  non-root path /LMAssets/cms-hpt.txt, reachable only in Chrome), 230031
+  Lake Huron (Sucuri; domain derived from cms-hpt — mylakehuron.com).
+  Tooling note: fcdp js does NOT await promises — launch the fetch, then
+  poll window state.
+- **SharePoint: prefer the cms-hpt-declared sharing link (U3).**
+  Intranet library paths redirect to a Microsoft login wall; the cms-hpt
+  sharing link (`/:x:/s/…?e=…&download=1`) is the public route and
+  downloads anonymously in Chrome (161365 Greater Regional — attester
+  in-file matched the cms-hpt contact). Never queue a SharePoint library
+  URL for the Chrome lane without first checking cms-hpt for the
+  sharing-link form.
+- **Dead-source discipline — REJECT with evidence, not wall-hold.**
+  (a) Both of an operator's domains parked on registrar landers = source
+  dead: 250017 (traceregiional.com + progressivehealthgroup.com; b47's
+  "verified" body was the 114-B lander stub itself — a stub that small is
+  a lander until proven otherwise). → b69 REJECT. (b) Origin-404 on BOTH
+  the recorded URL and the site's current PT-page link, with no Wayback
+  capture, = source dead: 084005 SUN Behavioral Delaware (only
+  shoppable-services and OP-stats files exist — not the comprehensive
+  MRF). → b69 REJECT. (c) A source can break at origin within days:
+  040088 was fleet probe-verified 2026-11-05; by 2026-11-09 the file path
+  AND cms-hpt.txt serve homepage HTML and a full Firecrawl /map (346
+  links) shows no transparency page at all. Verdict row left untouched
+  (the URL is the facility's own declared path); the weekly cms-hpt
+  harvest is the standing re-check for this class — do not re-derive by
+  hand between harvests.
+- **Legacy CMD workbook identity exception (bounded).** The five PR
+  Metropolitano .xlsx workbooks carry NO in-file hospital identity
+  (legacy single-sheet chargemaster format; same creator string on all
+  five). They were accepted on first-party provenance — and ONLY because
+  all four conditions held: (1) served from the facility's own dedicated
+  domain, (2) at the fleet-recorded path, (3) all files byte-distinct,
+  (4) content size consistent with facility size (psych hospital
+  smallest). Provenance-acceptance is valid only when ALL FOUR hold;
+  otherwise the identity gate (in-file header/metadata vs registry
+  record) applies as usual and the file does not stage.
 
 ## Self-improvement loop — every fleet failure pays rent (standing protocol)
 
