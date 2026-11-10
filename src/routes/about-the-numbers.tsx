@@ -74,12 +74,12 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 							</thead>
 							<tbody class="text-zinc-300">
 								<tr class="border-b border-zinc-900">
-									<td class="py-3 pr-3 font-medium">All US hospitals</td>
+									<td class="py-3 pr-3 font-medium">CMS's published list</td>
 									<td class="py-3 pr-3 text-right tab-num">
 										{fmt(totalFacilities)}
 									</td>
 									<td class="py-3 text-zinc-400">
-										Rows in CMS Hospital General Information.
+										Rows in CMS Hospital General Information — the hospital list CMS publishes for Care Compare.
 									</td>
 								</tr>
 								<tr class="border-b border-zinc-900">
@@ -89,7 +89,10 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 									</td>
 									<td class="py-3 text-zinc-400">
 										Acute care, critical access, children's, and rural emergency
-										hospitals — the set 45 CFR § 180 binds.
+										hospitals in CMS's published list — this site's
+										checkable operationalization of the set 45 CFR § 180
+										binds. The rule itself keys on state licensure; see
+										"The wider universe" below.
 									</td>
 								</tr>
 								<tr class="border-b border-zinc-900">
@@ -131,7 +134,7 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 						facilities. Our campaign registry is a union of three sets:
 						that seed list, every facility our discovery work verified
 						a price file for, and every record in the live price index.
-						As of the registry read-back on 2026-11-08 it tracks{" "}
+						As of the registry read-back on 2026-11-10 it tracks{" "}
 						<span class="tab-num">{fmt(REGISTRY_TRACKED_FACILITIES)}</span>{" "}
 						facilities —{" "}
 						<span class="tab-num">
@@ -150,13 +153,20 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 						appearing in Hospital General Information.
 					</p>
 					<p class="mt-3 text-zinc-300 leading-relaxed">
-						Every facility the registry adds beyond the seed was
-						identity-verified before it could be published here: the
-						CCN, hospital name, and taxpayer ID in the facility's own
-						published file must match the registry record. Records
-						that failed that check — including malformed or phantom
-						keys found along the way — were excluded or quarantined
-						rather than published.
+						A facility the registry adds beyond the seed is published
+						only after an identity check: the name and identifiers inside its own published file must match the registry record, and the publisher refuses a
+						file whose header contradicts it. That gate is newer than
+						the catalog. In November 2026 we re-audited the live
+						catalog against the files' own headers and removed 58
+						files that had been published under the wrong facility —
+						inherited bulk approvals, shared vendor files, federal
+						facilities carrying civilian files — and republished the
+						right files under their verified owners. Of the live
+						catalog,{" "}
+						<span class="tab-num">1,786</span> entries are backed by a
+						stored file whose header we verified in that re-audit; the
+						rest predate the file store and are verified at the index
+						level — present and priced — rather than header-checked.
 					</p>
 					<p class="mt-3 text-sm text-zinc-400 leading-relaxed">
 						One caveat, for the record: CMS holds more facility data
@@ -167,6 +177,75 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 						compliance (the{" "}
 						<span class="tab-num">{fmt(cmsRequired)}</span>-hospital
 						required set) — not to CMS's internal records.
+					</p>
+				</section>
+
+				<section class="mt-12">
+					<h2 class="text-xl font-semibold tracking-tight">
+						The wider universe
+					</h2>
+					<p class="mt-3 text-zinc-300 leading-relaxed">
+						Every count on this page comes from a list somebody
+						defined — and the definitions differ.
+					</p>
+					<ul class="mt-4 space-y-3 text-zinc-300 leading-relaxed">
+						<li class="flex gap-3">
+							<span class="text-emerald-400 mt-1">▸</span>
+							<span>
+								The American Hospital Association counts{" "}
+								<span class="tab-num font-semibold text-white">6,100</span>{" "}
+								U.S. hospitals (Fast Facts 2026): about 5,100 community
+								hospitals, plus federal, psychiatric, and other
+								specialty facilities.
+							</span>
+						</li>
+						<li class="flex gap-3">
+							<span class="text-emerald-400 mt-1">▸</span>
+							<span>
+								The price-transparency rule reaches wider: it applies to every institution
+								licensed as a hospital under state law (45 CFR
+								§ 180.20) — specialty, rehabilitation, and critical
+								access hospitals included, whether or not they take
+								Medicare. CMS estimates that universe at{" "}
+								<span class="tab-num font-semibold text-white">
+									over 7,000
+								</span>{" "}
+								institutions. Federal facilities (VA, military,
+								Indian Health Service) and state forensic hospitals
+								are deemed compliant under § 180.30 and do not post
+								files.
+							</span>
+						</li>
+						<li class="flex gap-3">
+							<span class="text-emerald-400 mt-1">▸</span>
+							<span>
+								CMS's published list — the{" "}
+								<span class="tab-num">{fmt(totalFacilities)}</span> rows
+								this site seeds from — is the Medicare-registered
+								subset of that universe, and the CMS-required count
+								above is the part of it whose facility types fall
+								under the rule. CMS publishes no roster of the 7,000+ to measure against.
+							</span>
+						</li>
+						<li class="flex gap-3">
+							<span class="text-emerald-400 mt-1">▸</span>
+							<span>
+								Independent trackers land between the frames: Turquoise Health counted 5,763 of the 6,357 hospitals
+								it tracked (90.7%) as having posted a file in 2023.
+								PatientRightsAdvocate<wbr />.org's September 2026 review of
+								2,000 hospitals found 49.4% fully compliant. Posting a file and complying with the rule are different measurements — this site tracks the first: a verified live file.
+							</span>
+						</li>
+					</ul>
+					<p class="mt-4 text-sm text-zinc-400 leading-relaxed">
+						Sources:{" "}
+						<a
+							href="https://www.aha.org/statistics/fast-facts-us-hospitals"
+							class="underline hover:text-zinc-200"
+						>
+							AHA Fast Facts on U.S. Hospitals, 2026
+						</a>
+						; 45 CFR §§ 180.20, 180.30; CMS CY 2024 OPPS fact sheet; Turquoise Health 2023; PatientRightsAdvocate.org, Eighth Compliance Report (Sept 2026). Accessed 2026-11-10.
 					</p>
 				</section>
 

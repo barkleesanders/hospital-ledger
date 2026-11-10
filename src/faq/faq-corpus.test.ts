@@ -197,7 +197,7 @@ describe("buildSiteCorpus / budget", () => {
 		// prompt fails here, not silently in production.
 		const total = site.reduce((n, d) => n + d.text.length, 0);
 		expect(total).toBeGreaterThan(10_000); // the pages really rendered
-		expect(total).toBeLessThan(23_000); // measured 21,868 on 2026-11-09 after the CMS-gap copy (16,767 on 2026-09-18)
+		expect(total).toBeLessThan(26_500); // measured 25,123 on 2026-11-10 after the universe-framing copy (21,868 on 2026-11-09 after the CMS-gap copy; 16,767 on 2026-09-18)
 
 		for (const record of [
 			hospitalDoc(CCN, HOSPITAL),
