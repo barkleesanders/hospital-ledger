@@ -33,8 +33,12 @@ mp = load("mrf_parse_repo", os.path.join(REPO, "scripts", "mrf_parse.py"))
 
 
 class FakePublishHelpers:
-    """publish_mini._name_consistent, restated: token-set containment
-    either way, >= 2 tokens on both sides."""
+    """publish_mini._name_consistent, copied faithfully — INCLUDING its
+    lowercase-only candidate tokenization: candidates must be
+    pre-lowercased by the caller (publish_mini's own callers pass
+    _identity_candidates output, which is lowered). A double that
+    lowercased for the caller hid exactly the bug the live E2E caught
+    (uppercase registry names never matching)."""
 
     @staticmethod
     def _name_consistent(header, candidates):
@@ -42,7 +46,7 @@ class FakePublishHelpers:
         if len(ht) < 2:
             return False
         for cand in candidates:
-            ct = set(re.findall(r"[a-z0-9]+", (cand or "").lower()))
+            ct = set(re.findall(r"[a-z0-9]+", cand or ""))
             if len(ct) >= 2 and (ct <= ht or ht <= ct):
                 return True
         return False
@@ -82,6 +86,20 @@ class IdentityGateTests(unittest.TestCase):
         verdict, detail = self.gate({
             "hospital_name": "EXAMPLE GENERAL HOSPITAL",
             "state": "CA", "city": "Springfield", "license": "70000048"})
+        self.assertEqual(verdict, "VERIFIED", detail)
+
+    def test_extract_tenet_shaped_header_verifies(self):
+        doc = {
+            "hospital_name": "GOOD SAMARITAN MEDICAL CENTER, INC.",
+            "hospital_address": ["1309 N Flagler Dr, West Palm Beach, FL 33401"],
+            "license_information": {"license_number": "4070", "state": "FL"},
+            "version": "3.0.0",
+        }
+        extracted = ps.extract_identity_json(doc)
+        self.assertEqual(extracted.get("state"), "FL")
+        self.assertEqual(extracted.get("city"), "West Palm Beach")
+        self.assertEqual(extracted.get("license"), "4070")
+        verdict, detail = self.gate(extracted, ccn="100287")
         self.assertEqual(verdict, "VERIFIED", detail)
 
     def test_mismatch_file_names_another_hospital(self):
@@ -147,6 +165,34 @@ class FindingsTests(unittest.TestCase):
 
 
 class NormalizedTests(unittest.TestCase):
+    def test_payer_rows_conserved_across_methodologies(self):
+        header = {"hospital_name": "EXAMPLE GENERAL HOSPITAL",
+                  "last_updated_on": "2026-09-01"}
+        base = {"description": "XRAY", "code": "71045", "code_type": "CPT",
+                "setting": "outpatient", "gross_charge": 100.0,
+                "cash_discount": 80.0}
+        items = [
+            dict(base, payer_rates=[
+                {"payer": "ACME", "plan": "PPO", "rate_dollar": 90.0,
+                 "methodology": "fee schedule"},
+                {"payer": "ACME", "plan": "PPO", "rate_dollar": None,
+                 "methodology": "percentage of charges"},
+            ]),
+            dict(base, payer_rates=[
+                # exact duplicate of the first row -> deduped
+                {"payer": "ACME", "plan": "PPO", "rate_dollar": 90.0,
+                 "methodology": "fee schedule"},
+                # same payer+plan, different rate -> kept
+                {"payer": "ACME", "plan": "PPO", "rate_dollar": 70.0,
+                 "methodology": "fee schedule"},
+            ]),
+        ]
+        doc = ps.build_normalized(header, items, "REGISTRY NAME", "2026-11-10")
+        sci = doc["standard_charge_information"]
+        self.assertEqual(len(sci), 1)
+        payers = sci[0]["standard_charges"][0]["payers_information"]
+        self.assertEqual(len(payers), 3, payers)
+
     def test_grouping_and_no_invention(self):
         header = {"hospital_name": "EXAMPLE GENERAL HOSPITAL",
                   "reporting_entity_name": "EXAMPLE GENERAL HOSPITAL INC",
