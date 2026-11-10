@@ -232,7 +232,7 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 							<span>
 								Independent trackers land between the frames: Turquoise Health counted 5,763 of the 6,357 hospitals
 								it tracked (90.7%) as having posted a file in 2023.
-								PatientRightsAdvocate.org's September 2026 review of
+								PatientRightsAdvocate<wbr />.org's September 2026 review of
 								2,000 hospitals found 49.4% fully compliant. Posting a file and complying with the rule are different measurements — this site tracks the first: a verified live file.
 							</span>
 						</li>
