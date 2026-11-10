@@ -16,6 +16,7 @@ npm run typecheck
 npm run test:site-data
 npm run test:faq
 npm run test:fetch-proxy
+npm run test:submissions
 node --test tests/client-ux.test.js
 npm run build
 npm run build:faq-island

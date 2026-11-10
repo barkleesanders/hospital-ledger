@@ -97,11 +97,11 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						CMS-required hospitals have a live machine-readable file.
 					</p>
 					<p class="mt-4 text-base sm:text-lg md:text-xl text-zinc-400 max-w-2xl leading-snug">
-						CMS requires hospitals to post their prices, but it publishes
-						no aggregated, standardized database of them — the files sit
-						scattered across thousands of hospital websites, and CMS's
-						own published hospital list doesn't include every facility
-						that posts one. Our registry tracks{" "}
+						CMS requires hospitals to post their prices, but it publishes no
+						aggregated, standardized database of them — the files sit scattered
+						across thousands of hospital websites, and CMS's own published
+						hospital list doesn't include every facility that posts one. Our
+						registry tracks{" "}
 						<span class="font-semibold text-white tab-num">
 							{fmt(REGISTRY_TRACKED_FACILITIES)}
 						</span>{" "}
@@ -109,8 +109,8 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						<span class="font-semibold text-white tab-num">
 							{fmt(totalFacilities)}
 						</span>{" "}
-						on CMS's published list — and this site standardizes their
-						files into one searchable database.
+						on CMS's published list — and this site standardizes their files
+						into one searchable database.
 					</p>
 					{/* "Ask anything" — the first interactive control on the page, in the
 					    same column as the lead paragraph (max-w-2xl). The hero's own CTA
@@ -376,6 +376,12 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						>
 							Where this data comes from
 						</a>
+						<a
+							href="/submit"
+							class="rounded-md border border-emerald-700 px-5 py-2.5 text-emerald-200 hover:bg-emerald-950 transition"
+						>
+							For hospitals: submit your file →
+						</a>
 					</div>
 				</div>
 			</header>
@@ -545,8 +551,9 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 							<p class="text-zinc-400">
 								Type a procedure name (<em>"MRI knee"</em>), a CPT code (
 								<code class="mono text-emerald-300">73721</code>), an insurer,
-								or a hospital. We match it against {fmt(standardizedPriceHospitals)} U.S. hospitals'
-								published price files.
+								or a hospital. We match it against{" "}
+								{fmt(standardizedPriceHospitals)} U.S. hospitals' published
+								price files.
 							</p>
 						</div>
 						<div>
@@ -683,8 +690,10 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 					</div>
 					<h2 class="serif text-2xl sm:text-3xl md:text-4xl mb-3">
 						Three days to launch. Rebuilt deeper.{" "}
-						<em class="text-emerald-300">~{Math.round(totalHours / 2080)} person-years</em> of human work —
-						updated daily.
+						<em class="text-emerald-300">
+							~{Math.round(totalHours / 2080)} person-years
+						</em>{" "}
+						of human work — updated daily.
 					</h2>
 					<p class="text-zinc-300 max-w-3xl leading-relaxed">
 						Hospital Ledger launched in May 2026 from a three-day build by two
@@ -742,7 +751,9 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 										<td class="py-2 pr-3">
 											~77 min avg (90% × 66 min clean + 10% × 180 min hard)
 										</td>
-										<td class="py-2 pr-3 text-right text-emerald-300">{fmt(parseHours)}</td>
+										<td class="py-2 pr-3 text-right text-emerald-300">
+											{fmt(parseHours)}
+										</td>
 									</tr>
 									<tr>
 										<td class="py-2 pr-3">
@@ -750,7 +761,9 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 										</td>
 										<td class="py-2 pr-3">{fmt(cmsRequiredTotal)} hospitals</td>
 										<td class="py-2 pr-3">~5 min / hospital</td>
-										<td class="py-2 pr-3 text-right text-emerald-300">{fmt(findHours)}</td>
+										<td class="py-2 pr-3 text-right text-emerald-300">
+											{fmt(findHours)}
+										</td>
 									</tr>
 									<tr>
 										<td class="py-2 pr-3">
@@ -832,12 +845,18 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 							</table>
 						</div>
 						<p class="mt-3 text-xs text-zinc-500">
-							≈ <span class="text-emerald-300">{(totalHours / 2080).toFixed(2)} person-years</span> at 40
-							hr/week fully-utilized, or roughly{" "}
-							<span class="text-emerald-300">{Math.floor(totalHours / 1040)}–{Math.ceil(totalHours / 1040)} calendar years</span> for one
-							analyst working a sustainable 20 hr/week on the side. And that is
-							just the build — keeping it current never ends: the pipeline
-							re-checks dozens of hospitals every night and re-verifies
+							≈{" "}
+							<span class="text-emerald-300">
+								{(totalHours / 2080).toFixed(2)} person-years
+							</span>{" "}
+							at 40 hr/week fully-utilized, or roughly{" "}
+							<span class="text-emerald-300">
+								{Math.floor(totalHours / 1040)}–{Math.ceil(totalHours / 1040)}{" "}
+								calendar years
+							</span>{" "}
+							for one analyst working a sustainable 20 hr/week on the side. And
+							that is just the build — keeping it current never ends: the
+							pipeline re-checks dozens of hospitals every night and re-verifies
 							compliance weekly, work a human team would have to staff forever.
 							The 99 GB of raw MRF data is too large to retype — nobody types
 							it; they normalize. The cost is mapping, not keystrokes. Reading
@@ -860,8 +879,8 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 									~${fmt(Math.round((totalHours * 100) / 1000) * 1000)}
 								</div>
 								<div class="text-xs text-zinc-500 mt-2 leading-relaxed">
-									{fmt(totalHours)} hr × $100/hr — the midpoint of published US healthcare
-									data-analyst freelance rates ($93–$160/hr per{" "}
+									{fmt(totalHours)} hr × $100/hr — the midpoint of published US
+									healthcare data-analyst freelance rates ($93–$160/hr per{" "}
 									<a
 										class="underline hover:text-zinc-300"
 										href="https://www.ziprecruiter.com/Salaries/Healthcare-Data-Analytics-Salary"
@@ -875,8 +894,8 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 									>
 										goLance 2026
 									</a>
-									). Senior healthcare specialists quote ~$200/hr — that's a
-									${(totalHours * 200 / 1000000).toFixed(2)}M build.
+									). Senior healthcare specialists quote ~$200/hr — that's a $
+									{((totalHours * 200) / 1000000).toFixed(2)}M build.
 								</div>
 							</div>
 							<div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
@@ -1067,6 +1086,42 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 							No cookies. No signup. Free forever.
 						</span>
 					</p>
+				</section>
+
+				<section
+					id="for-hospitals"
+					class="rounded-xl border border-emerald-700/30 bg-gradient-to-br from-emerald-950/30 to-zinc-900/40 p-4 sm:p-6 fade-in"
+				>
+					<div class="section-rule">
+						<span class="num">05</span>
+						<span class="label">For hospitals</span>
+						<span class="line" />
+					</div>
+					<h2 class="serif text-2xl sm:text-3xl md:text-4xl mb-2">
+						Run a hospital? Send us your file directly.
+					</h2>
+					<p class="text-zinc-400 mb-4 max-w-2xl">
+						Most files reach this database when our harvester finds them on a
+						hospital's own website. If yours is hard to find, in a format
+						patients can't use, or not posted yet, submit it here instead: free
+						processing, a plain-language validation report against the CMS
+						template requirements, and a clean CMS-template file built from your
+						own data, ready to post.
+					</p>
+					<p class="text-zinc-400 mb-5 max-w-2xl">
+						One thing we won't claim: submitting here does not by itself meet
+						the CMS requirement — the file has to live on your hospital's own
+						website. The file we hand back is built for exactly that. And if you
+						want to be listed from your submission, you can verify your website
+						and opt in; the same identity and completeness gates every harvested
+						file passes still apply.
+					</p>
+					<a
+						href="/submit"
+						class="inline-block rounded-md bg-emerald-500 px-5 py-2.5 font-medium text-zinc-950 hover:bg-emerald-400 transition"
+					>
+						Submit your price file →
+					</a>
 				</section>
 
 				<section id="search">
