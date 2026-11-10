@@ -464,7 +464,7 @@ first — fingerprint the staged bytes before touching the parser.
 **Queue derivation — D1 REGISTRY IS PRIMARY since 2026-10-30** (migration
 report: ~/workspace/hl-fleet/method-work/d1-registry-migration-20261030.md):
 the campaign registry lives in Cloudflare D1 database
-`hospital-ledger-registry` (uuid in fleet records),
+`hospital-ledger-registry` (uuid (uuid in fleet records)),
 table `hospital_registry`, **CCN is the PRIMARY KEY** — the duplicate-row
 class is now structurally impossible. Driver flow: refresh with
 `~/workspace/hl-gap-research/registry/import_registry.py --refresh`
@@ -840,6 +840,30 @@ alone — session-owned controllers die at compaction.
   Good Samaritans). Before parsing a shared/system file for a CCN, read
   its metadata rows (hospital_name/location) — never publish system rows
   under a sibling CCN.
+- **No arbitrary silent limits — and a green publish is not proof of
+  completeness (wave 4, 2026-11-09; Barklee directive: "a harsh limit
+  that doesn't even make sense" was a huge mistake):** any limit in
+  fleet pipeline code must be (a) derived from measured data, with the
+  headroom stated, or absent; (b) LOUD when hit — a cap that binds is
+  a failure to report, never a silent truncation; (c) stated in one
+  visible place, not buried in function defaults. Where no natural
+  limit exists, do not invent one: process everything, chunking for
+  memory instead of capping for convenience. **Completeness check:**
+  whenever a source is parsed, compare the parsed output against the
+  SOURCE's own counts (e.g. streaming entry count vs canonical items)
+  — a discrepancy is a defect to surface, not a rounding difference,
+  and a publish reporting SUCCESS proves the publish mechanics only,
+  never completeness. Worked example, the 030138/330046 pair:
+  identical symptom (a parse landing at exactly 200,000 items),
+  opposite harm — 030138 lost nothing; 330046 (Mount Sinai combined
+  file) silently lost 33,203 distinct priced items (16.6%) while its
+  publishes reported success. Only the source-count comparison tells
+  the pair apart; a parse count sitting exactly on a round cap is a
+  red flag until that comparison clears it. **Parser current state
+  (2026-11-09):** `SOURCE_ROW_CAP = 2_000_000` (≈3.3× the largest
+  observed source, 605,874 entries); mrf_parse.py sha256
+  `1858d1b82091bb278105e7106ac2298729ed964847b41f8a2a4d2949ee184526`;
+  pre-change backup `mrf_parse.py.bak-20261109-cap2m`.
 - **OOM class:** Mini-local duckdb parses with DUCKDB_MEMORY_LIMIT=6GB +
   TMPDIR on the external volume cleared 3-5.3 GB tall ZIPs. For giant
   JSON, install ijson on the Mini and use stream_parse_large_json over a
@@ -858,8 +882,13 @@ alone — session-owned controllers die at compaction.
   from remote_build. Note the parser's own 200k data-row cap binds on
   every engine path: for payer-dense tall files (~253 payer rows/code
   at UKHS) the canonical covers the first 200k data rows (170049: 790
-  items, all priced) — that is the pipeline standard, not a truncation
-  bug; raising the cap is a parser-wide decision, not a per-CCN fix.
+  items, all priced). **[The "pipeline standard, not a truncation bug"
+  framing once attached to this cap is SUPERSEDED — wave 4,
+  2026-11-09: a cap that binds silently IS a truncation defect. The
+  parser's row cap now stands at SOURCE_ROW_CAP = 2_000_000, and the
+  payer-dense class has a faithful no-loss route (the 469810 chunked
+  route, in the OOM bullet below). See "No arbitrary silent limits"
+  in this section.]**
   Work dir kept at `/Volumes/Share/hl-fleet/work-170049/`.
   **Non-UTF-8 giant CSV class (210055 UM Laurel, landed 2026-11-02):**
   a source carrying raw Windows-1252 bytes (0x93/0x94 smart quotes in
@@ -872,6 +901,24 @@ alone — session-owned controllers die at compaction.
   dispatch — the parser itself stays unmodified. 210055 took the wide
   branch (CMS v3 All-Payers / HSCRC single-rate): 200,000 items, all
   priced. Work dir kept at `/Volumes/Share/hl-fleet/work-210055/`.
+- **Payer-dense faithful chunked route (469810, wave 4, 2026-11-09):**
+  when a payer-dense source defeats single-pass parsing, do NOT cap
+  it — chunk it faithfully: extract with DuckDB using the parser's own
+  settings, run the UNMODIFIED parser per key-group, and merge, with a
+  payer_rates integrity proof across the merge. 469810 went from 83
+  live items to 5,481 with 13,419,634 payer_rates entries identical
+  before/after. Chunking splits work for memory; it never drops rows —
+  a chunked route that loses payer_rates is a failed route, not a
+  smaller result.
+- **Vendor cms-hpt cross-up (451310 Ballinger, b75, wave 4,
+  2026-11-09):** FastHealth's cms-hpt pointer for 451310 serves
+  Perkins County (NE)'s file — a vendor pointer can name the WRONG
+  hospital's file outright. The real MRF was linked from the
+  hospital's own price-transparency page, and identity from the file's
+  own header decided. The pointer is a lead; the file is the verdict:
+  when a vendor pointer and the facility's own PT page disagree, work
+  the PT-page file through the identity gate and REJECT the pointer
+  file for the CCN whose header it does not carry.
 - **Rendered-page discovery patterns (2026-11-02, nine CCNs landed via
   fcdp on the Mini's real Chrome):** (1) Emory's transparency page
   renders per-hospital current-year CSV links directly in the DOM —
@@ -1620,20 +1667,25 @@ every file passed the in-file identity gate before parsing.
   degraded browser. Rule: lanes sharing the Mini's Chrome do NOT swap
   shared tooling (bridge builds, extension state) while another lane is
   mid-run.
-- **OPEN FLAG — possible mrf_parse row cap at 200,000 (unproven;
-  three exact hits as of round 3, 2026-11-09).** 030138's
-  427,924,852 B JSON parsed to EXACTLY 200,000 items (200,000 priced);
-  330046 (Mount Sinai combined file) also hit exactly 200,000 at the
-  parser; round 3 added 140100 — exactly 200,000 items / 200,000
-  priced from a 242 MB JSON. Three exact hits make a cap likely, but
-  it stays UNPROVEN until the parser code is read; a fleet parser
-  check is in flight separately (wave 4, 2026-11-09). Live slim n is
-  small in two of the three cases (030138: 6,904; 140100: 7,059), so
-  user-facing impact there is unproven either way — 330046's
-  n=199,880 is the concerning one, the case where the apparent cap
-  may have eaten real priced rows. Do NOT treat parse counts from
-  very large files as complete until mrf_parse has been checked for a
-  row limit; recorded here as an open flag, not a finding.
+- **Parser cap — RESOLVED by wave 4 (2026-11-09); this bullet began
+  as an OPEN FLAG (three exact 200,000 hits: 030138's 427,924,852 B
+  JSON parsed to EXACTLY 200,000 items / 200,000 priced; 330046,
+  Mount Sinai combined file, also exactly 200,000; 140100, exactly
+  200,000 items / 200,000 priced from a 242 MB JSON).** The parser
+  code was read: the 200,000 cap was REAL, and it had silently
+  truncated — 330046 lost 33,203 distinct priced items (16.6%) while
+  publishes reported success; 030138 and 140100 show no demonstrated
+  loss (live slim n 6,904 and 7,059), the same symptom with opposite
+  harm, distinguishable only by comparing the parse against the
+  source's own entry count. The cap now stands at
+  `SOURCE_ROW_CAP = 2_000_000` (parser sha256
+  `1858d1b82091bb278105e7106ac2298729ed964847b41f8a2a4d2949ee184526`,
+  backup `mrf_parse.py.bak-20261109-cap2m`). Standing rule: never
+  treat a parse count as complete on the publish's say-so — run the
+  completeness check (source counts vs canonical items; see "No
+  arbitrary silent limits" in the Method-work lessons). A count
+  sitting exactly on a round cap is a red flag until that comparison
+  clears it.
 
 ### Round 3 (2026-11-09 late evening — the round-2 remainder + 230030)
 
