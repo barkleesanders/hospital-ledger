@@ -421,6 +421,32 @@ fetch/parse failure records `{ccn, error}` in the summary and the batch
 continues. Any future controller (any lane) ships with per-job isolation
 from the start — one bad hospital must never be able to kill a batch.
 
+**Staged-source cache doctrine — validate, TTL, invalidate (2026-11-09,
+batch-74/75 post-mortem):** the Daytona controller's cache-if-present
+staging was the proximate cause of the batch-74/75 "no items parsed"
+class. The 2026-11-09 no-items diagnosis
+(~/workspace/hl-fleet/noitems-diagnosis-20261109/dossier.md) proved 34 of
+42 in-scope failures were NOT parser failures: the batches replayed
+staged `.src` bytes from Nov 5 (one from Oct 28) that were never MRF
+data — Mercy/Bon Secours portal HTML (~100 KB, byte-identical across
+CCNs), SiteGround captcha stubs (227–262 B), a SharePoint sign-in page,
+an HTML 404, a 114-B redirect stub. remote_build logs no size/format
+for this class, so it was invisible from batch logs alone. Doctrine,
+now in daytona_controller.py (backup .bak-20261109-cachefix):
+(1) staged bytes are classified before parse dispatch
+(`classify_staged`: HTML-class = portal / captcha / sign-in / redirect
+stub) — HTML-class bytes are a FAILED FETCH outcome ("fetch-wall"),
+never handed to the parser as a source; (2) a staged `.src` older than
+STAGED_TTL_SECS (24h) is re-fetched, never replayed; (3) a "no items
+parsed" outcome deletes the staged `.src`, so any retry re-fetches
+instead of replaying the same bytes. Proven 2026-11-09: 490069 (stale
+portal HTML) now ends "fetch-wall" in 1s with the staged file
+invalidated; control 440058 re-fetched under the TTL and parsed
+2,486/963 in a sandbox; the classifier went 6/6 on real staged
+specimens (portal HTML, captcha stub, valid JSON ×3). Diagnostic rule
+that follows: a "no items parsed" cluster is a FETCH-evidence question
+first — fingerprint the staged bytes before touching the parser.
+
 **Queue derivation — D1 REGISTRY IS PRIMARY since 2026-10-30** (migration
 report: ~/workspace/hl-fleet/method-work/d1-registry-migration-20261030.md):
 the campaign registry lives in Cloudflare D1 database
@@ -724,6 +750,20 @@ alone — session-owned controllers die at compaction.
   Children's 503300: fleet canonical had literal quote contamination and 0
   priced; fresh parse 19,047/19,047). First move for any priced=0 class:
   re-fetch + reparse before touching aliases.
+- **Dialect builds must use the controller payload's alias registry
+  (learned 2026-11-09):** a canonical is only as good as the alias
+  seeding its build path used. The 054089 / 130779 / 171359 store
+  canonicals sat priced=0 not because their sources were dialect-hard
+  but because they were built WITHOUT the payload's 35-entry
+  header_aliases.json seeding (their builds saw the 1-entry Mini-local
+  registry or an adaptive-recovery path), so columns anchored on the
+  CMS metadata preamble and prices collapsed to 0. Rebuilt
+  controller-faithfully — sandbox layout, payload scripts/ +
+  data/header_aliases.json — all three parse fully priced (28,748 /
+  1,750 / 3,292) with NO parser change. Rule: never build or rebuild a
+  canonical outside the controller's payload environment; a priced=0
+  canonical whose raw source visibly contains prices is a build-path
+  suspect before it is a dialect suspect.
 - **Poisoned learned alias:** fingerprint 428961199a411c20 mapped gross=null
   for Hemet's CDM layout (CDMCHARGE col) and adaptive recovery missed it
   (token similarity 0.80 < 0.82 cutoff). Fix: `cdmcharge` added to
@@ -1100,6 +1140,34 @@ alone — session-owned controllers die at compaction.
   method-work, hl-install tree, Mini hl-stamp-test + publish-tree +
   fleet payload (backups .bak-20261102-multidoc); the producer
   pipeline bundle regenerates from repo main on its own cycle.
+- **Broken-JSON repair loader — Puerto Rico `machine.json` family
+  (403301, 400061, FIXED 2026-11-09, both LIVE):** a
+  hospital-*.vercel.app generator emits structurally broken JSON no
+  strict loader can accept: a top-level ARRAY of [metadata object,
+  bare-key marker object `{"standard_charge_information"}`, charge
+  objects...] with the metadata object never closed in 403301 (no
+  whole-document parse exists), and in 400061 the array wrapped in an
+  unkeyed brace that continues as an XLSX-converter sheet map. Inside
+  are two charge dialects — flat entries (`standard_charges` as a DICT
+  + sibling `negotiated_rates`) and CMS-style elements with the charge
+  block keyed `standard_charge_information` and doubled
+  `de_identified_de_identified_*` keys; 400061's wide payer keys are
+  whitespace-mangled with `"N/A"`/`"DRG"`/`"PER DIEM"` sentinel
+  values. Fix in payload mrf_parse.py (adopted 2026-11-09, backup
+  .bak-20261109-jsonrepair): `load_json_bytes_repaired` runs as a
+  THIRD fallback after strict + multidoc, gated on the repaired
+  loader having produced the document — strictly-loading files can
+  never reach the new code. It synthesizes sheet-map keys, maps the
+  bare-key marker to null, and falls back to a fragment scan
+  (`_scan_json_objects`); `_split_flat_array_doc`,
+  `_normalize_flat_entry`, `_normalize_flat_entries` + `_assemble_sci`
+  normalize both dialects into the v2-data path and drop junk
+  fragments (403301: 1,257 -> 0). Results: 403301 3,669/3,669;
+  400061 15,058/15,019. Regression: strict-path controls 054123
+  (9,193/9,193) and 110043 (31,163/31,163) produce identical counts
+  under baseline and patched parsers. Diagnostic signature: a `.json`
+  MRF whose top level is an array, or that contains the literal bare
+  marker `{"standard_charge_information"}` as an element.
 - **Oversized CSV field class (231305 Ascension Standish, FIXED +
   LIVE 2026-11-02, PR #33 merged 922d95f):** the stdlib csv module's
   default 128 KiB field limit killed the whole build
