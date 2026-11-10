@@ -17,7 +17,12 @@ import { ProcedureCarousel } from "../components/ProcedureCarousel";
 import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
 import { priceCoverage } from "../lib/price-coverage";
-import { bundledSummary, loadSummary, type Summary } from "../lib/site-data";
+import {
+	bundledSummary,
+	loadSummary,
+	REGISTRY_TRACKED_FACILITIES,
+	type Summary,
+} from "../lib/site-data";
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
@@ -43,7 +48,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 	return (
 		<Layout
 			title="Hospital Ledger — what the law required, what hospitals delivered"
-			description={`A free public database of U.S. hospital price transparency — standardized prices from ${fmt(standardizedPriceHospitals)} hospitals' federally-mandated machine-readable files, verified live. Built from CMS data. CC0 licensed.`}
+			description={`A free public database of U.S. hospital price transparency — standardized prices from ${fmt(standardizedPriceHospitals)} hospitals' federally-mandated machine-readable files, verified live — more hospitals than CMS's own published hospital list tracks. CC0 licensed.`}
 			ogTitle="Hospital Ledger"
 			url={url}
 			scriptSrc={["/cpt-names.js", "/home-client.js", "/procedure-carousel.js"]}
@@ -91,6 +96,22 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						</span>{" "}
 						CMS-required hospitals have a live machine-readable file.
 					</p>
+					<p class="mt-4 text-base sm:text-lg md:text-xl text-zinc-400 max-w-2xl leading-snug">
+						CMS requires hospitals to post their prices, but it publishes
+						no aggregated, standardized database of them — the files sit
+						scattered across thousands of hospital websites, and CMS's
+						own published hospital list doesn't include every facility
+						that posts one. Our registry tracks{" "}
+						<span class="font-semibold text-white tab-num">
+							{fmt(REGISTRY_TRACKED_FACILITIES)}
+						</span>{" "}
+						facilities — more than the{" "}
+						<span class="font-semibold text-white tab-num">
+							{fmt(totalFacilities)}
+						</span>{" "}
+						on CMS's published list — and this site standardizes their
+						files into one searchable database.
+					</p>
 					{/* "Ask anything" — the first interactive control on the page, in the
 					    same column as the lead paragraph (max-w-2xl). The hero's own CTA
 					    buttons sit under the carousel and the KPI cards, below the fold on
@@ -116,7 +137,15 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						>
 							/api/prices-index
 						</a>
-						.
+						. The registry behind these counts tracks{" "}
+						<span class="tab-num text-zinc-200">
+							{fmt(REGISTRY_TRACKED_FACILITIES)}
+						</span>{" "}
+						facilities in total, and the price index holds{" "}
+						<span class="tab-num text-zinc-200">
+							{fmt(standardizedPriceRows)}
+						</span>{" "}
+						standardized rows.
 					</p>
 					<div
 						id="coverage-gap"

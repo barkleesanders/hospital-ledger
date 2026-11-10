@@ -43,6 +43,18 @@ export type SiteDataSource = "r2" | "bundled";
 
 export const bundledSummary: Summary = bundledSummaryJson;
 
+/**
+ * Facilities tracked in the campaign registry (D1 `hospital-ledger-registry`):
+ * the union of the CMS Hospital General Information seed, discovery verdicts,
+ * and the live price index. The registry refresh read-back on 2026-11-08
+ * recorded n=5,973 (campaign state: `registry_refreshed_at`). CMS's own
+ * published list — the Hospital General Information set this site seeds
+ * from — is `total_facilities` in the summary (5,426). The registry figure
+ * does not live in summary.json; re-derive it from a registry refresh
+ * read-back before changing this constant.
+ */
+export const REGISTRY_TRACKED_FACILITIES = 5973;
+
 type Bindings = { HL_MRF_PARSED?: R2Bucket };
 
 // Per-isolate memo so a burst of page views does not re-read the same 6 KB
