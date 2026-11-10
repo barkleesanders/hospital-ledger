@@ -122,6 +122,16 @@ def main() -> int:
         if "node_modules" not in p.parts
     ]
 
+    # Server-only route handlers (src/routes/api/**) never execute in a
+    # browser: their fetch() calls are Worker-side requests, not CSP
+    # subresources. Scanning them flagged the submissions verify-site
+    # fetch (src/routes/api/submissions.ts, added 2026-11-10) as a
+    # connect-src violation — a false positive that failed every
+    # predeploy gate run from that commit on.
+    files = [
+        p for p in files if p.relative_to(ROOT).parts[1:3] != ("routes", "api")
+    ]
+
     violations: list[str] = []
     checked = 0
     for path in sorted(set(files)):
