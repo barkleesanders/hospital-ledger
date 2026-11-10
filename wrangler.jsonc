@@ -64,6 +64,16 @@
 			"name": "FAQ_RATE_LIMITER_GLOBAL",
 			"namespace_id": "2026091805",
 			"simple": { "limit": 600, "period": 60 }
+		},
+		{
+			"name": "SUBMIT_RATE_LIMITER",
+			"namespace_id": "2026111003",
+			"simple": { "limit": 300, "period": 60 }
+		},
+		{
+			"name": "SUBMIT_RATE_LIMITER_GLOBAL",
+			"namespace_id": "2026111004",
+			"simple": { "limit": 600, "period": 60 }
 		}
 	]
 }

@@ -28,6 +28,16 @@ import { payersIndexHandler } from "./routes/api/payers-index";
 import { pricesHandler } from "./routes/api/prices";
 import { pricesIndexHandler } from "./routes/api/prices-index";
 import { procedureHandler } from "./routes/api/procedure";
+import {
+	abortSubmission,
+	completeSubmission,
+	initSubmission,
+	submissionNormalized,
+	submissionReport,
+	submissionStatus,
+	uploadPart,
+	verifySite,
+} from "./routes/api/submissions";
 import { homePageHandler } from "./routes/home";
 import { hospitalPageHandler } from "./routes/hospital";
 import {
@@ -36,6 +46,7 @@ import {
 } from "./routes/hospitals";
 import { payerPageHandler } from "./routes/payer";
 import { procedurePageHandler } from "./routes/procedure";
+import { submitPageHandler, submitStatusPageHandler } from "./routes/submit";
 
 export type Env = {
 	Bindings: {
@@ -49,6 +60,12 @@ export type Env = {
 		FAQ_RATE_LIMITER?: FaqRateLimiter;
 		/** The account-wide budget for /api/faq/ask, one shared key. */
 		FAQ_RATE_LIMITER_GLOBAL?: FaqRateLimiter;
+		/** Cloudflare Rate Limiting for the submission write endpoints
+		 * (init + verify-site): per IP. Floors follow the ship skill's
+		 * rate-limit rule — see wrangler.jsonc. */
+		SUBMIT_RATE_LIMITER?: FaqRateLimiter;
+		/** The account-wide budget for submission writes, one shared key. */
+		SUBMIT_RATE_LIMITER_GLOBAL?: FaqRateLimiter;
 	};
 };
 
@@ -189,12 +206,17 @@ app.post("/api/webmcp-beacon", async (c) => {
 			const raw = await c.req.text();
 			if (raw.length <= 2048) {
 				const b = JSON.parse(raw) as Record<string, unknown>;
-				const event = b.event === "register" || b.event === "execute" ? b.event : null;
+				const event =
+					b.event === "register" || b.event === "execute" ? b.event : null;
 				if (event) {
-					const str = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : null);
+					const str = (v: unknown, n: number) =>
+						typeof v === "string" ? v.slice(0, n) : null;
 					const strArr = (v: unknown) =>
 						Array.isArray(v)
-							? v.filter((x) => typeof x === "string").slice(0, 32).map((x) => (x as string).slice(0, 128))
+							? v
+									.filter((x) => typeof x === "string")
+									.slice(0, 32)
+									.map((x) => (x as string).slice(0, 128))
 							: [];
 					const tool = str(b.tool, 128);
 					if (event === "register" || tool) {
@@ -213,7 +235,9 @@ app.post("/api/webmcp-beacon", async (c) => {
 						c.executionCtx.waitUntil(
 							c.env.HL_MRF_PARSED.put(key, JSON.stringify(payload), {
 								httpMetadata: { contentType: "application/json" },
-							}).then(() => {}).catch(() => {}),
+							})
+								.then(() => {})
+								.catch(() => {}),
 						);
 					}
 				}
@@ -350,6 +374,7 @@ app.get("/sitemap.xml", async (c) => {
 	const urls: string[] = [
 		`<url><loc>${SITE}/</loc><lastmod>${lastmod}</lastmod><priority>1.0</priority></url>`,
 		`<url><loc>${SITE}/about-the-numbers</loc><lastmod>${lastmod}</lastmod><priority>0.8</priority></url>`,
+		`<url><loc>${SITE}/submit</loc><lastmod>${lastmod}</lastmod><priority>0.6</priority></url>`,
 		`<url><loc>${SITE}/hospitals</loc><lastmod>${lastmod}</lastmod><priority>0.9</priority></url>`,
 	];
 	for (const st of [...states].sort()) {
@@ -399,6 +424,20 @@ app.get("/", homePageHandler);
 // SSR methodology page explaining the gap between CMS-required, live MRF,
 // and standardized-price counts. Linked from the home-page hero + Section 03.
 app.get("/about-the-numbers", aboutNumbersPageHandler);
+
+// Hospital file submissions: the form + status pages, and the multipart
+// upload API behind them (processing itself runs in the fleet — see
+// src/routes/api/submissions.ts).
+app.get("/submit", submitPageHandler);
+app.get("/submit/status/:id", submitStatusPageHandler);
+app.post("/api/submissions/init", initSubmission);
+app.post("/api/submissions/:id/parts/:n", uploadPart);
+app.post("/api/submissions/:id/complete", completeSubmission);
+app.post("/api/submissions/:id/abort", abortSubmission);
+app.get("/api/submissions/:id/status", submissionStatus);
+app.get("/api/submissions/:id/report", submissionReport);
+app.get("/api/submissions/:id/normalized", submissionNormalized);
+app.post("/api/submissions/:id/verify-site", verifySite);
 app.get("/security.txt", (c) => c.redirect("/.well-known/security.txt", 301));
 
 export default app;

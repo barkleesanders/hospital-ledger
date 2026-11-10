@@ -19,6 +19,7 @@
 		"audit:csp": "python3 scripts/csp_audit.py",
 		"test:faq": "vitest run --config vitest.faq.config.mjs",
 		"test:fetch-proxy": "vitest run --config vitest.fetch-proxy.config.mjs",
+		"test:submissions": "vitest run --config vitest.submissions.config.mjs",
 		"test:site-data": "vitest run --config vitest.site-data.config.mjs",
 		"test:harness": "node tools/test-harness.mjs",
 		"build:faq-island": "node tools/build-faq-island.mjs",
