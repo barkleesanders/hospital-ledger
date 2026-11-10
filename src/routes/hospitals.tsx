@@ -173,7 +173,7 @@ export async function hospitalsIndexHandler(c: Context<Env>) {
 				</h1>
 				<p class="mt-2 text-zinc-400">
 					{total.toLocaleString("en-US")} hospitals · grouped by state · data
-					from each hospital's federally-mandated machine-readable file
+					from each hospital's own published machine-readable price file
 				</p>
 				<div class="mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
 					{states.map((st) => (

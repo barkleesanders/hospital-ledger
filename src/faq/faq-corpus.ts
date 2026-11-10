@@ -141,7 +141,7 @@ function gradesDoc(): FaqCorpusDoc {
 			'Every hospital page opens with a "45 CFR § 180 compliance" card. When assessment metadata is available, it shows a letter grade (A, B, C, D or F) and a score out of 100 for the six data elements the federal hospital price transparency rule (45 CFR Part 180) requires a hospital to publish:',
 			...Object.values(ELEMENT_LABELS).map((label) => `- ${label}`),
 			`Score 80 or above: ${complianceExplainer(80)} Score 60 to 79: ${complianceExplainer(60)} Score below 60: ${complianceExplainer(0)}`,
-			"The compliance grade reflects how completely the hospital published the six required data elements, not the quality of care. Data comes straight from the hospital's federally-mandated machine-readable file.",
+			"The compliance grade reflects how completely the hospital published the six required data elements, not the quality of care. Data comes straight from the hospital's own published machine-readable file.",
 			"When a valid grade or score is missing, the page says Grade unavailable. An element without an explicit assessment is unknown. Missing assessment metadata does not mean a failing grade, an unpublished element, or hospital noncompliance.",
 			"Each hospital page also shows how many procedures it lists, how many insurances it has negotiated rates with, how many CPT / HCPCS codes it covers, a link to the hospital's source file, and its most expensive procedures by gross charge with cash, minimum and maximum negotiated prices.",
 		].join("\n"),
@@ -327,7 +327,7 @@ export function hospitalDoc(_ccn: string, data: HospitalData): FaqCorpusDoc {
 	const lines = [
 		`The hospital page the visitor is reading on ${SITE_NAME} (this page).`,
 		`Hospital: "${name}"`,
-		"The law: 45 CFR Part 180 (the federal hospital price transparency rule) requires every hospital to publish a machine-readable file with six data elements: a machine-readable file; gross / standard charges; a discounted cash price; payer-specific negotiated rates; minimum and maximum negotiated charges; and free public access with no login.",
+		"The law: 45 CFR Part 180 (the federal hospital price transparency rule) requires every hospital covered by the rule to publish a machine-readable file with six data elements: a machine-readable file; gross / standard charges; a discounted cash price; payer-specific negotiated rates; minimum and maximum negotiated charges; and free public access with no login.",
 		rating
 			? `Compliance grade: ${rating.grade}, score ${rating.score} out of 100. ${complianceExplainer(rating.score)} The grade reflects how completely the hospital published the six required data elements, not the quality of care.`
 			: "Compliance grade and score: unavailable. Missing assessment metadata does not establish noncompliance.",

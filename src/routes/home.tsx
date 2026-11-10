@@ -48,7 +48,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 	return (
 		<Layout
 			title="Hospital Ledger — what the law required, what hospitals delivered"
-			description={`A free public database of U.S. hospital price transparency — standardized prices from ${fmt(standardizedPriceHospitals)} hospitals' federally-mandated machine-readable files, verified live — more hospitals than CMS's own published hospital list tracks. CC0 licensed.`}
+			description={`A free public database of U.S. hospital price transparency — standardized prices from ${fmt(standardizedPriceHospitals)} hospitals' own published price files — more hospitals than CMS's own published hospital list tracks. CC0 licensed.`}
 			ogTitle="Hospital Ledger"
 			url={url}
 			scriptSrc={["/cpt-names.js", "/home-client.js", "/procedure-carousel.js"]}
@@ -141,7 +141,17 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						<span class="tab-num text-zinc-200">
 							{fmt(REGISTRY_TRACKED_FACILITIES)}
 						</span>{" "}
-						facilities in total, and the price index holds{" "}
+						facilities in total. For scale: the American Hospital
+						Association counts 6,100 U.S. hospitals in all, and CMS
+						estimates the rule reaches over 7,000 state-licensed
+						institutions — the wider-universe breakdown is in{" "}
+						<a
+							href="/about-the-numbers"
+							class="underline hover:text-emerald-300"
+						>
+							/about-the-numbers
+						</a>
+						. The price index holds{" "}
 						<span class="tab-num text-zinc-200">
 							{fmt(standardizedPriceRows)}
 						</span>{" "}
@@ -256,7 +266,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 									stroke-linejoin="round"
 								/>
 							</svg>
-							<span>We don't track or store anything</span>
+							<span>Cookieless analytics — no ad trackers</span>
 						</div>
 						<div class="flex items-start gap-2">
 							<svg
@@ -334,7 +344,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 								200+
 							</div>
 							<div class="text-xs text-zinc-500 mt-1">
-								canonical brands · 21,803 raw
+								canonical brands · 21,600+ raw plan names
 							</div>
 						</div>
 						<div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
@@ -603,9 +613,9 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 									>
 										45 CFR § 180
 									</a>
-									, every U.S. hospital must publish a machine-readable price
-									file — gross charges, cash prices, negotiated rates, and
-									min/max — free, public, no signup.
+									, every hospital the rule covers must publish a
+									machine-readable price file — gross charges, cash prices,
+									negotiated rates, and min/max — free, public, no signup.
 								</span>
 							</li>
 							<li class="flex gap-3">
@@ -962,7 +972,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 								99 GB
 							</div>
 							<div class="text-xs text-zinc-500 mt-1">
-								MRFs downloaded, parsed, normalized
+								MRF data processed for the September 2026 rebuild
 							</div>
 						</div>
 						<div class="rounded-lg bg-zinc-950/50 border border-zinc-800 p-4">
@@ -1055,7 +1065,8 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 								<li class="flex gap-2">
 									<span class="text-emerald-400 mt-0.5">▸</span>
 									<span>
-										13.8% of files sit behind bot defenses; "compliance" ≠
+										At the September 2026 rebuild, 13.8% of files sat behind
+										bot defenses; "compliance" ≠
 										"reachable".
 									</span>
 								</li>
@@ -1080,8 +1091,8 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						>
 							github.com/barkleesanders/hospital-ledger
 						</a>{" "}
-						— 78 pipeline scripts, ~26,100 lines of Python, ~12,000 lines of
-						TypeScript. AGPLv3 code, CC0 data.{" "}
+						— ~80 pipeline scripts, ~27,800 lines of Python, ~12,900 lines
+						of TypeScript. AGPLv3 code, CC0 data.{" "}
 						<span class="text-zinc-500">
 							No cookies. No signup. Free forever.
 						</span>
