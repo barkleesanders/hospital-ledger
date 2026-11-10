@@ -9,7 +9,12 @@ import type { Context } from "hono";
 import { Layout } from "../components/Layout";
 import type { Env } from "../index";
 import { priceCoverage } from "../lib/price-coverage";
-import { bundledSummary, loadSummary, type Summary } from "../lib/site-data";
+import {
+	bundledSummary,
+	loadSummary,
+	REGISTRY_TRACKED_FACILITIES,
+	type Summary,
+} from "../lib/site-data";
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
@@ -113,6 +118,56 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 							</tbody>
 						</table>
 					</div>
+				</section>
+
+				<section class="mt-12">
+					<h2 class="text-xl font-semibold tracking-tight">
+						Why our registry tracks more facilities than the CMS list
+					</h2>
+					<p class="mt-3 text-zinc-300 leading-relaxed">
+						The first row above is CMS Hospital General Information —
+						the hospital list CMS publishes for Care Compare — with{" "}
+						<span class="tab-num">{fmt(totalFacilities)}</span>{" "}
+						facilities. Our campaign registry is a union of three sets:
+						that seed list, every facility our discovery work verified
+						a price file for, and every record in the live price index.
+						As of the registry read-back on 2026-11-08 it tracks{" "}
+						<span class="tab-num">{fmt(REGISTRY_TRACKED_FACILITIES)}</span>{" "}
+						facilities —{" "}
+						<span class="tab-num">
+							{fmt(REGISTRY_TRACKED_FACILITIES - totalFacilities)}
+						</span>{" "}
+						more than CMS's published list.
+					</p>
+					<p class="mt-3 text-zinc-300 leading-relaxed">
+						The difference is whole facility classes the Care Compare
+						list under-covers: specialty hospitals (psychiatric,
+						children's, rehabilitation, and long-term care), federal
+						facilities, hospitals in U.S. territories, and programs
+						that hold their own CMS certification number inside a
+						larger system. A facility can hold a CCN, be bound by the
+						price-transparency rule, and post a valid file without
+						appearing in Hospital General Information.
+					</p>
+					<p class="mt-3 text-zinc-300 leading-relaxed">
+						Every facility the registry adds beyond the seed was
+						identity-verified before it could be published here: the
+						CCN, hospital name, and taxpayer ID in the facility's own
+						published file must match the registry record. Records
+						that failed that check — including malformed or phantom
+						keys found along the way — were excluded or quarantined
+						rather than published.
+					</p>
+					<p class="mt-3 text-sm text-zinc-400 leading-relaxed">
+						One caveat, for the record: CMS holds more facility data
+						internally than it publishes — its Provider of Services
+						file covers every certified provider. The comparison on
+						this page is to what CMS publishes (the Care Compare list)
+						and what it publicly tracks for price-transparency
+						compliance (the{" "}
+						<span class="tab-num">{fmt(cmsRequired)}</span>-hospital
+						required set) — not to CMS's internal records.
+					</p>
 				</section>
 
 				<section id="coverage-gap" class="mt-12">
