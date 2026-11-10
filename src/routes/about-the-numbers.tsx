@@ -154,9 +154,7 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 					</p>
 					<p class="mt-3 text-zinc-300 leading-relaxed">
 						A facility the registry adds beyond the seed is published
-						only after an identity check: the hospital name and
-						identifiers inside the facility's own published file must
-						match the registry record, and the publisher refuses a
+						only after an identity check: the name and identifiers inside its own published file must match the registry record, and the publisher refuses a
 						file whose header contradicts it. That gate is newer than
 						the catalog. In November 2026 we re-audited the live
 						catalog against the files' own headers and removed 58
@@ -188,8 +186,7 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 					</h2>
 					<p class="mt-3 text-zinc-300 leading-relaxed">
 						Every count on this page comes from a list somebody
-						defined, and the definitions differ — which is why "how
-						many hospitals are there?" has several right answers.
+						defined — and the definitions differ.
 					</p>
 					<ul class="mt-4 space-y-3 text-zinc-300 leading-relaxed">
 						<li class="flex gap-3">
@@ -205,8 +202,7 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 						<li class="flex gap-3">
 							<span class="text-emerald-400 mt-1">▸</span>
 							<span>
-								The price-transparency rule reaches wider than any
-								published list: it applies to every institution
+								The price-transparency rule reaches wider: it applies to every institution
 								licensed as a hospital under state law (45 CFR
 								§ 180.20) — specialty, rehabilitation, and critical
 								access hospitals included, whether or not they take
@@ -228,22 +224,16 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 								this site seeds from — is the Medicare-registered
 								subset of that universe, and the CMS-required count
 								above is the part of it whose facility types fall
-								under the rule. CMS does not publish a roster of the
-								7,000+, so no count on this page is measured against
-								one.
+								under the rule. CMS publishes no roster of the 7,000+ to measure against.
 							</span>
 						</li>
 						<li class="flex gap-3">
 							<span class="text-emerald-400 mt-1">▸</span>
 							<span>
-								Independent trackers land between the frames.
-								Turquoise Health counted 5,763 of the 6,357 hospitals
+								Independent trackers land between the frames: Turquoise Health counted 5,763 of the 6,357 hospitals
 								it tracked (90.7%) as having posted a file in 2023.
 								PatientRightsAdvocate.org's September 2026 review of
-								2,000 hospitals found 49.4% fully compliant. Posting
-								a file and complying with the rule are different
-								measurements — this site tracks the first, a verified
-								live file, and labels it as such.
+								2,000 hospitals found 49.4% fully compliant. Posting a file and complying with the rule are different measurements — this site tracks the first: a verified live file.
 							</span>
 						</li>
 					</ul>
@@ -255,11 +245,7 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 						>
 							AHA Fast Facts on U.S. Hospitals, 2026
 						</a>
-						; 45 CFR §§ 180.20, 180.30; CMS CY 2024 OPPS final rule
-						fact sheet; Turquoise Health 2023 Impact Report;
-						PatientRightsAdvocate.org, Eighth Hospital Price
-						Transparency Compliance Report (September 2026). Accessed
-						2026-11-10.
+						; 45 CFR §§ 180.20, 180.30; CMS CY 2024 OPPS fact sheet; Turquoise Health 2023; PatientRightsAdvocate.org, Eighth Compliance Report (Sept 2026). Accessed 2026-11-10.
 					</p>
 				</section>
 

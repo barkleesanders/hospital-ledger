@@ -141,10 +141,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						<span class="tab-num text-zinc-200">
 							{fmt(REGISTRY_TRACKED_FACILITIES)}
 						</span>{" "}
-						facilities in total. For scale: the American Hospital
-						Association counts 6,100 U.S. hospitals in all, and CMS
-						estimates the rule reaches over 7,000 state-licensed
-						institutions — the wider-universe breakdown is in{" "}
+						facilities in total. For scale: the AHA counts 6,100 U.S. hospitals; CMS puts the rule's reach at over 7,000 licensed institutions — details in{" "}
 						<a
 							href="/about-the-numbers"
 							class="underline hover:text-emerald-300"
