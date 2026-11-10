@@ -161,12 +161,24 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 						files that had been published under the wrong facility —
 						inherited bulk approvals, shared vendor files, federal
 						facilities carrying civilian files — and republished the
-						right files under their verified owners. Of the live
-						catalog,{" "}
-						<span class="tab-num">1,786</span> entries are backed by a
-						stored file whose header we verified in that re-audit; the
-						rest predate the file store and are verified at the index
-						level — present and priced — rather than header-checked.
+						right files under their verified owners. We then ran
+						the same check over the entries that predate the file
+						store —{" "}
+						<span class="tab-num">3,776</span> of them — and removed
+						14 more. Of the live catalog,{" "}
+						<span class="tab-num">1,795</span> entries are backed by a
+						stored file whose header we verified. The pre-store
+						entries that remain divide by the evidence that survives
+						for them: 73 verify against the source file's own header,
+						and 1,463 against the CMS filename convention — the
+						file's own name carries the facility's tax ID and legal
+						name, a weaker standard than reading the header, and
+						counted separately. Another 55 are shared system files or
+						program listings whose binding is explained rather than
+						individually verified. 431 stay listed but flagged as
+						suspect — not confirmed. And 1,740 cannot be verified at
+						all: no identity evidence survives for them, only the
+						price data itself.
 					</p>
 					<p class="mt-3 text-sm text-zinc-400 leading-relaxed">
 						One caveat, for the record: CMS holds more facility data
