@@ -1496,16 +1496,22 @@ every file passed the in-file identity gate before parsing.
   already blocked. Rule: navigate to download; blob-fetch to size-verify;
   when blob downloads stop landing, change route or tab — never keep
   clicking the anchor.
-- **CDP `Network.loadNetworkResource` + IO.read is a working exfil
-  route for in-browser bytes — chunk small.** For 140100 the blob
-  fetched fine in-tab (241,774,876 B, HTTP 200) but no download path
-  survived; the CDP resource pipeline worked mechanically, and the
-  binding constraint is transport: the fcdp CLI truncates large raw
-  responses and read chunks >1 MiB died. The staged retry
-  (`/tmp/lane2_cdp_pull.py` on the Mini) chunks at 256 KiB — prescribed,
-  not yet proven end-to-end (the working tab wedged on held blob memory
-  first). Plan chunk sizes around the ~1 MiB raw-output ceiling
-  whenever pulling bytes or large results through the fcdp CLI.
+- **CDP `Network.loadNetworkResource` + IO.read exfil — CORRECTED by
+  round 3 (2026-11-09, later the same evening): tested and FAILING
+  through the fcdp CLI; do not build a lane step on it.** Round 2's
+  read was: for 140100 the blob fetched fine in-tab (241,774,876 B,
+  HTTP 200) but no download path survived, the CDP resource pipeline
+  worked mechanically, and the staged retry
+  (`/tmp/lane2_cdp_pull.py` on the Mini) chunked IO.read at 256 KiB —
+  prescribed, not yet proven. Round 3 proved it the other way:
+  `loadNetworkResource` succeeded, then the FIRST 256 KiB IO.read
+  chunk (~350 KB as base64) broke the CLI's raw-response JSON envelope
+  ("Unterminated string"). Larger chunks died in round 2 (>1 MiB);
+  256 KiB dies in round 3. The route is unreliable through this CLI at
+  every chunk size tried — the working large-blob exfil is the
+  fresh-tab first download (round 3 subsection below). The ~1 MiB
+  raw-output ceiling still shapes other fcdp CLI use: plan chunk
+  sizes around it whenever pulling large results through the CLI.
 - **Loopback-POST exfil can be intercepted — an unexpected responder is
   a STOP, not a retry.** 140100 attempt 1 (no-cors POST to a Mini
   loopback receiver): nothing arrived. Attempt 2 (CORS mode): answered
@@ -1561,13 +1567,66 @@ every file passed the in-file identity gate before parsing.
   degraded browser. Rule: lanes sharing the Mini's Chrome do NOT swap
   shared tooling (bridge builds, extension state) while another lane is
   mid-run.
-- **OPEN FLAG — possible mrf_parse row cap at 200,000 (unproven).**
-  030138's 427,924,852 B JSON parsed to EXACTLY 200,000 items (200,000
-  priced) — a suspiciously round ceiling. Live slim n=6,904 either way,
-  so user-facing impact is unproven in both directions. Do NOT treat
-  parse counts from very large files as complete until mrf_parse has
-  been checked for a row limit; recorded here as an open flag, not a
-  finding.
+- **OPEN FLAG — possible mrf_parse row cap at 200,000 (unproven;
+  three exact hits as of round 3, 2026-11-09).** 030138's
+  427,924,852 B JSON parsed to EXACTLY 200,000 items (200,000 priced);
+  330046 (Mount Sinai combined file) also hit exactly 200,000 at the
+  parser; round 3 added 140100 — exactly 200,000 items / 200,000
+  priced from a 242 MB JSON. Three exact hits make a cap likely, but
+  it stays UNPROVEN until the parser code is read; a fleet parser
+  check is in flight separately (wave 4, 2026-11-09). Live slim n is
+  small in two of the three cases (030138: 6,904; 140100: 7,059), so
+  user-facing impact there is unproven either way — 330046's
+  n=199,880 is the concerning one, the case where the apparent cap
+  may have eaten real priced rows. Do NOT treat parse counts from
+  very large files as complete until mrf_parse has been checked for a
+  row limit; recorded here as an open flag, not a finding.
+
+### Round 3 (2026-11-09 late evening — the round-2 remainder + 230030)
+
+Evidence: `~/workspace/hl-fleet/chrome-lane3-20261109/RUN-NOTE.md`.
+Worklist: the 4 fetchable rows from round 2's remainder (140100,
+450018, 500064 — 079801 stayed out as a transplant-program
+adjudication case, 451310 as a from-scratch re-discovery) plus 230030,
+whose b71 ACCEPT Daytona had 403'd (Akamai) after round 2 closed.
+**4 of 4 PUBLISHED** (one serial `publish_mini.py` run, SUCCESS +
+byte-verify OK; live 5,604 → 5,608 total, 5,601 → 5,605 priced).
+Verdicts: b74 (3 ACCEPT — 140100, 450018, 500064; 230030 needed no
+row — its b71 ACCEPT names the URL the in-browser cms-hpt read
+confirmed). The lane was HEALTHY at start (~22:56): Mini SSH answered
+in ~0.3 s, `fcdp tabs` listed immediately, no extension or bridge
+recovery needed — the direct contrast to round 2's degradation, and
+the reason two of this round's lessons are "the earlier symptom was
+the lane, not the source." This round also CORRECTED round 2's CDP
+bullet in place (above: the 256 KiB exfil prescription is tested and
+failing) and updated the parser-cap flag in place (above: third exact
+200,000 hit).
+
+- **The reliable large-blob exfil: fetch→blob→a.click as a FRESH
+  tab's FIRST download.** 140100's 241,774,876 B blob saved byte-exact
+  this way. The per-tab programmatic-download block (round 2's
+  download-route bullet) never engages on a tab with no prior
+  downloads — spend a genuinely fresh tab per blob exfil instead of
+  fighting a used tab's block or reaching for the CDP route.
+- **SharePoint `:x:` sharing links can serve the MRF as a plain CSV
+  via direct tab navigation — and a mid-file stall is a lane-health
+  symptom until proven otherwise.** UTMB's Excel-flavored `:x:` link
+  (the replacement link re-derived in round 2) delivered the complete
+  239,685,228 B CSV by direct tab navigation, no viewer interaction.
+  Round 2's 91.7 MB stall was this same file dying on the degraded
+  lane; on a healthy lane the navigation download completed in
+  seconds. Retry navigation downloads on a healthy lane before
+  concluding anything about a source; a stall during known lane
+  degradation is evidence about the lane, not the file.
+- **Re-read the system's cms-hpt even mid-campaign — recorded
+  pointers go stale in form AND in substance.** 500064 Harborview's
+  recorded pointer was a superseded 2022 bundle ZIP; uwmedicine.org's
+  current cms-hpt declares a Harborview-specific JSON
+  (62,330,717 B; in-file identity: Harborview Medical Center, Seattle,
+  WA license HAC.FS.00000029), which published at live n=85,078. All
+  three cms-hpt reads this round were done in-browser first and saved
+  as staging evidence; in every case the current pointer matched or
+  superseded the recorded one exactly as the playbook predicts.
 
 ## Self-improvement loop — every fleet failure pays rent (standing protocol)
 
