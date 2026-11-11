@@ -10,12 +10,94 @@ for these VMs for hospital ledger work and parallelize it as much as you can").
 One CLI: `hlfleet.py` in `~/workspace/hl-fleet/` (VM copy) and `~/hl-fleet/` (Mini
 copy — the Mini is where lane controllers + credentials live).
 
+## STANDING RULE — Rust-first ingestion (Barklee directive, 2026-11-10)
+
+Local MRF download, decoding, and aggregation in ALL Hospital Ledger work
+uses the native Rust setup (`hl-ingest`) — this is one of the fleet's top
+standing rules, not an optional lane.
+
+- **Basis.** The native path is far more memory-efficient — measured:
+  2,000,001 payer rows processed at ~14.4 MiB peak footprint (evidence:
+  `/Volumes/Share/hl-fleet/rust-bench/over-2m.log`). The measured memory
+  figure is the proven basis for this rule; general speed is unmeasured
+  and no speed multiplier is claimed.
+- **Portability.** When an HL lane runs on another VM or host (InstaBox
+  box1, Daytona/E2B/Modal-class hosts, Kaggle, future lanes), the Rust
+  setup is installed there and used there too — carrying the runtime to
+  the compute is the expected pattern, not an exception. Per-host storage
+  rules from the runtime contract apply by analogy: bulk bytes stay off
+  the host's scarce internal disk wherever the host has an
+  external/Share-class volume; on the Mini that volume is `/Volumes/Share`.
+- **No silent fallback.** If the Rust setup is unavailable or a command
+  is unsupported on a host, STOP that ingestion and surface it — never
+  revert to whole-file Python, and never report unsupported/memory
+  failures as zero counts (the same doctrine family as the loud-cap and
+  identity gates).
+- **Operating detail.** The commands, admission rules, exit codes
+  (73 = busy, 75 = resource failure), 3 GiB process-tree cap, and storage
+  layout live in the "Mac mini native Rust ingestion runtime contract
+  (Codex handoff, 2026-11-10)" section of this skill — this rule is the
+  standing priority; that contract is how it operates.
+- **Parity caveat, kept honest.** Per-command verification of the
+  installed build is in progress (2026-11-10); until a command is
+  verified on a host, its use there is staged per the contract. The
+  directive is the operating target and the fleet moves to it as each
+  command's parity lands; Codex's final format/parity gates still govern
+  declaring the release complete.
+- **RESOLVED — CUTOVER COMPLETE (2026-11-10, ~18:15 PT). Read this
+  first: HL local ingestion is RUST-ONLY, settled fact, not a target.**
+  The Rust setup is the only local path for MRF download/decoding/
+  aggregation because it is drastically more memory-efficient —
+  measured on this fleet: the 1.88 GB / 5,694,490-row Mercy source
+  built at a peak footprint of 15,811,064 bytes (~15 MiB) and the
+  2,000,001-payer-row benchmark at ~14.4 MiB, while the legacy Python
+  whole-file import grew to 3,289,746,744 bytes before the native
+  guard terminated it. Canonical install: the FINAL native release
+  (Codex install, 2026-11-10 18:01 PT) — `~/.local/bin/hl-ingest`,
+  build_id `ff4bdeacc6578308`, sha256
+  `e8e6b09bf30461ec604f2e6c5aa968aaaf879a831d6b903fac5ddb83e22c126e`,
+  installed == release tree (see the FINAL native release section
+  below for the supersession chain and Codex's QA record: 20-fixture
+  parity suite, 0 unexplained differences). Independent cutover
+  parity verdict: PASSED — `verify` VERIFIED the Rust-built 060013
+  benchmark canonical (its 5,694,490 source rows reconcile exactly
+  with the wave-14 record; the canonical itself is BENCHMARK-ONLY,
+  synthetic source_url, never publishable); `count` reproduced the
+  known 2,198 items on staged 031319.csv under two successive builds
+  and counted the wave-14 backlog ZIPs natively (070002: 45,418
+  items; 260020: 59,733; 010087: 56,147 with 2,264,732 source rows);
+  `stage` staged and recounted exactly; `fetch` is surface-exposed
+  but execution-deferred — it refuses non-HTTP(S) sources by design
+  (`HL_ERROR download requires an HTTP(S) source`), and proving it
+  means a live hospital fetch, an ingestion action outside
+  verification scope. Repointed: `build_canonical_mini.py` is a
+  pure-exec Rust shim (sha `a6f6b680…`) — no Python parser, no
+  fallback; the retired Python builder survives only in backups and
+  runs solely via the separate, loudly-logged entry point
+  `build_canonical_mini_PYTHON_OVERRIDE.py` (sha `539f9b8d…`:
+  mandatory stderr banner + a timestamped line in
+  `~/hl-fleet/python-parse-override.log` on every use; smoke-proven
+  at items=2,198 parity). Silent Python use in the local build path
+  is impossible. Named exceptions (documented, never silent): (1)
+  Daytona/E2B/Modal sandbox lanes keep their in-process Python parse
+  until their controllers carry a Linux hl-ingest build — no
+  sandbox-target build exists yet; (2) `process_submissions.py`
+  (hospital-submission processor) keeps its sha-pinned `mrf_parse`
+  load — its output contract is the submitter-facing normalized
+  download, not a fleet canonical; repointing is a separate change
+  under that feature's gates; (3) wave-14's 150169 stayed on WS-A2's
+  in-flight route at cutover close (source download still running).
+  Portability: InstaBox box1 runs the Rust setup natively (own Linux
+  build, sha `b1f36914…`, `status` exit 0 — see Phase 5 in the
+  cutover subsection). This VM is not a parse host (publish-path
+  doctrine) — NOT-APPLICABLE.
+
 ## The lanes (all proven live 2026-10-27 unless noted)
 
 | Lane | Shape | Money | Use for |
 |---|---|---|---|
 | **Modal** | fetch + parse in containers, `.starmap` parallel | $30/mo Starter credits, recurring forever; workspace `barkleesanders` | Default lane. Open egress (fetched Sitecore CDN fine). Proof: 013029+013030, 22k items each, ~48s incl. image build. |
-| **Daytona** | **parse-only** — sources fetched on the Mini, staged into the sandbox | **$1,100 prepaid credit, never expires** (org "Personal", Tier 2, region us, auto top-up OFF, no card on file) | High-RAM parsing (huge ZIPs/CSVs) once staged. Parses took ~2s for 4–7 MB CSVs; sandbox cold start ~50s. |
+| **Daytona** | **parse-only** — sources fetched on the Mini, staged into the sandbox | **$1,100 prepaid credit, never expires** (org "Personal",, Tier 2, region us, auto top-up OFF, no card on file) | High-RAM parsing (huge ZIPs/CSVs) once staged. Parses took ~2s for 4–7 MB CSVs; sandbox cold start ~50s. |
 | **Mini** | staging fetcher + controller host + **the publisher** (since 2026-10-28) | — | Healthy egress when the VM proxy degrades; owns all lane credential files; runs `publish_mini.py` from the Share publish tree (see Publish doctrine). |
 | **VM (Muse)** | small local chunks via `hl_wave.py` (the daily wave only) | — | **OUT of the fleet publish path since 2026-10-28** (was "sole publisher" Oct 26/27 — SUPERSEDED, see Publish doctrine). Never let a lane touch R2. |
 | **InstaBox box1** | free Firecracker microVM (4 vCPU / 8 GiB / 20 GiB at `/data`), own NAT egress, driven from the Mini via `instabox` CLI / SSH alias `instabox-box1` | Free (key expires 2026-12-06; 100 GiB/mo egress) | **Standing campaign lane (Barklee directive 2026-11-08)**: probe shards, cms-hpt sweeps, and egress-fallback batch execution whenever the VM's own egress is degraded. Guarded shard pattern + full mechanics: skill `local-instabox`. |
@@ -2436,3 +2518,257 @@ checks → merge, and verify the merged tree contains the update. The
 canonical internal editions stay in the agentprofile skill registry; the
 repo copies are the public mirror Barklee directed on 2026-11-02 so the
 skill travels with the code and contributors can run the same playbook.
+
+## Mac mini native Rust ingestion runtime contract (Codex handoff, 2026-11-10)
+
+Standing priority: see "STANDING RULE — Rust-first ingestion (Barklee
+directive, 2026-11-10)" — this contract is the operating detail under
+that rule.
+
+Awareness contract merged 2026-11-10 from the active Codex session's
+maintenance handoff, authorized by Barklee, so Muse and this skill know
+the safer Rust setup. It is an awareness merge only: it changes no wave,
+adjudication, identity, payer-conservation, publish-lock, byte-verification,
+or manifest-last gate anywhere in this skill — every one of those gates
+stands exactly as written above. The Mini-side guides carrying the same
+contract are
+`/Users/barkleesanders/projects/hospital-ledger/skills/autoresearch-hospital-ledger/SKILL.md`
+and `/Users/barkleesanders/projects/hospital-ledger/skills/hospital-ledger-refresh/SKILL.md`;
+the Rust source lives in
+`/Users/barkleesanders/projects/hospital-ledger/tools/hl-ingest/` (Codex's
+in-progress work — never overwrite it from a Muse session).
+
+- **Native binary.** Local MRF download / decoding / aggregation on the
+  Mac mini is moving into the native binary `~/.local/bin/hl-ingest`
+  (installed build read back 2026-11-10: version `0.1.0`, work root
+  `/Volumes/Share/hl-fleet/rust-runtime`). Command surface:
+  `status` · `fetch URL EXTERNAL_PATH` · `stage INPUT EXTERNAL_PATH` ·
+  `count FILE URL` · `build CCN NAME URL FILE OUTDIR` · `verify CANONICAL`.
+- **Release status — PENDING.** The NEW native release is still pending
+  Codex's final format/parity gates. The installed version is NOT declared
+  to support all of these commands until each is verified per-command.
+  If a command is unavailable: STOP. Never fall back to whole-file Python,
+  and never report an unsupported-format or memory failure as a zero count
+  — a failed import is a failed import, never a successful zero.
+- **External-volume storage (Mini).** All Mini source bytes, downloads,
+  work/scratch, SQLite spill, canonical outputs, and health receipts live
+  on the real mounted `/Volumes/Share` external volume, even when slower;
+  there is NO internal-SSD fallback. Code/executable and small host-wide
+  admission-lock metadata may remain internal. `~/hl-fleet` resolves to
+  `/Volumes/Share/hl-fleet/local-workspace`; results/staging remain
+  external. A directory merely named Share is not proof — verify the real
+  mount. Missing drive means stop.
+- **Admission and resource discipline.** One native import at a time.
+  Process-tree footprint cap is 3 GiB including compressed pages.
+  Exit 73 = busy; exit 75 = resource failure. Preserve the importer's exit
+  status through pipes (pipefail discipline — never hide it behind
+  `| tail`, `tee`, a following `echo`, or `; true`). The Rust engine
+  streams records and output, and spills grouping/payers to external
+  SQLite rather than holding a whole file in memory.
+- **Identity evidence.** Missing facility-column identity evidence is
+  UNMEASURED, never verified absence — the same doctrine family as this
+  skill's identity gates: no evidence manufactured, no absence claimed
+  from an empty read.
+- **VM paths stay Linux paths.** The Muse VM keeps its own Linux paths
+  and invokes the Mac binary only through the Mini SSH connector; never
+  create `/Volumes/Share` on the VM.
+- **Measured evidence (read back 2026-11-10).** The native benchmark
+  processed 2,000,001 payer rows at a peak footprint of 15,057,424 bytes
+  (~14.4 MiB), complete=true — evidence
+  `/Volumes/Share/hl-fleet/rust-bench/over-2m.log`. That is a MEASURED
+  MEMORY figure for that benchmark input, not a general speed claim. A
+  real 1.8 GB Mercy source test is STILL RUNNING / BEING VERIFIED — no
+  completion and no speedup is claimed for it anywhere in this skill.
+
+### Rust cutover (2026-11-10, Barklee directive 17:38 PT)
+
+Barklee directed the cutover be completed and cleaned up so HL runs only
+the Rust path for local MRF download/decoding/aggregation. Outcomes as
+they land (this subsection is updated per phase):
+
+- **Phase 1 — canonical install: DONE (2026-11-10 17:39 PT).** The
+  two-binary hazard is RETIRED: `~/.local/bin/hl-ingest` is now the
+  full-surface release build, sha256
+  `650a7142c2b5beb25f1b723270d3b2a685e699f0f4f958a0181c7403b0adffdb`
+  (`--help` shows build/count/fetch/stage/verify/run/watch/status;
+  `status` exit 0, work root `/Volumes/Share/hl-fleet/rust-runtime`).
+  The prior partial-surface binary (sha `e606c59a…`, build/run/watch/
+  status only) is backed up at
+  `~/.local/bin/hl-ingest.bak-20261110-173947-precutover`. Both report
+  version `0.1.0` — pin by sha256, never by version. (The long-running
+  `hl-ingest watch` daemon still executes the pre-cutover binary image
+  from memory; the on-disk binary is the release build.)
+- **Phase 2 — guide truth: DONE (2026-11-10).** Both Mini guides
+  (autoresearch-hospital-ledger, hospital-ledger-refresh) now prescribe
+  the real installed surface including stage/count/verify/run/watch and
+  the canonical sha; their "candidate until parity" hedges stand.
+  Backups: `SKILL.md.bak-20261110-rustcutover` beside each guide.
+  Registry/mirror sync of this skill rides with wave 14's write-back
+  #6, as before.
+- **Phase 3 — parity completion: DONE (2026-11-10 ~18:07 PT).**
+  Mercy build finished 17:44 PT; `verify` VERIFIED its output
+  (re-verified again under the final 18:01 build). Parity verdict
+  PASSED for build/count/stage/verify; `fetch` surface-exposed,
+  execution deferred to first real use (HTTP(S)-only by design —
+  see the STANDING RULE resolution). The 060013 hand-off note plus
+  its BENCHMARK-ONLY correction are in the wave-14 STATE.md.
+- **Phase 4 — repoint + Python retirement: DONE (2026-11-10
+  ~18:08 PT).** Codex's pure-exec shim (17:53 PT) superseded the
+  cutover session's dispatch patch (17:51 PT) within minutes; the
+  loudly-logged override entry point
+  `build_canonical_mini_PYTHON_OVERRIDE.py` completes the
+  requirement (banner + log, smoke-proven). `publish_mini.py`, the
+  importer and the harvester untouched. Wave-14 backlog migration
+  anchors are recorded in the wave-14 STATE.md (070002 / 260020 /
+  010087 migrate to the Rust builder; 150169 named exception,
+  in-flight).
+- **Phase 5 — other hosts: DONE (2026-11-10).** (a) InstaBox box1:
+  REAL install — crate built on box1 (cargo, exit 0, 62 s),
+  `/data/home/.local/bin/hl-ingest` sha `b1f36914…`, `status` exit 0
+  after provisioning a genuine separate-device bind-mount at
+  /Volumes/Share (the binary's external-volume guard is
+  unconditional in this build; the cleaner long-term fix is a
+  per-host external-root config in the binary). (b) Daytona/E2B/
+  Modal: NAMED EXCEPTION — controllers have a payload channel, but
+  no Linux sandbox-target hl-ingest build exists and the worker
+  contract is in-process Python; redesign item, documented in the
+  STANDING RULE resolution. (c) This VM: NOT-APPLICABLE (not a
+  parse host).
+- **Phase 6 — report + loud amendments: DONE (2026-11-10 ~18:15
+  PT)** — this subsection, the STANDING RULE resolution above, and
+  the loud Rust-first openings added to both Mini guides. Registry/
+  mirror sync still rides with wave 14's write-back #6.
+
+## Browser/account contract — personal Chrome on the Mini (Codex coordination, 2026-11-10)
+
+- On the Mini, personal-account browser work uses `~/.local/bin/chrome-personal` (`status` / `open URL`) via the existing connector. The helper resolves barkleesanders@gmail.com fresh from profile identity on every call and FAILS if the identity is missing or ambiguous. There is no Default-profile, front-window, or fcdp connection assumption. Do not hardcode any profile directory: Profile 4 is the personal profile as of 2026-11-10, but it is NOT a fallback constant — resolve identity fresh on each call. Verify the specific tab's account before personal actions. The AIVA and Catherine named profiles stay separate.
+- Browser use in Hospital Ledger work is for DISCOVERY pages only: never navigate to, open, or render a full source MRF JSON/CSV/archive in Chrome. (Evidence: two direct cancer-center MRF JSON tabs on 2026-11-09 at 22:25/22:27 PT matched 9–11 GiB renderer growth.) Source bytes are downloaded directly with native `hl-ingest fetch` to the real mounted external drive, then native `count`/`build` — never through the browser.
+- Linux VM paths stay Linux paths; this contract governs the Mini lane only.
+- This amendment authorizes no imports, publishes, or deploys.
+
+## FINAL native release — supersedes all pending states (Codex install, 2026-11-10 18:01 PT)
+
+- **Final install (Codex, 2026-11-10 18:01 PT; receipt stamp 20261111T020110Z):** the reviewed FINAL native `hl-ingest` is installed at `~/.local/bin/hl-ingest` on the Mac mini — **build_id `ff4bdeacc6578308`**, binary **SHA256 `e8e6b09bf30461ec604f2e6c5aa968aaaf879a831d6b903fac5ddb83e22c126e`** (`hl-ingest 0.1.0 build ff4bdeacc6578308`). Pin by build_id/SHA256, never by the `0.1.0` version string. Live readback at 2026-11-11T02:09:06Z (raw capture: `/Volumes/Share/hl-fleet/muse-rust-awareness/RAW-READBACK-20261110.txt`; release proof `final-runtime-20261110.json` recorded 2026-11-11T02:02:48Z): hostname `Barklees-Mac-mini.local`, `status` exit 0 reporting build `ff4bdeacc6578308`, `--version` and `shasum -a 256` matching the figures above exactly.
+- **Supersession:** the earlier installed state (release build SHA256 `650a7142…`, installed by the pre-freeze cutover session) and the pending reviewed state (build_id `235d8ecabb1dc463`, SHA256 `8dc9e4…`) are **SUPERSEDED HISTORY** — retained in this file's earlier sections, not erased, and no longer current. Any "release PENDING" wording above this section is superseded by this section. The install receipt records `8dc9e4b653c4dbf04fb7d0ccd80082288861675d37e30402ab8d863b19bb019f` as the direct `before_sha256` replaced at 18:01; the replaced binary is preserved at `/Volumes/Share/hl-fleet/rust-runtime/backups/ceiling-release-20261111T020110Z/hl-ingest-before`.
+- **QA (proof: `/Volumes/Share/hl-fleet/rust-parity/ceiling-release-20261110-175434/final-summary.json`, `qaAllPassed: true`):** 35 tests passed, plus fmt and strict clippy and a release build pass; two runs of the 20-fixture parity suite gave 19 exact matches plus one proven singleton XML improvement each, **0 unexplained differences**; all **40 receipts valid**; all canonical item arrays **unchanged from prior native**; `releaseMatchesFrozenBinary: true`. Scope, stated as loudly as the pass: this establishes the tested surface — it is **not** full-corpus parity for every hospital.
+- **Ceiling:** `--max-mib` hard maximum is **3072** and **cannot be raised**; smaller budgets are allowed. Rejection proved live and recorded in the final-runtime proof: `hl-ingest run --max-mib 4096 -- /usr/bin/true` → exit 1, `HL_ERROR memory budget must be between 16 and 3072 MiB; the host ceiling cannot be raised`.
+- **Wrappers:** the local builder/count compatibility wrappers are **pure-exec** forwarders to the native binary — they contain **no Python MRF parser and no fallback override**. A format or command the native build cannot handle **fails visibly**; exit 73 (busy) and exit 75 (resource failure) are never publishable results.
+- **Watcher:** the native watch daemon runs as **PID 62030**; its logs and health receipts live on the external volume (`/Volumes/Share/hl-fleet/rust-runtime/health/memory-guard.stdout.log` / `.stderr.log`), never internal storage.
+- **Mercy benchmark — COMPLETED, and BENCHMARK-ONLY:** the 1.88 GB Mercy test finished (receipt `/Volumes/Share/hl-fleet/rust-bench/mercy-out/060013.rust-receipt.json`, `HL_RESOURCE` line in `mercy.log`): source **1,880,772,552 bytes** / 5,694,490 source rows → **151,481 items / 5,521,999 payer rates**, **peak footprint 15,811,064 bytes (~15.1 MiB)**, elapsed 2,767,222 ms (~46 min), exit 0. **The caveats are part of the result:** the run used real local source bytes but a **synthetic `source_url` argument**, so its canonical (`rust-bench/mercy-out/060013.json.gz`, flagged by `BENCHMARK-ONLY.txt` in the same directory) is **NOT provenance-valid and NOT publish-valid** — memory benchmark only, never a publish candidate. **No general speed claim** is made from it; the measured claim is memory footprint only.
+- **Proofs:** `/Volumes/Share/hl-fleet/rust-runtime/final-runtime-20261110.json` (status/version/ceiling-rejection/watcher evidence) · `/Volumes/Share/hl-fleet/rust-runtime/backups/ceiling-release-20261111T020110Z/install-receipt.json` (installed_at, before/after SHA256, build_id) · QA summary path above. Both Mini project guides (autoresearch-hospital-ledger, hospital-ledger-refresh) already record this same final release under "Verified Mini native release (2026-11-10, 18:01 PT)".
+- **Sync state:** Registry + public-mirror sync of this amendment: **PENDING** (no git push under this readback); the VM guide is the current source of truth. A byte-identical readback copy of this guide as amended is saved at `/Volumes/Share/hl-fleet/muse-rust-awareness/SKILL-fleet-FINAL-RELEASE-20261110.md`.
+
+## Resolution wave 14 — the legacy census resolved (2026-11-10)
+
+Wave 13 left the pre-fleet legacy cohort (3,776 index entries) classified
+but unresolved: 14 confirmed mismatches, 431 suspects, 1,740 unverifiable.
+Wave 14 resolved all three classes end-to-end. Working state and full
+evidence: `~/workspace/hl-fleet/resolution-wave14-20261110/` (STATE.md is
+the record; per-workstream adjudication files govern individual CCNs).
+
+**Outcome accounting (index-n census, reconciled hop by hop).** Baseline
+5,557 total / 5,554 priced / 86,595,865 rows → WS-A republished the 14
+wave-13 confirmed with their own files (+11 CCNs, +113,159 rows; 3 more
+were build-backlog) → WS-B adjudicated the 431 suspects (42 VERIFIED,
+6 SHARED-EXPLAINED, 21 MISMATCH confirmed, 362 still-suspect) and WS-C
+re-verified the 1,740 unverifiable (989 VERIFIED, 26 MISMATCH confirmed,
+696 still-unverifiable, 29 in other terminal classes) → the 47 confirmed
+(21 + 26) were taken down (−460,643 rows) → 44 of the 47 were restored
+with their own header-verified files (39 hunt builds + 5 native builds,
++933,114 and +350,228 rows in two publish runs) and the WS-A backlog
+3 (150082, 193300, 150169) completed the 14. Final live: **5,567 total /
+5,564 priced / 87,531,723 rows** (net +10 / +10 / +935,858 vs baseline —
+every hop measured on the live index, none asserted). The 4 NO_FILE
+closures (331323, 010051, 450860, 670109) stay closed and held; their
+methods are recorded in the D-workstream manifests. Residual honesty:
+362 still-suspect and 696 still-unverifiable entries remain live and
+flagged — adjudication exhausted the recorded methods per class; they
+are NOT verified, and no future wave may describe them as such.
+
+**The resolution method stack (what actually convicted and cleared).**
+(1) cms-hpt re-derivation for legacy CCNs — the live pointer, not the
+stale registry seed, is the starting point; slugs rotate and seeds rot.
+(2) 403 edge-lane recovery — a WAF/edge 403 on the pointer page is a
+lane problem, not an absence: cms-hpt scrape of the 403'd URL, alternate
+fleet lanes, and the system's own mirror hosts recover the pointer.
+(3) Wayback vintage verification — when the current file is ambiguous,
+the archived vintage of the facility's own MRF page/file settles which
+file the facility itself published. (4) Twin-equality — a suspect whose
+live n exactly equals a co-claimant facility's live n is the co-claimant's
+file until proven otherwise. (5) Count-lineage — a candidate own file
+whose production-parser count falls in the 0.5–2.0 lineage band of the
+live entry is consistent with the same facility's newer vintage; far
+outside the band demands an explanation before acceptance.
+
+**Classifier-vs-adjudication own-name check (the wave's costliest
+lesson).** WS-C's classifier keyed "foreign" on the co-claimant named in
+a shared file without checking whether the header ALSO names the
+candidate itself; adjudication de-convicted 28 of 54 candidates on
+exactly that point (legal-entity names, predecessor names, named
+locations inside system files, duplicate-CCN pairs). Rule: a shared or
+system file is foreign to a CCN only when its header names a specific
+different facility AND no header field names the candidate — as
+hospital, location, or legal entity — at any candidate source. A
+classifier flag is a worklist, never a verdict.
+
+**Gate-1 operations (publish-time, learned on live FATALs).**
+- Pre-flight every publish batch with the gate itself:
+  `publish_mini.identity_gate(ccn)` imports cleanly and returns the same
+  refusal the publish would hit — run it for the whole batch before
+  launching serial publishes, so one refusal cannot abort a run halfway.
+- The empty-`source_identity` refusal class: when the Gate-2 extractor
+  stamps `{}` (BOM/array-header files), Gate 1 falls back to URL-slug
+  tokens, which can share no token with the registry name (170023:
+  slug "commonspirit-kansas" vs ST. CATHERINE HOSPITAL - GARDEN CITY →
+  FATAL). Remedy is the wave-12 restamp: rewrite ONLY `source_identity`
+  from the file's own header fields, proving the item stream untouched
+  by normalized-items md5 before/after. A restamped canonical gets a
+  restamp-record verdict citing the new sha (b87/170023 pattern).
+- Verdict details must be identity-bearing in the importer's own terms:
+  the field-evidence form `hospital_name: '...'` /
+  `hospital_address: '...'` (single quotes) or an address matching
+  `\d+ <Name> <St|Ave|Blvd|Dr|Rd|...>, <City>, <ST> <zip>` (commas and a
+  listed street suffix required). A detail that fails
+  `detail_is_identity_bearing()` does not stick against a sticky REJECT
+  (Gate 4) — assert it in the batch generator, not at refresh time.
+
+**Registry refresh operations (b85–b87 lessons).**
+- Verdict batch TSVs REQUIRE the header row `ccn<TAB>url<TAB>verdict<TAB>detail`:
+  the importer reads every batch with DictReader; a headerless batch
+  crashes the refresh with `KeyError: 'verdict'` before any D1 write
+  (b87 first attempt — harmless because the crash precedes staging, but
+  it costs a full relaunch).
+- A refresh dying mid-landing (egress collapse; D1 SSL/RemoteDisconnected
+  storms) is resumable by relaunch: landed batches are fingerprint-kept.
+  Absorption is proven ONLY by the closing triple — staging acc ==
+  D1 read-back acc == build expectation — never by the batch log alone.
+- The swap parks staging under two RENAMEs; a death between them leaves
+  `facilities_prev` holding live data (b85 lesson) — check before any
+  manual D1 intervention.
+
+**Oversize builds route native (the jetsam lesson, closed).** The
+Python chunked route's stage_extract DuckDB sort jetsam-died on 150169
+thirty times under memory contention and could not land the build. The
+final native `hl-ingest build` completed all five backlog files —
+including 150169 (11,668,475 rows → 74,703 items) and 060013
+(5,694,490 rows → 151,481 items) — at a ~15.7 MB peak process-tree
+footprint each, receipt + `hl-ingest verify` as the evidence pair.
+Above the 2,000,000-row loud cap, the native build is the route; the
+Python chunked driver remains the fallback for files the native engine
+cannot parse, and a native parse failure is reported as a failure,
+never as a zero count. **Provenance rule:** a build's `source_url`
+argument IS the canonical's provenance — the 060013 benchmark run used
+a synthetic URL and its output is BENCHMARK-ONLY forever
+(`rust-bench/mercy-out/BENCHMARK-ONLY.txt`); the publishable 060013
+canonical is the separate real-URL build (receipt input sha identical,
+output sha 9bc46b89…). Never publish a benchmark artifact.
+
+**Per-class exit standards (as applied in wave 14).** VERIFIED = the
+file's own header names the facility (or a header names it as a system
+member at its own registry address). SHARED-EXPLAINED = the header names
+a system/program the facility verifiably belongs to, with the member
+relationship itself evidenced. MISMATCH = verbatim header naming a
+specific different facility + no own header at any candidate source +
+one corroboration (twin-equality, count-lineage, or sole-source).
+STILL-SUSPECT / STILL-UNVERIFIABLE = methods exhausted and recorded;
+the entry stays live, flagged, and undescribed as verified anywhere.
