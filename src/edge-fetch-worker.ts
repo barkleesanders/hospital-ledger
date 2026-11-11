@@ -11,9 +11,13 @@
  */
 
 import { Hono } from "hono";
+import { wideEvent } from "./lib/wide-event";
 import { type FetchEnv, fetchProxyHandler } from "./routes/api/fetch-proxy";
 
 const app = new Hono<FetchEnv>();
+// Wide-event logging (native observability): exactly one http_request JSON
+// event per fetch request, outermost — same pattern as the site Worker.
+app.use("*", wideEvent);
 // Hono serves HEAD from GET routes; the handler keeps HEAD as HEAD upstream.
 app.get("/api/fetch", fetchProxyHandler);
 
