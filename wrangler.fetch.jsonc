@@ -15,5 +15,20 @@
 	// Egress from the US: many hospital origins refuse non-US addresses
 	// (developers.cloudflare.com/workers/configuration/placement/, read 2026-10-13).
 	"placement": { "region": "aws:us-east-1" },
-	"observability": { "enabled": true, "head_sampling_rate": 1 }
+	// Explicit logs + traces blocks (not the shorthand): a deploy with only
+	// `"observability": {"enabled": true}` silently reset the site Worker's
+	// traces.enabled to false in the 2026-11-11 wave — the explicit form is
+	// what makes the Wave A platform settings durable. Enforced by
+	// scripts/check-observability.mjs.
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1,
+		"logs": {
+			"enabled": true,
+			"invocation_logs": true,
+			"persist": true,
+			"head_sampling_rate": 1
+		},
+		"traces": { "enabled": true, "persist": true, "head_sampling_rate": 1 }
+	}
 }

@@ -57,6 +57,53 @@ if (
 	failures.push("src/index.tsx: wideEvent middleware is not wired into the app");
 }
 
+// The edge-fetch Worker (wrangler.fetch.jsonc) carries the same contract:
+// explicit logs + traces blocks, and wideEvent wired into its own entry.
+// Its observability block is the last key in the file, so it is read to EOF.
+const fetchConfig = readFileSync(
+	new URL("../wrangler.fetch.jsonc", import.meta.url),
+	"utf8",
+);
+const fetchObs =
+	/"observability"\s*:\s*\{([\s\S]*)\}\s*$/.exec(fetchConfig.trim())?.[1] ?? "";
+if (!fetchObs) {
+	failures.push("wrangler.fetch.jsonc: top-level observability block not found");
+} else {
+	for (const section of ["logs", "traces"]) {
+		const block =
+			new RegExp(`"${section}"\\s*:\\s*\\{([^}]*)\\}`).exec(fetchObs)?.[1] ?? "";
+		const enabledValue = /"enabled"\s*:\s*(true|false)/.exec(block)?.[1];
+		if (enabledValue !== "true") {
+			failures.push(
+				`wrangler.fetch.jsonc: [observability.${section}] must exist with enabled = true`,
+			);
+		}
+		if (!/"persist"\s*:\s*true/.test(block)) {
+			failures.push(
+				`wrangler.fetch.jsonc: [observability.${section}] must set persist = true`,
+			);
+		}
+	}
+	if (!/"invocation_logs"\s*:\s*true/.test(fetchObs)) {
+		failures.push(
+			"wrangler.fetch.jsonc: [observability.logs] must set invocation_logs = true",
+		);
+	}
+}
+
+const fetchEntry = readFileSync(
+	new URL("../src/edge-fetch-worker.ts", import.meta.url),
+	"utf8",
+);
+if (
+	!fetchEntry.includes('from "./lib/wide-event"') ||
+	!fetchEntry.includes("wideEvent")
+) {
+	failures.push(
+		"src/edge-fetch-worker.ts: wideEvent middleware is not wired into the app",
+	);
+}
+
 if (failures.length > 0) {
 	console.error(failures.join("\n"));
 	process.exit(1);
