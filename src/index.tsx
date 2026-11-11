@@ -18,6 +18,7 @@ import {
 	mountInfiniteFaq,
 } from "./faq/faq-route";
 import { r2Passthrough, readR2Json } from "./lib/r2";
+import { wideEvent } from "./lib/wide-event";
 import { aboutNumbersPageHandler } from "./routes/about-the-numbers";
 import { complianceRankingHandler } from "./routes/api/compliance-ranking";
 import { coverageHandler } from "./routes/api/coverage";
@@ -70,6 +71,11 @@ export type Env = {
 };
 
 const app = new Hono<Env>();
+
+// Wide-event logging (native observability): exactly one structured
+// "http_request" JSON event per request, emitted from a finally — see
+// src/lib/wide-event.ts. Registered first so it wraps every handler.
+app.use("*", wideEvent);
 
 // Security headers — ports site/_headers (defense-in-depth at the edge).
 app.use("*", async (c, next) => {

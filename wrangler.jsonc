@@ -41,8 +41,23 @@
 			"bucket_name": "hl-mrf-parsed"
 		}
 	],
+	// Native observability (Wave B, 2026-11-11): explicit logs + traces, NOT
+	// the shorthand {"enabled": true} — the shorthand left traces to platform
+	// defaults and a post-Wave-A deploy silently reset traces.enabled to
+	// false live. This block is the durable source of truth.
 	"observability": {
-		"enabled": true
+		"enabled": true,
+		"logs": {
+			"enabled": true,
+			"invocation_logs": true,
+			"persist": true,
+			"head_sampling_rate": 1
+		},
+		"traces": {
+			"enabled": true,
+			"persist": true,
+			"head_sampling_rate": 1
+		}
 	},
 	// Workers AI for the "Ask anything" row (src/faq/faq-route.ts). `remote: true`
 	// makes `wrangler dev` call the real model instead of a local stub.
