@@ -15,5 +15,56 @@
   },
   "learned_at": "2026-10-19T01:50:00+00:00Z",
   "note": "strict"
+ },
+ "6c78530f49769531": {
+  "mapping": {
+   "code": 2,
+   "code_type": null,
+   "desc": 0,
+   "gross": 12,
+   "cash": 13,
+   "min": null,
+   "max": null,
+   "setting": 8,
+   "billing": 7,
+   "payer": 14,
+   "plan": 15
+  },
+  "learned_at": "2026-11-10T19:12:26+00:00Z",
+  "note": "strict"
+ },
+ "30ae9b69de013c77": {
+  "mapping": {
+   "code": 2,
+   "code_type": null,
+   "desc": 0,
+   "gross": 5,
+   "cash": 6,
+   "min": null,
+   "max": null,
+   "setting": 4,
+   "billing": 3,
+   "payer": null,
+   "plan": null
+  },
+  "learned_at": "2026-11-10T19:12:26+00:00Z",
+  "note": "strict"
+ },
+ "b148e7758cd02363": {
+  "mapping": {
+   "code": 1,
+   "code_type": null,
+   "desc": 0,
+   "gross": 4,
+   "cash": 5,
+   "min": null,
+   "max": null,
+   "setting": 3,
+   "billing": null,
+   "payer": 6,
+   "plan": 7
+  },
+  "learned_at": "2026-11-10T19:12:26+00:00Z",
+  "note": "strict"
  }
 }
