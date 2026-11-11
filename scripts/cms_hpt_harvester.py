@@ -29,7 +29,7 @@ Strategy:
   5. HEAD-verify each MRF URL
   6. Write to mrf_rediscovered with source 'cms-hpt'
 """
-import asyncio, sqlite3, re, sys, os, datetime
+import asyncio, sqlite3, re, sys, os, datetime, json
 from urllib.parse import urlparse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -102,6 +102,62 @@ def parse_cms_hpt(text):
         if entry.get('mrf-url') and entry.get('location-name'):
             entries.append(entry)
     return entries
+
+
+# --- Wave-11d Gate 5: one-token-one-facility ------------------------------
+# A pointer token (PARA dbName, download token, Craneware key, blob path
+# key) names ONE facility's file. When the cms-hpt pointer set shows the
+# same token claimed by >= 2 distinct facilities (distinct location-names),
+# the token may NOT be auto name-matched to any of them: it is recorded
+# as shared and routed to header-confirmation only. (Origin: one
+# Craneware key, 82f7c2f5..., was ACCEPTed under three CCNs in b3 —
+# 193301 / 223303 / 453312 — and served Shriners Northern California's
+# file under all three.)
+def pointer_token(url):
+    """Vendor pointer token of an MRF URL, or None when the URL carries
+    no facility-scoped token."""
+    try:
+        p = urlparse(url or '')
+    except Exception:
+        return None
+    qs = {}
+    for pair in (p.query or '').split('&'):
+        if '=' in pair:
+            k, v = pair.split('=', 1)
+            qs[k.lower()] = v
+    if qs.get('dbname'):
+        return ('para', qs['dbname'])
+    host = (p.hostname or '').lower()
+    segs = [s for s in (p.path or '').split('/') if s]
+    if 'craneware' in host:
+        for i, s in enumerate(segs):
+            if s == 'public' and i + 1 < len(segs):
+                return ('craneware', segs[i + 1])
+    for s in segs:
+        if re.fullmatch(r'[0-9a-f]{32}', s):
+            return ('hexkey', s)
+    if host.endswith('blob.core.windows.net') and len(segs) >= 2:
+        return ('blob', '/'.join(segs[:2]))
+    if 'hospitalpricedisclosure' in host:
+        if qs.get('pi'):
+            return ('hpd', qs['pi'])
+        if segs:
+            return ('hpd', segs[0])
+    return None
+
+
+def shared_token_facilities(entries):
+    """Map token -> set of distinct facilities (normalized location-
+    names) claiming it across the pointer set. Only tokens claimed by
+    >= 2 distinct facilities are returned."""
+    claims = {}
+    for _domain, e in entries:
+        tok = pointer_token(e.get('mrf-url'))
+        if tok is None:
+            continue
+        fac = re.sub(r'\s+', ' ', (e.get('location-name') or '').lower()).strip()
+        claims.setdefault(tok, set()).add(fac)
+    return {t: fs for t, fs in claims.items() if len(fs) >= 2}
 
 
 async def fetch_cms_hpt(client, sem, domain):
@@ -240,8 +296,23 @@ async def main():
         # Phase 2: match each entry to a CCN (uses pre-built state-keyed index)
         print(f"\nmatching {len(all_entries)} entries to CCNs...", file=sys.stderr)
         build_hospital_index(conn)
+        # Gate 5 (wave-11d): shared pointer tokens are diverted to
+        # header-confirmation only — never auto name-matched.
+        shared_tokens = shared_token_facilities(all_entries)
+        diverted = []
         matched = []
         for domain, e in all_entries:
+            tok = pointer_token(e.get('mrf-url'))
+            if tok is not None and tok in shared_tokens:
+                diverted.append({
+                    'token': f"{tok[0]}:{tok[1]}",
+                    'mrf_url': e['mrf-url'],
+                    'location_name': e['location-name'],
+                    'source_domain': domain,
+                    'claimed_by': sorted(shared_tokens[tok]),
+                    'route': 'header-confirmation only (Gate 5 shared token)',
+                })
+                continue
             m = match_to_ccn(conn, e['location-name'])
             if m:
                 matched.append({
@@ -255,6 +326,16 @@ async def main():
                 })
         print(f"  matched: {len(matched)} entries", file=sys.stderr)
         print(f"  distinct CCNs covered: {len({m['ccn'] for m in matched})}", file=sys.stderr)
+        if diverted:
+            shared_path = os.path.join(ROOT, 'db', 'cms_hpt_shared_tokens.json')
+            try:
+                with open(shared_path, 'w') as f:
+                    json.dump(diverted, f, indent=1)
+            except Exception:
+                pass
+            print(f"  Gate 5: diverted {len(diverted)} entries on shared "
+                  f"pointer tokens (header-confirmation only) -> {shared_path}",
+                  file=sys.stderr)
 
         # Phase 3: HEAD-verify each MRF URL once (parallel, indexed for ordered results)
         print(f"\nHEAD-verifying {len(matched)} MRF URLs...", file=sys.stderr)
