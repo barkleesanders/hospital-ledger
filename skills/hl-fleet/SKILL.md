@@ -204,6 +204,16 @@ it:
   Logs: `~/hl-fleet/publish-mini-<label>.log`; state: `~/hl-fleet/publish-state.json`;
   lock: `~/hl-fleet/publish.lock` (never two publishes at once — check for a
   running publish, VM or Mini, before launching).
+- **Copy-truth trigger (2026-11-11, forge):** a fleet publish is not done
+  when the data verifies. Every publish that changes the live index —
+  counts, membership, or any figure the site's copy quotes — invokes the
+  copy-truth gate (the refresh skill's Phase 8.5) in the same work item:
+  the pushing lane runs it, or hands it to the lane holding the repo
+  checkout, and records the gate's outcome next to the publish result.
+  Data-current ≠ copy-current (the refresh skill's 2026-11-06 lesson); a
+  publish reported complete with no gate outcome recorded is an incomplete
+  publish. The gate's procedure lives in `local-hospital-ledger-refresh`
+  Phase 8.5 — never restate or fork it here.
 - **Publish tree** = `/Volumes/Share/hl-fleet/publish-tree` (symlink
   `~/hl-publish-tree`): the VM pipeline tree's `scripts/` + `db/` +
   `data/header_aliases.json` + aggregates, synced 2026-10-28. Canonicals are

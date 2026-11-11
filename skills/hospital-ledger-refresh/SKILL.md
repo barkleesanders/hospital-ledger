@@ -142,6 +142,103 @@ Poll `https://hospitalledger.com/api/manifest` (cache-busted) up to 20 × 10 s
 until `generated_at` equals the run's and `summary_source == "r2"`.
 Gate: match within 200 s. On failure: report last-seen values.
 
+### Phase 8.5 — Copy sync: the copy-truth gate (on EVERY push; also standalone on request)
+
+The counts publish updates DATA only. The site's written copy — README
+stats, homepage prose numbers, the procedure carousel — lives in the GitHub
+repo's Worker source and drifts silently as the data moves. This phase is
+the standing guard (added 2026-11-06 at the operator's direction after the
+homepage was found claiming "Cloudflare Pages" and May-era counts).
+
+**Trigger (2026-11-11, forge):** this gate runs on every push that changes
+live data or deploys the Worker — this runbook's counts publish, a fleet
+publish (a `publish_mini` campaign publish or a daily pricing wave), and
+any Worker deploy under `/ship` — whoever ran the push. The pushing lane
+invokes the gate in the same work item and records its outcome next to the
+push result; a push is not complete until the gate has run. Live counts
+move most often under fleet publishes, so the trigger lives with the push,
+not with this runbook's calendar.
+
+1. **Run the repo copy audit** in a current checkout of
+   `barkleesanders/hospital-ledger` (Mini `~/hl-adv`):
+   `npm run audit:copy` (`scripts/predeploy_audit.py`). It verifies README
+   and home.tsx claims against live `summary.json` ground truth. On FAIL,
+   set each flagged claim to the audit's expected value — the audit's
+   numbers come from the data, never hand-pick replacements. (2026-11-06:
+   5 README claims were stale this way — 5,025→5,398 hospitals,
+   81,783,100→84,697,056 rows, 17.7M→18.8M CPT rows, 5,040→5,406 index.)
+2. **Carousel basis check — basis-aware, never cross-compare.**
+   `src/components/ProcedureCarousel.tsx` `PROCEDURE_SLIDES` medians are
+   **gross-charge p50** and its min/max are **gross p5/p95**; the procedure
+   PAGES headline **cash** stats. Verify each slide's `median` against
+   `GET /api/procedure/<code>` → `stats.gross_p50` and `hospitals` against
+   `stats.hospital_count`. NEVER "correct" the carousel from page text
+   (cash basis) or from raw min/max — a 2026-11-06 audit nearly did exactly
+   that; the carousel was right, only its basis was unlabeled (it now
+   carries a visible "gross charges, 5th–95th percentile" note). If
+   `gross_p50`/`hospital_count` genuinely drift, update medians/counts via
+   the repo flow below; p5/p95 await a full-rows source (the cpt-index API
+   serves only a top-25 sample per code).
+3. **Code-count claims**: the homepage's "N pipeline scripts, ~X lines of
+   Python, ~Y lines of TypeScript" is recomputed from the repo, not
+   remembered: `find . -name '*.py' -not -path './node_modules/*' -not -path './.git/*'`
+   (count + `wc -l`), same for `*.ts`/`*.tsx`. (2026-11-06 measured:
+   78 py files / 26,109 LOC; 52 ts+tsx files / 11,958 LOC.)
+4. **Ship path for any copy change**: `main` is protected — branch, PR,
+   wait for CI (verify 22/24/26, analyze, CodeQL), merge, then deploy from
+   the checkout with `npm run deploy` (scripts/deploy.sh) and verify the
+   new copy on the live homepage. Precedent: PR #55 (2026-11-06), merge
+   `9c25e57`, Worker version `a248e618`. The predeploy gate
+   (`npm run predeploy`) must be green first; its harness step needs
+   Playwright's chromium headless shell (`npx playwright install chromium`).
+5. **Every number, every surface.** `audit:copy`'s named coverage (README +
+   home.tsx) is a floor, not the gate. Sweep the remaining copy surfaces —
+   about, about-the-numbers, FAQ, the submit page, footer — for figures:
+   each must map to a named field of the data of record (`summary.json`,
+   `/api/coverage`, the D1 registry read-back, or the live index). A
+   figure with no mapping is removed or given one — never carried forward
+   from a previous copy pass. A stale claim on a surface the audit does
+   not check is still this push's defect: fix it in this push via the
+   step-4 ship path, and extend the audit's coverage in the same PR when
+   the claim is a recurring figure.
+6. **Purpose check.** Read the copy's statements of what the site is and
+   does (homepage hero, about page, README lede) against the site as it
+   actually behaves today — features shipped or removed, the search
+   behaviour, the hospital-submission flow. A statement describing a
+   feature that no longer exists, or a purpose description that omits a
+   path the site now offers (e.g. hospital submission), is corrected in
+   this push like any stale number.
+7. **Provenance & limitations check.** Read the copy's method statements
+   against the pipeline's actual method (the fleet skill is the record):
+   files are discovered from each hospital's own `cms-hpt.txt` pointer,
+   fetched from the hospital's own hosting, identity-gated on the file's
+   own header, refreshed by the daily pricing waves and the weekly
+   harvest. Copy may not claim a check the pipeline does not run. Then
+   read the limitation statements against the CURRENT measured census
+   (fleet skill, wave-14 classes): the verification buckets
+   (header-verified / filename-convention / shared-explained / suspect /
+   unverifiable) with their current counts, and the standing honesty
+   rules — posting a file is not CMS compliance; standard charges are not
+   what a patient pays; federal facilities are excepted from the rule. A
+   universal claim ("every file verified") over a catalog whose measured
+   buckets say otherwise is a defect of the same class as a stale count:
+   fix in this push, with wording taken from the measured buckets, never
+   from memory.
+8. **Post-deploy closure.** The gate is not discharged by the pre-deploy
+   audit. After any deploy or data publish, run `npm run audit:copy:live`
+   (`scripts/predeploy_audit.py --check-live`) and re-check the surfaces
+   steps 5–7 swept against the live site; `audit:copy:live` must PASS
+   before the push is declared done. A stale figure or false statement
+   found live is a defect of THIS push: fix it in the same work item (a
+   follow-up PR through the step-4 path, immediately), and do not report
+   the push complete until the live copy verifies — "note it for the next
+   pass" is not a disposition this gate recognises. Where a figure has to
+   be hand-edited into static copy, treat the hand-edit itself as the
+   defect signal: prefer the summary-driven dynamic rendering the data
+   pages already use; where static text must carry a number, the number
+   is regenerated at push time from the data of record, never carried
+   forward from the previous pass.
+
 ### Phase 9 — Report
 - exit code + log path; `generated_at`; `compliant X / Y = Z%`
 - delta vs the pre-run snapshot: newly-live and newly-dead MRF counts
