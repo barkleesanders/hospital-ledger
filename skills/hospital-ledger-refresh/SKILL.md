@@ -46,6 +46,36 @@ Invariants:
   (the old script refused this; the native workflow must too).
 - Writes go only to `meta/` and `prices/index.json`. Never delete R2 objects.
 - `validate_site_data.py --tier counts` must exit 0 before any publish.
+- **Adjudication gate — separate from validation, binding on every lane
+  (2026-11-12).** Validation proves a file is well-formed and
+  identity-consistent; it says nothing about whether the CCN may be
+  published. Before ANY publish from a lane this skill governs — the
+  Phase 7 counts publish, the daily pricing wave, the publish-retry
+  lane — the publish set is checked against the shared holds file
+  `~/workspace/hl-fleet/adjudicated_holds.txt`: the ONE source of truth
+  for do-not-publish (the fleet skill's Gate 3 is the record of the
+  regime). The file is read at publish time; if it cannot be read, the
+  publish does not proceed — fail closed, exactly as publish_mini's
+  Gate 1 does. A CCN in the file is never published, however cleanly
+  its file parses and however well its header matches: a held CCN in a
+  wave's changed set is dropped from the publish set and reported; a
+  held CCN inside a counts rebuild is a stop-the-publish defect (the
+  rebuild's inputs must exclude it — never publish and repair after).
+  A winning REJECT verdict (fleet skill Gates 4 and 6 — sticky REJECTs,
+  federal exclusion) binds every lane identically: a CCN whose REJECT
+  is visible in the run's own registry/verdict inputs is treated as
+  held until Barklee's adjudication releases it, whether or not it has
+  reached the holds file yet. CCN 150042's quarantine is separate,
+  absolute, and equally binding on these lanes. This skill carries NO
+  copy of the hold list — a copied list is a stale list by construction;
+  holds change only by Barklee's adjudication, recorded per the fleet
+  skill's hold-release standard. The pricing wave's own mechanics must
+  perform this check before publishing; where the wave's tooling does
+  not, the agent running or supervising the wave performs it against
+  the changed set before the publish proceeds. (Founding incident:
+  pricing wave 62, 2026-11-12, published 31001F — a wave-11e federal
+  closure sitting in the holds file — because no text bound this lane
+  to it.)
 
 ## Native runbook — execute in order, gate each phase
 
@@ -127,7 +157,9 @@ On validation failure: report the FAIL lines, STOP — nothing is published.
 
 ### Phase 7 — Publish (only on a publish run)
 Preconditions: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `R2_ENDPOINT`
-set (from `~/hospital-ledger.env`); this is NOT a `--limit` run.
+set (from `~/hospital-ledger.env`); this is NOT a `--limit` run; the
+adjudication gate (Pipeline contract) has run on this publish set in this
+run — holds file read at publish time, no held CCN in the rebuilt set.
 ```bash
 export R2_BUCKET="${PARSED_R2_BUCKET:-hl-mrf-parsed}"
 .venv/bin/python scripts/r2_put.py --check   # HEAD bucket must be 200
