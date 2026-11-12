@@ -264,7 +264,10 @@ it:
 - **The VM is out of the publish path.** `hlfleet.py publish` and
   `fast_publish.py` are legacy; the daily pricing wave (`hl_wave.py`) keeps
   its own VM mechanics and its own state — the Mini publisher never touches
-  `hl_wave_state.json`.
+  `hl_wave_state.json`. Its mechanics are its own; its adjudication is
+  not — the wave is bound by the shared holds file like every publishing
+  lane (Gate 3), and this carve-out is about mechanics and state only,
+  never an exemption from adjudication.
 - First Mini publish: **451312 (Rice Medical Center), 2026-10-28 11:53 PDT** —
   SUCCESS, byte-verify OK, live 4,397 → 4,398 (coverage gen 18:53:19Z). The
   050390 dry-run before it reproduced live counts exactly (4,397 → 4,397).
@@ -2243,7 +2246,15 @@ clean; 210006, 210055 repaired; the wave-5/6 recoveries rebuilt).
   truth, read by both the campaign driver (queue subtraction +
   publish guard) and publish_mini's Gate 1. It supersedes every
   inline hold list in any job body — inline lists are caches,
-  never the authority. Current state: **57 CCNs**, sha256
+  never the authority. **It also binds every other lane that can
+  publish** (2026-11-12): named, the daily pricing wave
+  (`hl_wave.py`) checks the file before publishing — the refresh
+  skill carries that lane's operative gate — and any future
+  publishing lane inherits the binding by this sentence, not by
+  being added to this list. The two named consumers are the
+  fleet's own enforcement points, not the boundary of the
+  adjudication. (Wave 62 published the held 31001F on 2026-11-12
+  through exactly this enumeration gap.) Current state: **57 CCNs**, sha256
   `6a0007f8…` (the 11 Nov-9 adjudications + 13 wave-11
   confirmed-closed/NO_FILE + 13 b81-closed suspects + 19 wave-11e
   federal closures + 154057). CCN 150042's quarantine is separate
