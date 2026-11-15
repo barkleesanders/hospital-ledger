@@ -135,7 +135,7 @@ Gate: `.venv/bin/python -c "import httpx; print(httpx.__version__)"` prints `0.2
 
 ### Phase 2 — Probe
 ```bash
-.venv/bin/python scripts/probe_mrf_urls.py --all --concurrency "$CONCURRENCY" --run-id "$RUN_ID" --method edge|proxy|mini
+.venv/bin/python scripts/probe_mrf_urls.py --all --concurrency "$CONCURRENCY" --run-id "$RUN_ID" --method edge|mini|retry
 ```
 4,335 URLs at the 2026-11-15 run; duration is egress-bound — minutes on
 healthy legs, hours when degraded. The runner drives the three methods
@@ -209,9 +209,20 @@ Phase 2 tries each item by up to **three different methods**, in order:
 primary lane (a bare direct probe from the VM is forbidden since the
 2026-11-05 approval-card guard; the probe fails closed without
 HL_FETCH_PROXY in edge mode, and the runner stops with code 30 if the
-unit env loses it); (2) **proxy** — the resilient-egress proxy at
-127.0.0.1:8899; (3) **mini** — the Mac mini's egress (curl over SSH,
-batched — the 2026-11-05 guard's own sanctioned fallback). The
+unit env loses it); (2) **mini** — the Mac mini's egress (curl over SSH,
+batched — the 2026-11-05 guard's own sanctioned fallback); (3) **retry**
+— a second edge pass, time-separated by the whole mini pass, eligible
+only for items both edge and mini already attempted (transient WAF /
+rate-limit windows clear, so a delayed re-ask is a genuinely different
+attempt). **Removed 2026-11-15 (approval-card bug, Barklee report):**
+the resilient-egress proxy at 127.0.0.1:8899 as method 2 — it is a
+CONNECT proxy, so the VM process names every hospital domain to the
+gateway and the approval gate cards each first-seen one (~24 cards in
+one morning, bursts 11:03–11:13 PT). A lane is card-free only when the
+VM process's peer is one fixed already-granted domain (the hl_edge
+Worker) or the fetch executes on another machine (the Mini) — see the
+fleet skill's CONNECT-proxy trap entry. Never re-add a CONNECT-proxy
+or direct method for hospital domains. The
 first method to return a real HTTP status answers the item, finally.
 A transport-class outcome (−1/−2) is not an answer: the item stays
 pending for the next method. An item still unanswered after all three

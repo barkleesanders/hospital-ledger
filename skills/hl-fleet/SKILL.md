@@ -686,9 +686,10 @@ parks are lane-specific; discharge is part of the run). Check
 `hl_lessons_gate.py status` in every campaign pass; 0 owed is the healthy
 state.
 
-**First-seen-domain approval cards — ALL direct VM egress cards, scripts
-included (root-caused 2026-11-01, Barklee-directed /debug; this entry
-CORRECTS an earlier same-day draft that blamed the cron worker's browsing):**
+**First-seen-domain approval cards — ALL VM egress cards: direct, script,
+and CONNECT-proxy alike (root-caused 2026-11-01, Barklee-directed /debug;
+CONNECT-proxy class added 2026-11-15; this entry CORRECTS an earlier
+same-day draft that blamed the cron worker's browsing):**
 the VM's egress gate raises a human approval card for ANY first-seen
 hospital domain, from ANY process — agent web tools, shell curl, or a
 Python script's httpx/urllib. (Diagnosed 2026-09-21: "shell approval cards
@@ -725,6 +726,30 @@ never just rewrite the job body and re-fire. (4) A `cron.stop` does not
 cancel a queued occurrence; it auto-starts and needs its own stop.
 Pending cards from stopped runs are inert leftovers (the permission
 surface is list-only; Nova cannot clear them) — Barklee can dismiss them.
+**The CONNECT-proxy trap (2026-11-15, Barklee report — the 'direct egress'
+framing above was the gap):** the gate cards the domain a VM process
+NAMES, not the socket it opens. A fetch-style proxy API on one fixed
+granted domain (hl_edge → hospitalledger.com/api/fetch) is card-free
+because the VM process only ever names hospitalledger.com. A
+CONNECT-style proxy — the resilient-egress proxy at 127.0.0.1:8899
+included — makes the VM process name EVERY target domain in the CONNECT
+line, so every first-seen hospital domain cards exactly as if fetched
+directly, even though the process's only socket is to 127.0.0.1 and the
+proxy exits through the Mini. Proof: the counts probe carried 8899 as a
+designed method for one morning (2026-11-15) and generated ~24 cards in
+bursts at 11:03–11:13 PT, all attributed to the proxy-owning scope; the
+method was removed the same day (the ladder is now edge → mini → retry,
+retry being a time-separated second edge pass). Standing rules:
+(5) the naming test, applied when DESIGNING or choosing a fetch lane,
+not only when running one: what domains will a VM process name — to any
+gateway, proxy, or API? If the answer is 'each hospital's domain', the
+lane cards and is forbidden for hospital domains, however local or
+trusted the intermediary. Card-free lanes are exactly: the hl_edge
+fetch API; execution on another machine (Mini SSH, sandbox exec); or a
+fetch API on a single fixed domain. (6) Never edit a live runner's
+script in place while it executes — bash reads by byte offset, the edit
+corrupts the runner mid-run, and its fetcher child can outlive a service
+stop; patch, verify, then relaunch.
 **Second source, same day (17:22–17:33 PST): the campaign-driver cron
 worker.** After the scripts were proven clean at the socket level (the
 harvest process held 60 connections, ALL to 127.0.0.1; the proxy log
@@ -784,9 +809,12 @@ doctrine rather than habit):
   promote log made the morning readable as one transport event.)
 - **The ladder, in fixed order** (traverse at most once per run):
   rung 1 — re-probe both legs (curl example.com +
-  hospitalledger.com, direct then via 127.0.0.1:8899; a leg is
-  healthy only on a FAST 200 — a 9-second 200 is a degraded leg,
-  not a healthy one); rung 2 — run the step under the healthy leg;
+  hospitalledger.com, direct then via 127.0.0.1:8899 — the 8899 leg
+  here carries ONLY these two fixed probe URLs, never a hospital
+  domain: as a CONNECT proxy it would card every first-seen hospital
+  domain it named, per the approval-card entry's CONNECT-proxy trap;
+  a leg is healthy only on a FAST 200 — a 9-second 200 is a degraded
+  leg, not a healthy one); rung 2 — run the step under the healthy leg;
   rung 3 — if the step dies transport-dead mid-run, re-probe and
   re-run the STEP once under the other leg, if it is healthy;
   rung 4 — defer to the next scheduled cycle and record the run as
