@@ -2019,7 +2019,11 @@ absence. The named pairs: pricing wave → its `hl_waves.jsonl`
 record by ~04:30 PT daily; counts refresh → its status file by
 Sunday ~08:00 PT; discovery loop → its harvest + promote logs by
 Sunday ~06:00 PT; campaign driver → `hl_campaign_state.json`
-fresh within 2× its 10-minute cadence. (2026-11-15 lesson: the
+fresh within 2× its 10-minute cadence **while the campaign is
+active** — a recorded stage exhaustion is the terminal artefact
+and closes the pair until a new stage opens (an exhausted driver
+is not "silent" for failing to refresh a state file that has
+nothing left to say). (2026-11-15 lesson: the
 counts FAILED status surfaced only because a monitor noticed a
 state CHANGE; a run that dies before writing any status would
 have been invisible. Change-detection is not a silence deadline.)
