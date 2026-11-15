@@ -72,7 +72,26 @@ Invariants:
   skill's hold-release standard. The pricing wave's own mechanics must
   perform this check before publishing; where the wave's tooling does
   not, the agent running or supervising the wave performs it against
-  the changed set before the publish proceeds. (Founding incident:
+  the changed set before the publish proceeds.
+  **The gate binds every WRITE of a publish set, not only the publish
+  moment (2026-11-15, tutor).** Any path that records CCNs for later
+  publish or retry — an exception handler parking a failed set, a
+  deferred/unpublished list in lane state, a pending-publish manifest —
+  filters the set against the holds file BEFORE writing it; an
+  all-held set records nothing. A publish set read back from any such
+  record is filtered again on read: a poisoned or stale record
+  (written by older code, by hand, by any lane) never reaches a
+  publish, and the strip is logged. (Second founding incident: wave
+  65, 2026-11-15 — the publish itself was correctly filtered to
+  330154, but the lock-release exception handler parked the UNFILTERED
+  changed set, including held federal closures 33016F/33019F, into the
+  retry manifest, where a later retry could have published them. The
+  wave's park path now filters at the single choke point every park
+  funnels through — `hl_wave.py` `drop_held`/`park_for_retry`,
+  regression-tested, and sabotage-validated 2026-11-15 with a planted
+  poisoned manifest fed to the real retry entry: held CCNs dropped,
+  manifest self-cleaned, publish machinery never entered. Any lane
+  adding a new deferred-set write adopts the same shape.) (Founding incident:
   pricing wave 62, 2026-11-12, published 31001F — a wave-11e federal
   closure sitting in the holds file — because no text bound this lane
   to it.)
@@ -118,8 +137,53 @@ Gate: `.venv/bin/python -c "import httpx; print(httpx.__version__)"` prints `0.2
 ```bash
 .venv/bin/python scripts/probe_mrf_urls.py --all --concurrency "$CONCURRENCY"
 ```
-~3,609 URLs, ~3–10 min. Gate: exit 0 and log tail shows `probe complete`.
-Recovery: re-run the phase (INSERT OR REPLACE is idempotent).
+4,335 URLs at the 2026-11-15 run; duration is egress-bound — minutes on
+healthy legs, hours when degraded. Gate: exit 0, log tail shows
+`probe complete`, AND the plausibility check below passes.
+Recovery: re-run the phase (INSERT OR REPLACE is idempotent) — subject to
+the failure classes below.
+
+#### Phase 2 failure classes & the saturated-probe rule (2026-11-15, tutor)
+
+- **KILLED-PROBE** — the probe process dies by signal with no traceback
+  (the log's last line is a progress line, or the shell reports
+  `Killed`). The sender of the signal is UNPROVEN until measured (peak
+  RSS, journal/dmesg record captured at failure time): never write a
+  mechanism ("OOM", "reaped") into an incident record without the
+  discriminating measurement — the fleet's 2026-11-02 precedent proved
+  identical silent deaths on this VM were lifecycle reaping, NOT OOM
+  (supervised run rc=0 at 36 MB peak RSS). A killed probe is its own
+  class in the run record, with the signal/exit recorded — never folded
+  into a generic "build/validate failed".
+- **FROZEN-SIGNAL** — a progress sub-counter static while the main
+  counter advances (attempt 1, 2026-11-15: `alive` pinned at 782 across
+  1,400 consecutive probed items). This is the fleet's wedged-controller
+  signature generalized to any long probe: name it in the run record.
+  A long frozen stretch whose outcomes are transport-class is evidence
+  about the transport, not about the hospitals.
+- **SATURATED-PROBE — the publish hazard.** Probe outcomes split into
+  HTTP answers and transport-class outcomes (status −1/−2: timeout /
+  connect / protocol errors). A probe whose transport-class outcomes
+  exceed its HTTP answers measured the transport, not the hospitals:
+  classify it TRANSPORT-DEAD however it exits — never published, and
+  its rows never treated downstream as hospital deaths. A
+  `probe complete` line does NOT clear this check; the `by_status`
+  breakdown is part of the gate. (2026-11-15: both killed attempts
+  carried long transport-saturated stretches; had either run completed,
+  every prior gate would have passed it and thousands of false deaths
+  would have flowed into the counts build. The kills prevented a bad
+  publish by accident, not by design — this rule makes it design.)
+- **Instrumentation is part of the phase, not a nicety.** The
+  `by_status` breakdown must be printed periodically during the run and
+  at ANY exit, success or failure — a diagnostic reachable only on
+  success is a concealer. And a probe of this size must persist
+  incrementally (per-chunk commit) so a kill resumes instead of
+  restarting from zero. Until `probe_mrf_urls.py` does both, this phase
+  is ALL-OR-NOTHING — a kill loses the entire run — and that exposure
+  is stated in the run record every time it binds. The script change
+  ships via Barklee's bundle (the no-`scripts/*.py` rule stands); the
+  requirement and the current non-compliance are both recorded here so
+  no operator discovers the exposure at 93%.
 
 ### Phase 3 — Enforcement match
 ```bash
