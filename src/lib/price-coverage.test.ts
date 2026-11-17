@@ -128,13 +128,9 @@ describe("old producer compatibility, served pages and FAQ", () => {
 			expect(response.status).toBe(200);
 			const text = pageText(await response.text());
 			expect(text).toContain(
-				"Of 3 CMS-required hospitals with a verified live file, 1 have searchable",
+				"Of the 3 hospitals the law covers that have a verified live file, 1 have prices you can search here",
 			);
-			expect(text).toContain(
-				path === "/"
-					? "1 are not yet in the price index"
-					: "1 hospitals aren't in the price index",
-			);
+			expect(text).toContain("1 aren't in the price index yet");
 			expect(text).not.toContain(
 				"Every CMS-required hospital with a live file is now accounted for",
 			);
@@ -152,7 +148,7 @@ describe("old producer compatibility, served pages and FAQ", () => {
 		const raw = await app.request("/data/summary.json", {}, env);
 		expect(await raw.text()).toBe(JSON.stringify(legacySummary));
 		const docs = await loadFaqCorpus(env);
-		expect(docs[0].text).toContain("2 still lack searchable rows");
+		expect(docs[0].text).toContain("The other 2 don't yet");
 		expect(docs[1].text).toContain("The 2-hospital gap");
 	});
 
@@ -208,7 +204,7 @@ describe("old producer compatibility, served pages and FAQ", () => {
 		expect(await response.text()).toContain("Fixture grounded response.");
 		expect(prompts).toHaveLength(1);
 		expect(prompts[0]).toContain("The 2-hospital gap");
-		expect(prompts[0]).toContain("1 are not yet in the price index");
+		expect(prompts[0]).toContain("1 aren't in the price index yet");
 	});
 
 	it("reports mismatched snapshots unavailable instead of inventing a complete cohort", async () => {
@@ -222,7 +218,7 @@ describe("old producer compatibility, served pages and FAQ", () => {
 			const text = pageText(
 				String(render("https://hospitalledger.com/", summary)),
 			);
-			expect(text).toContain("different populations");
+			expect(text).toContain("different groups");
 			expect(text).not.toContain("0-hospital gap");
 		}
 	});
@@ -238,7 +234,7 @@ describe("old producer compatibility, served pages and FAQ", () => {
 		const response = await app.request("/", {}, env);
 		expect(response.status).toBe(200);
 		expect(pageText(await response.text())).toContain(
-			"breakdown is not currently available",
+			"breakdown isn't available yet",
 		);
 		const coverage = await app.request("/api/coverage", {}, env);
 		expect(coverage.status).toBe(503);

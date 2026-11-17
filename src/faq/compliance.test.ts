@@ -81,15 +81,15 @@ describe("missing compliance metadata is unmeasured", () => {
 		const text = pageText(html);
 		expect(text).toContain("Grade unavailable");
 		expect(text).toContain(
-			"Missing assessment metadata does not establish noncompliance",
+			"Missing assessment data does not mean the hospital failed to comply",
 		);
 		expect(text).toContain("Gross / standard charges: unknown");
 		expect(text).toContain("RX-149131");
 		expect(text).toContain("$14,534,100");
-		expect(html).toContain("compliance grade unavailable");
-		expect(html).not.toContain("compliance grade F");
+		expect(html).toContain("publication grade unavailable");
+		expect(html).not.toContain("publication grade F");
 		expect(text).not.toContain("F · 0");
-		expect(text).not.toContain("published little");
+		expect(text).not.toContain("contains little of what");
 		expect(text).not.toContain("NOT published");
 		expect(html).not.toContain('href="/procedure/RX-149131"');
 
@@ -123,7 +123,7 @@ describe("missing compliance metadata is unmeasured", () => {
 		};
 		const text = pageText(await hospitalHtml(measured));
 		expect(text).toContain("F · 0");
-		expect(text).toContain("published little");
+		expect(text).toContain("contains little of what § 180 requires");
 		expect(text).toContain(
 			"Machine-readable file published: assessment threshold met",
 		);

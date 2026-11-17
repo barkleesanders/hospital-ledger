@@ -69,10 +69,10 @@ function notFoundPage(ccn: string, url: string) {
 /** One sentence on the score band; shared with the "Ask anything" corpus (src/faq/faq-corpus.ts). */
 export function complianceExplainer(score: number): string {
 	return score >= 80
-		? "This hospital published most of what § 180 requires."
+		? "This hospital's published file contains most of what § 180 requires."
 		: score >= 60
-			? "This hospital published part of what § 180 requires."
-			: "This hospital published little of what § 180 requires.";
+			? "This hospital's published file contains part of what § 180 requires."
+			: "This hospital's published file contains little of what § 180 requires.";
 }
 
 function hospitalPage(ccn: string, data: HospitalData, url: string) {
@@ -105,7 +105,7 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 	const retrievedDate = data.fetched_at ? data.fetched_at.slice(0, 10) : null;
 	const explainer = rating
 		? complianceExplainer(rating.score)
-		: "A compliance grade and score are not available for this record. Missing assessment metadata does not establish noncompliance.";
+		: "No grade or score is available for this record. Missing assessment data does not mean the hospital failed to comply.";
 	const geo = geoFor(ccn);
 	const where = geo ? ` (${geo})` : "";
 	const priceCount = items.length;
@@ -115,7 +115,7 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 			: "";
 	const description =
 		`${name}${where}: ${priceCount.toLocaleString("en-US")} published prices ` +
-		`${procPhrase}price-transparency compliance grade ${rating?.grade ?? "unavailable"}. Free, no signup.`;
+		`${procPhrase}price-file publication grade ${rating?.grade ?? "unavailable"}. Free, no signup.`;
 	const jsonLd = {
 		"@context": "https://schema.org",
 		"@type": "Hospital",
@@ -165,7 +165,7 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 					<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 						<div>
 							<div class="text-xs uppercase tracking-wider text-zinc-400 mb-1">
-								45 CFR § 180 compliance
+								Price-file publication check · 45 CFR § 180
 							</div>
 							<div
 								class={`${rating ? "text-3xl sm:text-4xl md:text-5xl" : "text-xl sm:text-2xl"} break-words font-semibold tab-num ${colorClass}`}
@@ -361,10 +361,10 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 				</section>
 
 				<p class="text-xs text-zinc-400">
-					Data straight from this hospital's federally-mandated machine-readable
-					file (45 CFR § 180). The compliance grade reflects how completely the
-					hospital published the six required data elements, not the quality of
-					care.
+					Data straight from this hospital's own published price file (45 CFR
+					§ 180). The grade scores how completely the file contains the six
+					required data elements. It is a check of the file — not a CMS
+					compliance ruling, and not a measure of quality of care.
 				</p>
 			</main>
 		</Layout>

@@ -48,7 +48,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 	return (
 		<Layout
 			title="Hospital Ledger — what the law required, what hospitals delivered"
-			description={`A free public database of U.S. hospital price transparency — standardized prices from ${fmt(standardizedPriceHospitals)} hospitals' own published price files — more hospitals than CMS's own published hospital list tracks. CC0 licensed.`}
+			description={`Search U.S. hospital prices for free. Every price comes from the hospital's own published price file, checked against the hospital that posted it: ${fmt(standardizedPriceHospitals)} hospitals with searchable prices. Prices aren't quotes — what you pay depends on your plan. CC0 data, no signup.`}
 			ogTitle="Hospital Ledger"
 			url={url}
 			scriptSrc={["/cpt-names.js", "/home-client.js", "/procedure-carousel.js"]}
@@ -72,36 +72,36 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						charge?
 					</h1>
 					<p class="mt-5 text-base sm:text-lg md:text-xl text-zinc-300 max-w-2xl leading-snug">
-						Compare standardized price rows from{" "}
+						Compare prices from{" "}
 						<span
 							id="hero-hospital-count"
 							class="font-semibold text-white tab-num"
 						>
 							{fmt(standardizedPriceHospitals)}
 						</span>{" "}
-						U.S. hospitals — straight from each hospital's own
-						federally-mandated price file. We separately verified{" "}
-						<span
-							id="hero-live-mrf-count"
-							class="font-semibold text-white tab-num"
-						>
-							{fmt(liveMrfRequired)}
-						</span>{" "}
-						of{" "}
+						U.S. hospitals. Every price comes straight from that hospital's
+						own published price file — the file federal law requires it to
+						post. Of the{" "}
 						<span
 							id="hero-required-visible"
 							class="font-semibold text-white tab-num"
 						>
 							{fmt(cmsRequiredTotal)}
 						</span>{" "}
-						CMS-required hospitals have a live machine-readable file.
+						hospitals the law covers, we have verified a live file for{" "}
+						<span
+							id="hero-live-mrf-count"
+							class="font-semibold text-white tab-num"
+						>
+							{fmt(liveMrfRequired)}
+						</span>
+						.
 					</p>
 					<p class="mt-4 text-base sm:text-lg md:text-xl text-zinc-400 max-w-2xl leading-snug">
-						CMS requires hospitals to post their prices, but it publishes no
-						aggregated, standardized database of them — the files sit scattered
-						across thousands of hospital websites, and CMS's own published
-						hospital list doesn't include every facility that posts one. Our
-						registry tracks{" "}
+						CMS makes hospitals post their prices, but it doesn't collect
+						them in one place — each file sits on its own hospital's
+						website, in its own format, and CMS's list leaves out some
+						facilities that do post one. We track{" "}
 						<span class="font-semibold text-white tab-num">
 							{fmt(REGISTRY_TRACKED_FACILITIES)}
 						</span>{" "}
@@ -109,8 +109,8 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						<span class="font-semibold text-white tab-num">
 							{fmt(totalFacilities)}
 						</span>{" "}
-						on CMS's published list — and this site standardizes their files
-						into one searchable database.
+						on CMS's list — and we put their files into one standard format
+						you can search.
 					</p>
 					{/* "Ask anything" — the first interactive control on the page, in the
 					    same column as the lead paragraph (max-w-2xl). The hero's own CTA
@@ -121,9 +121,8 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 					</div>
 					<p class="mt-5 text-sm sm:text-base text-zinc-400 max-w-2xl leading-relaxed">
 						<span class="font-semibold text-zinc-200">How we count:</span> the
-						headline counts only hospitals with{" "}
-						<code class="mono text-zinc-200">n &gt; 0</code> price rows, across
-						all indexed hospital populations. Aggregate counts are in{" "}
+						headline number counts only hospitals whose file gave us at least
+						one usable price. The full counts are in{" "}
 						<a
 							href="/data/summary.json"
 							class="underline hover:text-emerald-300"
@@ -137,22 +136,24 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						>
 							/api/prices-index
 						</a>
-						. The registry behind these counts tracks{" "}
+						. Our registry tracks{" "}
 						<span class="tab-num text-zinc-200">
 							{fmt(REGISTRY_TRACKED_FACILITIES)}
 						</span>{" "}
-						facilities in total. For scale: the AHA counts 6,100 U.S. hospitals; CMS puts the rule's reach at over 7,000 licensed institutions — details in{" "}
+						facilities. For scale, the American Hospital
+						Association counts 6,100 U.S. hospitals, and CMS says the rule
+						reaches over 7,000 licensed facilities — details in{" "}
 						<a
 							href="/about-the-numbers"
 							class="underline hover:text-emerald-300"
 						>
 							/about-the-numbers
 						</a>
-						. The price index holds{" "}
+						. The index holds{" "}
 						<span class="tab-num text-zinc-200">
 							{fmt(standardizedPriceRows)}
 						</span>{" "}
-						standardized rows.
+						prices.
 					</p>
 					<div
 						id="coverage-gap"
@@ -164,45 +165,46 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						{coverage ? (
 							<>
 								<p class="mt-1.5">
-									Of {fmt(liveMrfRequired)} CMS-required hospitals with a
-									verified live file,{" "}
-									{fmt(coverage.required_live_price_hospitals)} have searchable
-									prices.{" "}
+									Of the {fmt(liveMrfRequired)} hospitals the law covers
+									that have a verified live file,{" "}
+									{fmt(coverage.required_live_price_hospitals)} have prices
+									you can search here. The other{" "}
 									{fmt(
 										coverage.required_live_zero_price_hospitals +
 											coverage.required_live_unindexed_hospitals,
 									)}{" "}
-									still lack searchable rows:
+									don't yet:
 								</p>
 								<ul class="mt-2.5 space-y-2.5 list-disc pl-6 marker:text-emerald-400">
 									<li>
-										{fmt(coverage.required_live_zero_price_hospitals)} have an
-										index entry with zero rows.
+										{fmt(coverage.required_live_zero_price_hospitals)} are in
+										the index, but their entry has no prices in it yet.
 									</li>
 									<li>
-										{fmt(coverage.required_live_unindexed_hospitals)} are not
-										yet in the price index.
+										{fmt(coverage.required_live_unindexed_hospitals)} aren't
+										in the price index yet.
 									</li>
 								</ul>
 								<p class="mt-2.5">
-									The headline also includes{" "}
-									{fmt(coverage.price_hospitals_outside_required_live)} priced
-									hospital records outside that required/live-file group. These
-									are different populations, not interchangeable totals.
+									The headline also counts{" "}
+									{fmt(coverage.price_hospitals_outside_required_live)}{" "}
+									hospitals outside that group — they post files even though
+									they aren't on CMS's required list. The groups are counted
+									differently, so the totals don't add up.
 								</p>
 							</>
 						) : (
 							<p class="mt-1.5">
-								The live-file and price-index totals cover different
-								populations. A consistent hospital-by-hospital coverage
-								breakdown is not currently available; we do not subtract those
-								totals to estimate the gap.
+								The two totals count different groups of hospitals. We don't
+								subtract one from the other to guess the gap — a consistent
+								hospital-by-hospital breakdown isn't available yet.
 							</p>
 						)}
 						<p class="mt-2.5">
-							Zero indexed rows do not establish that a hospital's source file
-							is empty or noncompliant; retrieval, parsing, and filtering still
-							need investigation. Full breakdown at{" "}
+							An entry with no prices doesn't mean the hospital's file is
+							empty or that it broke the rule — the file may have failed to
+							download or parse, and those are still being investigated. Full
+							breakdown at{" "}
 							<a
 								href="/about-the-numbers"
 								class="underline hover:text-emerald-300"
@@ -313,7 +315,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 								{fmt(standardizedPriceHospitals)}
 							</div>
 							<div class="text-xs text-zinc-500 mt-1">
-								standardized price rows
+								with searchable prices
 							</div>
 						</div>
 						<div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
@@ -535,10 +537,10 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						</form>
 					</div>
 					<p class="mt-4 text-xs text-zinc-500">
-						Every price comes straight from the hospital's federally-mandated
-						machine-readable file. The "cash price" is the self-pay discount
-						they're required to publish. Your actual bill depends on your plan,
-						deductible, and copay.
+						Every price comes straight from the hospital's own published
+						price file. The "cash price" is the discount for paying yourself
+						that the law makes them publish. What you actually pay depends on
+						your plan, your deductible, and your copay.
 					</p>
 				</section>
 
@@ -611,30 +613,29 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 										45 CFR § 180
 									</a>
 									, every hospital the rule covers must publish a
-									machine-readable price file — gross charges, cash prices,
+									price file — gross charges, cash prices,
 									negotiated rates, and min/max — free, public, no signup.
 								</span>
 							</li>
 							<li class="flex gap-3">
 								<span class="text-emerald-400 mt-1">▸</span>
 								<span>
-									Hospitals publish files in many different formats. We verified
-									live MRFs for{" "}
-									<span class="tab-num">{fmt(liveMrfRequired)}</span> of{" "}
+									Hospitals publish files in many different formats. We have
+									verified a live file for{" "}
+									<span class="tab-num">{fmt(liveMrfRequired)}</span> of the{" "}
 									<span class="tab-num">{fmt(cmsRequiredTotal)}</span>{" "}
-									CMS-required hospitals. Separately, we have standardized price
-									rows for{" "}
+									hospitals the law covers. Separately, prices are live here
+									for{" "}
 									<span class="tab-num">{fmt(standardizedPriceHospitals)}</span>{" "}
-									hospital records across all indexed populations.
+									hospitals.
 								</span>
 							</li>
 							<li class="flex gap-3">
 								<span class="text-emerald-400 mt-1">▸</span>
 								<span>
-									A live URL and a searchable price are different milestones. We
-									measure the remaining coverage gap by joining hospital
-									identifiers, not by subtracting totals from different
-									populations. See{" "}
+									A working file link and a searchable price are two different
+									things. We measure the gap hospital by hospital, not by
+									subtracting totals that count different groups. See{" "}
 									<a
 										href="/about-the-numbers"
 										class="text-emerald-300 underline"
@@ -980,7 +981,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 								{fmt(parsedMrfOutputs)}
 							</div>
 							<div class="text-xs text-zinc-500 mt-1">
-								{fmt(standardizedPriceHospitals)} produced standardized rows
+								{fmt(standardizedPriceHospitals)} of them have prices live here
 							</div>
 						</div>
 						<div class="rounded-lg bg-zinc-950/50 border border-zinc-800 p-4">
@@ -1318,22 +1319,21 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 								</li>
 							</ol>
 							<p class="mt-3 text-xs text-zinc-500">
-								Current on-site preview coverage:{" "}
+								Prices are live on this site for{" "}
 								<span
 									id="methodology-price-count"
 									class="tab-num text-zinc-300"
 								>
 									{fmt(standardizedPriceHospitals)}
 								</span>{" "}
-								hospitals with standardized price rows across all indexed
-								populations. Separately,{" "}
+								hospitals; we have verified a live price file for{" "}
 								<span
 									id="methodology-live-mrf-count"
 									class="tab-num text-zinc-300"
 								>
 									{fmt(liveMrfRequired)}
 								</span>{" "}
-								CMS-required hospitals with a verified live MRF.
+								of the hospitals the law covers.
 							</p>
 						</div>
 						<div class="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4">
@@ -1495,18 +1495,18 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						Activities.
 					</p>
 					<p>
-						<strong>Method:</strong> 11 stages (TPAFS seed → page parsing → Exa
-						search → Claude agents → CMS-HPT marker files → email-domain
-						expansion → Wayback fallback). {SITE_COUNTS.compliance_pct}% live
-						MRFs found via automated probing; {fmt(standardizedPriceHospitals)}{" "}
-						hospitals have standardized price rows. Updated from generated data
-						on {updatedDate}.
+						<strong>Method:</strong> we find each hospital's price file in 11
+						steps — public hospital lists first, then each hospital's own
+						posted pointer file, with search and archive fallbacks. Automated
+						checks found {SITE_COUNTS.compliance_pct}% of the live files;
+						prices are live here for {fmt(standardizedPriceHospitals)}{" "}
+						hospitals. Updated {updatedDate}.
 					</p>
 					<p>
-						<strong>Limits:</strong> Some MRFs require browser bot-bypass
-						(Akamai-walled hospitals), and some discovery or parsing paths still
-						need repair. Missing searchable rows are not proof that the hospital
-						failed to publish a price file.
+						<strong>Limits:</strong> Some hospitals' files sit behind bot
+						walls we can't always get past, and some of our collection and
+						parsing paths still need repair. If a hospital's prices are
+						missing here, that is not proof the hospital never posted a file.
 					</p>
 					<p class="text-zinc-600">
 						© 2026 Hospital Ledger. Not affiliated with CMS, HHS, Cost Plus
