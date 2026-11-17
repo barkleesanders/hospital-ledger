@@ -20,14 +20,15 @@ const n = (v: number | undefined) => (v ?? 0).toLocaleString("en-US");
  */
 function datasetDescription(D: Summary): string {
 	return (
-		`Compliance status for ${n(D.total_facilities)} U.S. hospitals under the federal hospital ` +
-		`price transparency rule (45 CFR Part 180), of which ${n(D.cms_required_total)} are required ` +
-		`to publish a machine-readable file; ${n(D.compliant)} have a verified live file ` +
-		`(${D.compliance_pct}%). Each record pairs CMS Hospital General Information with live ` +
-		`verification of the hospital's machine-readable file URL, plus CMS enforcement history ` +
-		`(${n(D.enforcement_actions_total)} actions). Includes ${n(D.standardized_price_rows)} ` +
-		`standardized price rows across ${n(D.standardized_price_hospitals)} hospitals and ` +
-		`${n(D.cpt_indexed_rows)} CPT-indexed rows. Public domain, no signup, no cookies.`
+		`Whether each U.S. hospital has posted the price file the federal price transparency ` +
+		`rule requires (45 CFR Part 180). CMS's published list names ${n(D.total_facilities)} ` +
+		`hospitals; ${n(D.cms_required_total)} of them must post a price file, and ` +
+		`${n(D.compliant)} have a verified live file (${D.compliance_pct}%). Each record pairs ` +
+		`CMS Hospital General Information with a live check of the hospital's own price-file ` +
+		`address, plus CMS enforcement history (${n(D.enforcement_actions_total)} actions). ` +
+		`Includes ${n(D.standardized_price_rows)} prices in one standard format across ` +
+		`${n(D.standardized_price_hospitals)} hospitals and ${n(D.cpt_indexed_rows)} ` +
+		`procedure-indexed rows. Public domain, no signup, no cookies.`
 	);
 }
 

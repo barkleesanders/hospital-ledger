@@ -51,7 +51,7 @@ describe("row placement", () => {
 	it("home page: the row is inside the hero header, after the lead paragraph and before the CTA buttons", () => {
 		const html = String(homePage("https://hospitalledger.com/"));
 		const lead = html.indexOf(
-			"CMS-required hospitals have a live machine-readable file.",
+			"hospitals the law covers, we have verified a live file for",
 		);
 		const row = html.indexOf(`id="${FAQ_ASK_HOST_ID}"`);
 		const howWeCount = html.indexOf("How we count:");

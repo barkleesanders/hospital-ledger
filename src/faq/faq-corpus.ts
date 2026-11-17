@@ -138,11 +138,11 @@ function gradesDoc(): FaqCorpusDoc {
 			"How a hospital's compliance grade is scored (shown on every hospital page)",
 		url: `${SITE_ORIGIN}/`,
 		text: [
-			'Every hospital page opens with a "45 CFR § 180 compliance" card. When assessment metadata is available, it shows a letter grade (A, B, C, D or F) and a score out of 100 for the six data elements the federal hospital price transparency rule (45 CFR Part 180) requires a hospital to publish:',
+			'Every hospital page opens with a "Price-file publication check · 45 CFR § 180" card. When assessment data is available, it shows a letter grade (A, B, C, D or F) and a score out of 100 for the six data elements the federal hospital price transparency rule (45 CFR Part 180) requires a hospital to publish:',
 			...Object.values(ELEMENT_LABELS).map((label) => `- ${label}`),
 			`Score 80 or above: ${complianceExplainer(80)} Score 60 to 79: ${complianceExplainer(60)} Score below 60: ${complianceExplainer(0)}`,
-			"The compliance grade reflects how completely the hospital published the six required data elements, not the quality of care. Data comes straight from the hospital's own published machine-readable file.",
-			"When a valid grade or score is missing, the page says Grade unavailable. An element without an explicit assessment is unknown. Missing assessment metadata does not mean a failing grade, an unpublished element, or hospital noncompliance.",
+			"The grade scores how completely the hospital's file contains the six required data elements. It is a check of the file — not a CMS compliance ruling, and not a measure of quality of care. Data comes straight from the hospital's own published price file.",
+			"When a grade or score is missing, the page says Grade unavailable. An element without an explicit assessment is unknown. Missing data does not mean a failing grade, an unpublished element, or that the hospital broke the rule.",
 			"Each hospital page also shows how many procedures it lists, how many insurances it has negotiated rates with, how many CPT / HCPCS codes it covers, a link to the hospital's source file, and its most expensive procedures by gross charge with cash, minimum and maximum negotiated prices.",
 		].join("\n"),
 	};

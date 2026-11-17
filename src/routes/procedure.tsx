@@ -505,11 +505,11 @@ function procedurePage(data: ProcedureData, url: string) {
 				</section>
 
 				<p class="mt-6 text-xs text-zinc-500">
-					Data straight from each hospital's federally-mandated machine-readable
-					file (45 CFR § 180). Prices reflect what the hospital published; what
-					you actually pay depends on your specific plan, deductible, and other
-					factors. "Cash price" is the discounted self-pay rate hospitals are
-					required to publish for uninsured patients.
+					Data straight from each hospital's own published price file (45 CFR
+					§ 180). Prices reflect what the hospital published; what you actually
+					pay depends on your specific plan, deductible, and other factors.
+					"Cash price" is the discounted self-pay rate hospitals are required
+					to publish for uninsured patients.
 				</p>
 			</main>
 		</Layout>

@@ -34,7 +34,7 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 	return (
 		<Layout
 			title="About the numbers — Hospital Ledger"
-			description={`Why the homepage says ${fmt(standardized)} hospitals when CMS required ${fmt(cmsRequired)} and ${fmt(compliant)} have a live MRF. Pipeline, count definitions, and the live gap.`}
+			description={`Why the homepage says ${fmt(standardized)} hospitals when the rule covers ${fmt(cmsRequired)} and ${fmt(compliant)} have a verified live price file — how we find the files, how we count, and where the gaps are.`}
 			ogTitle="About the numbers — Hospital Ledger"
 			url={url}
 			summary={S}
@@ -99,8 +99,8 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 									<td class="py-3 pr-3 font-medium">Verified live file</td>
 									<td class="py-3 pr-3 text-right tab-num">{fmt(compliant)}</td>
 									<td class="py-3 text-zinc-400">
-										CMS-required hospitals where we verified a live,
-										downloadable MRF URL.
+										Hospitals the rule covers where we found a live price
+										file at the posted address and downloaded it.
 									</td>
 								</tr>
 								<tr>
@@ -111,11 +111,10 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 										{fmt(standardized)}
 									</td>
 									<td class="py-3 text-zinc-400">
-										All indexed hospital records with{" "}
-										<code class="mono text-zinc-300">n &gt; 0</code>{" "}
-										standardized rows, including records outside the
-										required/live-file group. This is the homepage headline, not
-										a subset count of the row above.
+										Every hospital in the index whose file gave us at least
+										one usable price, including hospitals outside the
+										required group above. This is the homepage headline — it
+										is not a subset of the row above.
 									</td>
 								</tr>
 							</tbody>
@@ -128,70 +127,72 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 						Why our registry tracks more facilities than the CMS list
 					</h2>
 					<p class="mt-3 text-zinc-300 leading-relaxed">
-						The first row above is CMS Hospital General Information —
-						the hospital list CMS publishes for Care Compare — with{" "}
+						The first row above is CMS's own hospital list (the one it
+						publishes for Care Compare), with{" "}
 						<span class="tab-num">{fmt(totalFacilities)}</span>{" "}
-						facilities. Our campaign registry is a union of three sets:
-						that seed list, every facility our discovery work verified
-						a price file for, and every record in the live price index.
-						As of the registry read-back on 2026-11-10 it tracks{" "}
+						facilities. Our registry combines three sets: that list,
+						every facility we have verified a price file for, and every
+						hospital in the live price index. As of the 2026-11-17
+						read-back it tracks{" "}
 						<span class="tab-num">{fmt(REGISTRY_TRACKED_FACILITIES)}</span>{" "}
 						facilities —{" "}
 						<span class="tab-num">
 							{fmt(REGISTRY_TRACKED_FACILITIES - totalFacilities)}
 						</span>{" "}
-						more than CMS's published list.
+						more than CMS's list.
 					</p>
 					<p class="mt-3 text-zinc-300 leading-relaxed">
-						The difference is whole facility classes the Care Compare
-						list under-covers: specialty hospitals (psychiatric,
+						The extra facilities are whole classes of hospitals that
+						CMS's list covers poorly: specialty hospitals (psychiatric,
 						children's, rehabilitation, and long-term care), federal
 						facilities, hospitals in U.S. territories, and programs
 						that hold their own CMS certification number inside a
-						larger system. A facility can hold a CCN, be bound by the
-						price-transparency rule, and post a valid file without
-						appearing in Hospital General Information.
+						larger system. A facility can hold its own certification
+						number, be covered by the rule, and post a valid file
+						without ever appearing on CMS's list.
 					</p>
 					<p class="mt-3 text-zinc-300 leading-relaxed">
-						A facility the registry adds beyond the seed is published
-						only after an identity check: the name and identifiers inside its own published file must match the registry record, and the publisher refuses a
-						file whose header contradicts it. That gate is newer than
-						the catalog. In November 2026 we re-audited the live
-						catalog against the files' own headers and removed 58
-						files that had been published under the wrong facility —
-						inherited bulk approvals, shared vendor files, federal
-						facilities carrying civilian files — and republished the
-						right files under their verified owners. We then ran
-						the same check over the entries that predate the file
-						store —{" "}
-						<span class="tab-num">3,776</span> of them — and removed
-						61 more whose files belonged to a different facility.
-						57 of those are back with their own verified files;
-						4 stay removed, because no file of their own could be
-						found. Of the live catalog,{" "}
+						A facility we add beyond CMS's list is published only
+						after an identity check: the name and identifiers inside
+						its own price file must match its registry record. That
+						check is newer than the catalog. In November 2026 we
+						re-checked the live catalog against the files' own
+						headers and took down 58 files published under the wrong
+						hospital — inherited bulk approvals, files shared across
+						a system, federal facilities carrying civilian files —
+						and republished the right files under their verified
+						owners. We then ran the same check over the{" "}
+						<span class="tab-num">3,776</span> entries that predate
+						the file store and removed 61 more whose files belonged
+						to a different facility. 57 are back with their own
+						verified files; 4 stay down — no file of their own could
+						be found.
+					</p>
+					<p class="mt-3 text-zinc-300 leading-relaxed">
+						These counts are from that November 2026 re-audit of
+						5,567 entries; hospitals published since pass the same
+						checks, and the live total is in the table above. Of the
+						re-audited catalog,{" "}
 						<span class="tab-num">1,852</span> entries are backed by a
-						stored file whose header we verified. The pre-store
-						entries that remain divide by the evidence that survives
-						for them: 1,056 verify against the source file's own
-						header, and 1,534 against the CMS filename convention —
-						the file's own name carries the facility's tax ID and
-						legal name, a weaker standard than reading the header,
-						and counted separately. Another 66 are shared system
-						files or program listings whose binding is explained
-						rather than individually verified. 363 stay listed but
-						flagged as suspect — not confirmed. And 696 cannot be
-						verified at all: no identity evidence survives for
-						them, only the price data itself.
+						stored file whose header we verified. Older entries are
+						graded by the evidence that survives: 1,056 verify
+						against the source file's own header; 1,534 against the
+						CMS filename convention — the name carries the facility's
+						tax ID and legal name, a weaker standard, counted
+						separately. Another 66 are shared system files or program
+						listings, explained rather than individually verified.
+						363 stay listed but flagged suspect. And 696 cannot be
+						verified at all — nothing survives to prove the file is
+						theirs but the price data itself.
 					</p>
 					<p class="mt-3 text-sm text-zinc-400 leading-relaxed">
-						One caveat, for the record: CMS holds more facility data
-						internally than it publishes — its Provider of Services
-						file covers every certified provider. The comparison on
-						this page is to what CMS publishes (the Care Compare list)
-						and what it publicly tracks for price-transparency
-						compliance (the{" "}
-						<span class="tab-num">{fmt(cmsRequired)}</span>-hospital
-						required set) — not to CMS's internal records.
+						One caveat: CMS holds more facility data internally than
+						it publishes — its Provider of Services file covers every
+						certified provider. The comparisons here are to what CMS
+						publishes (the Care Compare list) and the set it publicly
+						tracks for the price rule (the{" "}
+						<span class="tab-num">{fmt(cmsRequired)}</span> hospitals
+						the rule covers) — not to CMS's internal records.
 					</p>
 				</section>
 
@@ -274,11 +275,11 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 					{coverage ? (
 						<>
 							<p class="mt-3 text-zinc-300 leading-relaxed">
-								We match hospital identifiers in the registry to the price
-								index. Of {fmt(compliant)} CMS-required hospitals with a
-								verified live file,{" "}
-								{fmt(coverage.required_live_price_hospitals)} have searchable
-								rows. The remaining {fmt(totalGap ?? 0)} split into two measured
+								We match hospitals in the registry to the price index one by
+								one. Of the {fmt(compliant)} hospitals the law covers that
+								have a verified live file,{" "}
+								{fmt(coverage.required_live_price_hospitals)} have prices you
+								can search here. The other {fmt(totalGap ?? 0)} fall into two
 								groups:
 							</p>
 							<ul class="mt-4 space-y-3 text-zinc-300 leading-relaxed">
@@ -288,9 +289,9 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 										<span class="tab-num font-semibold text-white">
 											{fmt(coverage.required_live_zero_price_hospitals)}
 										</span>{" "}
-										hospitals have zero indexed rows. This describes our output,
-										not the contents or compliance of the source file. These
-										appear in{" "}
+										are in the index, but their entry has no prices in it yet.
+										That says something about our index, not about the
+										hospital's file. They appear in{" "}
 										<a
 											href="/data/prices/index.json"
 											class="underline hover:text-zinc-200"
@@ -306,37 +307,36 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 										<span class="tab-num font-semibold text-white">
 											{fmt(coverage.required_live_unindexed_hospitals)}
 										</span>{" "}
-										hospitals aren't in the price index at all yet. They have a
-										live URL verification recorded in the registry, but no
-										indexed output. This alone does not establish whether
-										retrieval, parsing, filtering, or a pending publication
-										caused the gap.
+										aren't in the price index yet. We have verified their file's
+										address, but no prices from it are indexed. The count alone
+										doesn't say why — the file may not have downloaded, may not
+										have parsed, or may be waiting to publish.
 									</span>
 								</li>
 							</ul>
 							<p class="mt-4 text-zinc-300 leading-relaxed">
 								Another {fmt(coverage.price_hospitals_outside_required_live)}{" "}
-								priced records are outside this required/live-file cohort.
-								Together with its {fmt(coverage.required_live_price_hospitals)}{" "}
-								searchable hospitals, they make the {fmt(standardized)}{" "}
-								headline. We keep these records searchable rather than discard
-								useful prices to force two different totals to match.
+								hospitals with prices here sit outside that group — they post
+								files even though they aren't on CMS's required list. Together
+								with the {fmt(coverage.required_live_price_hospitals)} above,
+								they make the {fmt(standardized)} headline. We keep their
+								prices rather than throw away useful prices to make two
+								totals match.
 							</p>
 						</>
 					) : (
 						<p class="mt-3 text-zinc-300 leading-relaxed">
-							A consistent registry and index breakdown is currently
-							unavailable. The two headline totals describe different
-							populations, so subtracting them would not establish the number of
-							missing hospitals.
+							A consistent hospital-by-hospital breakdown isn't available yet.
+							The two headline totals count different groups of hospitals, so
+							subtracting one from the other wouldn't tell us how many
+							hospitals are missing.
 						</p>
 					)}
 					<p class="mt-4 text-sm text-zinc-400 leading-relaxed">
-						We surface only <code class="mono text-zinc-300">n &gt; 0</code>{" "}
-						entries on the homepage because zero-row outputs aren't useful for
-						comparison. They count toward the parse-pipeline yield, not toward
-						the patient-facing count. A live URL is not a finding of legal
-						compliance.
+						The homepage counts only hospitals with at least one usable price
+						(<code class="mono text-zinc-300">n &gt; 0</code>) — an entry with
+						no prices isn't useful for comparing prices. A live file address
+						is not a finding that the hospital complied with the law.
 					</p>
 				</section>
 
@@ -349,16 +349,18 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 							CMS HPT seed.
 						</li>
 						<li>
-							<span class="font-medium">Discover</span> — sitemap walker +
-							email-domain expansion + Wayback fallback to locate each
-							hospital's MRF URL.
+							<span class="font-medium">Discover</span> — start from each
+							hospital's own <code class="mono">cms-hpt.txt</code> pointer
+							file — the file CMS requires it to post naming where its price
+							file lives; sitemap walker, email-domain expansion, and the
+							Wayback archive cover missing or stale pointers.
 						</li>
 						<li>
-							<span class="font-medium">Probe</span> — check candidate URLs for
-							a live machine-readable file. The registry records verified URLs
-							for <span class="tab-num">{fmt(compliant)}</span> of{" "}
-							<span class="tab-num">{fmt(cmsRequired)}</span> CMS-required
-							hospitals. Verification is a snapshot, not a guarantee that a full
+							<span class="font-medium">Probe</span> — check candidate
+							addresses for a live price file; the registry records verified
+							addresses for <span class="tab-num">{fmt(compliant)}</span> of{" "}
+							<span class="tab-num">{fmt(cmsRequired)}</span> hospitals the
+							rule covers. A check is a snapshot, not a guarantee a full
 							download works today.
 						</li>
 						<li>

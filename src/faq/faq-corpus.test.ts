@@ -179,9 +179,9 @@ describe("buildSiteCorpus / budget", () => {
 		// The grade explainer carries the six elements and the three score bands.
 		expect(site[3].text).toContain("- Min / max negotiated charges");
 		expect(site[3].text).toContain(
-			"Score 80 or above: This hospital published most of what § 180 requires.",
+			"Score 80 or above: This hospital's published file contains most of what § 180 requires.",
 		);
-		expect(site[3].text).toContain("not the quality of care");
+		expect(site[3].text).toContain("not a measure of quality of care");
 		// Layout chrome is not content.
 		expect(site[0].text).not.toContain("Preparing a VA disability claim?");
 		expect(site[0].text).not.toContain("© 2026");
@@ -260,7 +260,7 @@ describe("hospitalDoc", () => {
 		expect(doc.text).toContain("45 CFR Part 180");
 		expect(doc.text).toContain("Compliance grade: B, score 83 out of 100.");
 		expect(doc.text).toContain(
-			"This hospital published most of what § 180 requires.",
+			"This hospital's published file contains most of what § 180 requires.",
 		);
 		expect(doc.text).toContain(
 			"- Machine-readable file published: assessment threshold met",
