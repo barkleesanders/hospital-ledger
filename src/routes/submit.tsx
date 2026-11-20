@@ -11,23 +11,45 @@
  */
 
 import type { Context } from "hono";
+import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Layout } from "../components/Layout";
 import type { Env } from "../index";
+import {
+	breadcrumbListNode,
+	type Crumb,
+	graphJsonLd,
+	webPageNode,
+} from "../lib/seo";
 
 const inputCls =
 	"w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none";
 const labelCls = "block text-sm font-medium text-zinc-300 mb-1";
 
 export function submitPage(url: string) {
+	const crumbs: Crumb[] = [
+		{ name: "Home", path: "/" },
+		{ name: "Submit your hospital's price file", path: "/submit" },
+	];
+	const jsonLd = graphJsonLd(
+		webPageNode({
+			name: "Submit your hospital's price file",
+			url,
+			description:
+				"Hospitals: upload your machine-readable price file in any format. Free processing, a plain-language validation report against the CMS template requirements, and a clean CMS-template file to post on your own website.",
+		}),
+		breadcrumbListNode(crumbs),
+	);
 	return (
 		<Layout
 			title="Submit your hospital's price file — Hospital Ledger"
+			jsonLd={jsonLd}
 			description="Hospitals: upload your machine-readable price file in any format. Free processing, a plain-language validation report against the CMS template requirements, and a clean CMS-template file to post on your own website."
 			ogTitle="Submit your hospital's price file"
 			url={url}
 			scriptSrc="/submit.js"
 		>
 			<main class="mx-auto max-w-3xl px-4 sm:px-6 py-10 space-y-8">
+				<Breadcrumbs items={crumbs} />
 				<header>
 					<h1 class="serif text-3xl sm:text-4xl md:text-5xl leading-tight">
 						Submit your hospital's price file

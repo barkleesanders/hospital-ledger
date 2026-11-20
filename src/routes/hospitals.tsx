@@ -10,11 +10,22 @@ import type { Context } from "hono";
 // Bundled CCN → [city, state] snapshot (see hospital.tsx). R2 gives us the live
 // hospital list; this gives us the geography to group it by.
 import HOSPITAL_GEO from "../../public/data/hospital-geo.json";
+import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Layout, PageHeader } from "../components/Layout";
 import type { Env } from "../index";
 import type { Bindings } from "../lib/data";
 import { titleCase } from "../lib/format";
 import { readR2Json } from "../lib/r2";
+import {
+	breadcrumbListNode,
+	type Crumb,
+	fitTitle,
+	graphJsonLd,
+	itemListNode,
+	SITE_ORIGIN,
+	webPageNode,
+} from "../lib/seo";
+import { loadSummary } from "../lib/site-data";
 
 type HospitalEntry = { ccn: string; name: string; city: string; state: string };
 
@@ -160,14 +171,32 @@ export async function hospitalsIndexHandler(c: Context<Env>) {
 	const grouped = byState(entries);
 	const states = [...grouped.keys()].sort();
 	const total = entries.length;
+	const crumbs: Crumb[] = [
+		{ name: "Home", path: "/" },
+		{ name: "Hospitals", path: "/hospitals" },
+	];
+	const jsonLd = graphJsonLd(
+		itemListNode({
+			name: "Hospitals by state",
+			items: states
+				.filter((st) => st !== "UNKNOWN")
+				.map((st) => ({
+					name: stateName[st] ?? st,
+					url: `${SITE_ORIGIN}/hospitals/${st}`,
+				})),
+		}),
+		breadcrumbListNode(crumbs),
+	);
 	return c.html(
 		<Layout
 			title={`All ${total.toLocaleString("en-US")} hospitals with price data — Hospital Ledger`}
 			description={`Browse all ${total.toLocaleString("en-US")} U.S. hospitals with published price transparency data, by state. Free, no signup.`}
 			url={url}
+			jsonLd={jsonLd}
 		>
 			<PageHeader eyebrow="Directory" />
 			<main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+				<Breadcrumbs items={crumbs} />
 				<h1 class="text-2xl sm:text-3xl md:text-4xl font-semibold">
 					Hospitals with published prices
 				</h1>
@@ -260,19 +289,40 @@ export async function hospitalsStateHandler(c: Context<Env>) {
 			404,
 		);
 	}
+	const crumbs: Crumb[] = [
+		{ name: "Home", path: "/" },
+		{ name: "Hospitals", path: "/hospitals" },
+		{ name: label, path: `/hospitals/${st}` },
+	];
+	const { summary } = await loadSummary(c.env);
+	const jsonLd = graphJsonLd(
+		webPageNode({
+			name: `${label} hospitals with published prices`,
+			url,
+			dateModified: summary.generated_at,
+		}),
+		itemListNode({
+			name: `Hospitals in ${label}`,
+			numberOfItems: list.length,
+			items: list.slice(0, 100).map((e) => ({
+				name: titleCase(e.name),
+				url: `${SITE_ORIGIN}/hospital/${e.ccn}`,
+			})),
+		}),
+		breadcrumbListNode(crumbs),
+	);
 	return c.html(
 		<Layout
-			title={`${label}: ${list.length.toLocaleString("en-US")} hospitals with published prices — Hospital Ledger`}
+			title={fitTitle(
+				`${label} hospitals: ${list.length.toLocaleString("en-US")} with published prices`,
+			)}
 			description={`Every hospital in ${label} with published price transparency data — compare prices, cash rates, and compliance grades. Free, no signup.`}
 			url={url}
+			jsonLd={jsonLd}
 		>
 			<PageHeader eyebrow="Directory" />
 			<main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
-				<div class="text-sm text-zinc-400">
-					<a href="/hospitals" class="hover:text-zinc-200">
-						← All states
-					</a>
-				</div>
+				<Breadcrumbs items={crumbs} />
 				<h1 class="mt-2 text-2xl sm:text-3xl md:text-4xl font-semibold">
 					{label} hospitals
 				</h1>

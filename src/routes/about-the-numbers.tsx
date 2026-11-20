@@ -6,9 +6,16 @@
  */
 
 import type { Context } from "hono";
+import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Layout } from "../components/Layout";
 import type { Env } from "../index";
 import { priceCoverage } from "../lib/price-coverage";
+import {
+	breadcrumbListNode,
+	type Crumb,
+	graphJsonLd,
+	webPageNode,
+} from "../lib/seo";
 import {
 	bundledSummary,
 	loadSummary,
@@ -31,15 +38,29 @@ export function aboutPage(url: string, S: Summary = bundledSummary) {
 			coverage.required_live_unindexed_hospitals
 		: null;
 	const updated = S.generated_at.slice(0, 10);
+	const crumbs: Crumb[] = [
+		{ name: "Home", path: "/" },
+		{ name: "About the numbers", path: "/about-the-numbers" },
+	];
+	const jsonLd = graphJsonLd(
+		webPageNode({
+			name: "About the numbers",
+			url,
+			dateModified: S.generated_at,
+		}),
+		breadcrumbListNode(crumbs),
+	);
 	return (
 		<Layout
 			title="About the numbers — Hospital Ledger"
+			jsonLd={jsonLd}
 			description={`Why the homepage says ${fmt(standardized)} hospitals when the rule covers ${fmt(cmsRequired)} and ${fmt(compliant)} have a verified live price file — how we find the files, how we count, and where the gaps are.`}
 			ogTitle="About the numbers — Hospital Ledger"
 			url={url}
 			summary={S}
 		>
 			<main class="mx-auto max-w-3xl px-4 sm:px-6 py-10 sm:py-14">
+				<Breadcrumbs items={crumbs} />
 				<p class="text-xs uppercase tracking-widest text-emerald-400">
 					Methodology
 				</p>

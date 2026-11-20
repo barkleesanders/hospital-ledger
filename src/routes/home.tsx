@@ -47,7 +47,7 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 	const updatedDate = SITE_COUNTS.generated_at.slice(0, 10);
 	return (
 		<Layout
-			title="Hospital Ledger — what the law required, what hospitals delivered"
+			title="Hospital Ledger — what the law required hospitals to charge"
 			description={`Search U.S. hospital prices for free. Every price comes from the hospital's own published price file, checked against the hospital that posted it: ${fmt(standardizedPriceHospitals)} hospitals with searchable prices. Prices aren't quotes — what you pay depends on your plan. CC0 data, no signup.`}
 			ogTitle="Hospital Ledger"
 			url={url}
