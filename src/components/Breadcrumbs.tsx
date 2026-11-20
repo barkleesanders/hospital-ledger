@@ -15,7 +15,7 @@ export const Breadcrumbs: FC<{ items: Crumb[] }> = ({ items }) => (
 				return (
 					<li class="flex items-center gap-1.5">
 						{i > 0 ? (
-							<span aria-hidden="true" class="text-zinc-600">
+							<span aria-hidden="true" class="text-zinc-400">
 								/
 							</span>
 						) : null}
