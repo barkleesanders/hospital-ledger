@@ -4,11 +4,21 @@
  */
 
 import type { Context } from "hono";
+import { Breadcrumbs } from "../components/Breadcrumbs";
 import { GradeBadge } from "../components/ComplianceBar";
 import { Layout, PageHeader } from "../components/Layout";
 import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
 import { loadPayer, type PayerData } from "../lib/data";
+import {
+	breadcrumbListNode,
+	type Crumb,
+	graphJsonLd,
+	itemListNode,
+	SITE_ORIGIN,
+	webPageNode,
+} from "../lib/seo";
+import { loadSummary } from "../lib/site-data";
 import { fmtMoney } from "../lib/format";
 
 const VALID_SLUG = /^[a-z0-9][a-z0-9-]{0,80}$/;
@@ -29,7 +39,12 @@ function notFoundPage(slug: string, url: string) {
 	);
 }
 
-function payerPage(slug: string, data: PayerData, url: string) {
+function payerPage(
+	slug: string,
+	data: PayerData,
+	url: string,
+	refreshedAt: string,
+) {
 	const p = data.payer ?? { slug, display: slug };
 	const display = p.display ?? slug;
 	const hospitalCount = data.hospital_count ?? data.hospitals.length;
@@ -44,11 +59,37 @@ function payerPage(slug: string, data: PayerData, url: string) {
 
 	const aliases = (p.raw_aliases ?? []).slice(0, 5);
 
+	const crumbs: Crumb[] = [
+		{ name: "Home", path: "/" },
+		{ name: display, path: `/payer/${slug}` },
+	];
+	const description = `Hospitals that have negotiated rates with ${display}.`;
+	const jsonLd = graphJsonLd(
+		webPageNode({
+			name: `${display} prices`,
+			url,
+			description,
+			dateModified: refreshedAt,
+		}),
+		itemListNode({
+			name: `Hospitals with negotiated rates with ${display}`,
+			numberOfItems: hospitalCount,
+			items: rows
+				.slice(0, 50)
+				.map((h) => ({
+					name: h.name,
+					url: `${SITE_ORIGIN}/hospital/${h.ccn}`,
+				})),
+		}),
+		breadcrumbListNode(crumbs),
+	);
+
 	return (
 		<Layout
 			title={`${display} prices — Hospital Ledger`}
-			description={`Hospitals that have negotiated rates with ${display}.`}
+			description={description}
 			url={url}
+			jsonLd={jsonLd}
 			stylesheets={["/faq.css"]}
 			moduleScripts={["/faq-island.js"]}
 		>
@@ -73,6 +114,7 @@ function payerPage(slug: string, data: PayerData, url: string) {
 			</header>
 
 			<main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+				<Breadcrumbs items={crumbs} />
 				<section class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
 					<div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
 						<div class="text-xs uppercase tracking-wider text-zinc-400">
@@ -254,7 +296,8 @@ export async function payerPageHandler(c: Context<Env>): Promise<Response> {
 	if (!data) {
 		return c.html(notFoundPage(slug, canonicalUrl), 404);
 	}
-	return c.html(payerPage(slug, data, canonicalUrl), 200, {
+	const { summary } = await loadSummary(c.env);
+	return c.html(payerPage(slug, data, canonicalUrl, summary.generated_at), 200, {
 		"cache-control": "public, max-age=300",
 		"x-hl-template": "payer-ssr",
 	});

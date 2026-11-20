@@ -11,6 +11,7 @@
 
 import type { Context } from "hono";
 import type { FC } from "hono/jsx";
+import { Breadcrumbs } from "../components/Breadcrumbs";
 import { EditorialHero } from "../components/EditorialHero";
 import { Layout, PageHeader } from "../components/Layout";
 import { PriceHistogram } from "../components/PriceHistogram";
@@ -18,6 +19,13 @@ import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
 import { lookupCptName } from "../lib/cpt-names";
 import { loadProcedure, type ProcedureData } from "../lib/data";
+import {
+	breadcrumbListNode,
+	type Crumb,
+	fitTitleWithSuffix,
+	graphJsonLd,
+} from "../lib/seo";
+import { loadSummary } from "../lib/site-data";
 import { escapeHtml, fmtMoney, titleCase } from "../lib/format";
 
 const VALID_CODE = /^[A-Z0-9][A-Z0-9-]{1,9}$/i;
@@ -278,7 +286,7 @@ export const PriceCaveats: FC = () => (
 	</details>
 );
 
-function procedurePage(data: ProcedureData, url: string) {
+function procedurePage(data: ProcedureData, url: string, refreshedAt: string) {
 	const name = procedureName(data);
 	const minNote = cashMinNote(data.stats.flagged_low ?? 0);
 
@@ -300,29 +308,39 @@ function procedurePage(data: ProcedureData, url: string) {
 		}
 	}
 
+	const crumbs: Crumb[] = [
+		{ name: "Home", path: "/" },
+		{ name, path: `/procedure/${data.code}` },
+	];
+	const jsonLd = graphJsonLd(
+		{
+			"@type": "MedicalProcedure",
+			name,
+			url,
+			dateModified: refreshedAt,
+			code: {
+				"@type": "MedicalCode",
+				codeValue: data.code,
+				codingSystem: data.type === "HCPCS" ? "HCPCS" : "CPT",
+			},
+		},
+		breadcrumbListNode(crumbs),
+	);
+
 	return (
 		<Layout
-			title={`${name} (${data.code}) — Hospital Ledger`}
+			title={fitTitleWithSuffix(name, ` (${data.code})`)}
 			description={seoDesc}
-			ogTitle={`${name} (${data.code}) — Hospital Ledger`}
+			ogTitle={fitTitleWithSuffix(name, ` (${data.code})`)}
 			url={url}
-			jsonLd={{
-				"@context": "https://schema.org",
-				"@type": "MedicalProcedure",
-				name,
-				url,
-				code: {
-					"@type": "MedicalCode",
-					codeValue: data.code,
-					codingSystem: data.type === "HCPCS" ? "HCPCS" : "CPT",
-				},
-			}}
+			jsonLd={jsonLd}
 			scriptSrc="/procedure-client.js"
 			stylesheets={["/faq.css"]}
 			moduleScripts={["/faq-island.js"]}
 		>
 			<PageHeader eyebrow="Procedure" />
 			<main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+				<Breadcrumbs items={crumbs} />
 				<EditorialHero eyebrow={eyebrow} title={name}>
 					{ledeMarkup(data)}
 				</EditorialHero>
@@ -526,7 +544,8 @@ export async function procedurePageHandler(c: Context<Env>): Promise<Response> {
 	if (!data) {
 		return c.html(notFoundPage(code, canonicalUrl), 404);
 	}
-	return c.html(procedurePage(data, canonicalUrl), 200, {
+	const { summary } = await loadSummary(c.env);
+	return c.html(procedurePage(data, canonicalUrl, summary.generated_at), 200, {
 		"cache-control": "public, max-age=300",
 		"x-hl-template": "procedure-ssr",
 	});

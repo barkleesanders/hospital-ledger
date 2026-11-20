@@ -9,11 +9,19 @@ import type { Context } from "hono";
 // rarely, so a bundled snapshot is safe; hospital names/prices always come
 // from live R2.
 import HOSPITAL_GEO from "../../public/data/hospital-geo.json";
+import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Layout, PageHeader } from "../components/Layout";
 import { FaqAskRow } from "../faq/faq-section";
 import type { Env } from "../index";
 import { complianceElementStatus, complianceRating } from "../lib/compliance";
 import { type HospitalData, loadHospital } from "../lib/data";
+import {
+	breadcrumbListNode,
+	type Crumb,
+	fitTitle,
+	graphJsonLd,
+} from "../lib/seo";
+import { loadSummary } from "../lib/site-data";
 import { fmtMoney } from "../lib/format";
 import { HOSPITAL_ID_PATTERN } from "../lib/hospital-id";
 import { grossChargeDate } from "../lib/price-provenance";
@@ -75,7 +83,12 @@ export function complianceExplainer(score: number): string {
 			: "This hospital's published file contains little of what § 180 requires.";
 }
 
-function hospitalPage(ccn: string, data: HospitalData, url: string) {
+function hospitalPage(
+	ccn: string,
+	data: HospitalData,
+	url: string,
+	refreshedAt: string,
+) {
 	const name = data.hospital_name || `Hospital ${ccn}`;
 	const compliance = data.compliance ?? {};
 	const rating = complianceRating(compliance);
@@ -116,27 +129,41 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 	const description =
 		`${name}${where}: ${priceCount.toLocaleString("en-US")} published prices ` +
 		`${procPhrase}price-file publication grade ${rating?.grade ?? "unavailable"}. Free, no signup.`;
-	const jsonLd = {
-		"@context": "https://schema.org",
-		"@type": "Hospital",
-		name,
-		url,
-		identifier: ccn,
-		...(geo
-			? {
-					address: {
-						"@type": "PostalAddress",
-						addressLocality: geo.split(",")[0].trim(),
-						addressRegion: GEO[ccn]?.[1],
-						addressCountry: "US",
-					},
-				}
-			: {}),
-	};
+	const stateCode = GEO[ccn]?.[1];
+	const crumbs: Crumb[] = [
+		{ name: "Home", path: "/" },
+		{ name: "Hospitals", path: "/hospitals" },
+		...(stateCode
+			? [{ name: stateCode, path: `/hospitals/${stateCode}` }]
+			: []),
+		{ name, path: `/hospital/${ccn}` },
+	];
+	// dateModified: this hospital's own retrieval stamp when the record
+	// carries one, else the pipeline refresh stamp (audit #30).
+	const jsonLd = graphJsonLd(
+		{
+			"@type": "Hospital",
+			name,
+			url,
+			identifier: ccn,
+			dateModified: data.fetched_at ?? refreshedAt,
+			...(geo
+				? {
+						address: {
+							"@type": "PostalAddress",
+							addressLocality: geo.split(",")[0].trim(),
+							addressRegion: GEO[ccn]?.[1],
+							addressCountry: "US",
+						},
+					}
+				: {}),
+		},
+		breadcrumbListNode(crumbs),
+	);
 
 	return (
 		<Layout
-			title={`${name}${where} prices — Hospital Ledger`}
+			title={fitTitle(`${name}${where} prices`)}
 			description={description}
 			url={url}
 			jsonLd={jsonLd}
@@ -161,6 +188,7 @@ function hospitalPage(ccn: string, data: HospitalData, url: string) {
 			</header>
 
 			<main class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+				<Breadcrumbs items={crumbs} />
 				<section class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6 mb-6">
 					<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 						<div>
@@ -381,7 +409,8 @@ export async function hospitalPageHandler(c: Context<Env>): Promise<Response> {
 	if (!data) {
 		return c.html(notFoundPage(ccn, canonicalUrl), 404);
 	}
-	return c.html(hospitalPage(ccn, data, canonicalUrl), 200, {
+	const { summary } = await loadSummary(c.env);
+	return c.html(hospitalPage(ccn, data, canonicalUrl, summary.generated_at), 200, {
 		"cache-control": "public, max-age=300",
 		"x-hl-template": "hospital-ssr",
 	});
