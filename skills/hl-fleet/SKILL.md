@@ -394,7 +394,11 @@ parallel lanes since 2026-10-30, both at Barklee's direction**, goal-owned):
 derive the queue → top up free controller slots → when a controller finishes
 OR DIES, publish its yield serially and let re-derivation recycle the
 remainder → keep the lessons gate discharged → update
-`hidden_files/hl_campaign_state.json` → report only on change. The 10-minute
+`hidden_files/hl_campaign_state.json` → report only on change. **Empty-queue
+end state:** when the post-subtraction queue is empty and no partitions are
+in flight, the cycle's correct output is deliberate inaction — record stage
+exhaustion in the campaign state and stop; free controller slots are never
+a reason to launch anything. The 10-minute
 monitor stays as the fast detector; the driver is the mover. Checking cadence
 does not speed a batch — batches run continuously once launched — it caps
 the idle gap between a batch ending/dying and the next one starting; that
@@ -625,8 +629,9 @@ absolute.
 **SUPERSEDED as the list of record (wave 11d, 2026-11-10):** the
 eleven above are the founding entries. The ONE source of truth is
 now the shared holds file `~/workspace/hl-fleet/adjudicated_holds.txt`
-(Mini copy byte-identical; **57 CCNs** after wave 12, sha256
-`6a0007f8…`), read by the driver at both points above AND by
+(Mini copy byte-identical; **62 CCNs** at the 2026-11-15
+read-back, sha256 `935396dd…` — a dated snapshot, verify live
+before quoting), read by the driver at both points above AND by
 publish_mini's Gate 1, which fails closed if the file is unreadable.
 Any inline list — including this paragraph's — is a cache, never the
 authority. See Gate 3 in the Waves 11–12 section.
@@ -681,9 +686,10 @@ parks are lane-specific; discharge is part of the run). Check
 `hl_lessons_gate.py status` in every campaign pass; 0 owed is the healthy
 state.
 
-**First-seen-domain approval cards — ALL direct VM egress cards, scripts
-included (root-caused 2026-11-01, Barklee-directed /debug; this entry
-CORRECTS an earlier same-day draft that blamed the cron worker's browsing):**
+**First-seen-domain approval cards — ALL VM egress cards: direct, script,
+and CONNECT-proxy alike (root-caused 2026-11-01, Barklee-directed /debug;
+CONNECT-proxy class added 2026-11-15; this entry CORRECTS an earlier
+same-day draft that blamed the cron worker's browsing):**
 the VM's egress gate raises a human approval card for ANY first-seen
 hospital domain, from ANY process — agent web tools, shell curl, or a
 Python script's httpx/urllib. (Diagnosed 2026-09-21: "shell approval cards
@@ -720,6 +726,30 @@ never just rewrite the job body and re-fire. (4) A `cron.stop` does not
 cancel a queued occurrence; it auto-starts and needs its own stop.
 Pending cards from stopped runs are inert leftovers (the permission
 surface is list-only; Nova cannot clear them) — Barklee can dismiss them.
+**The CONNECT-proxy trap (2026-11-15, Barklee report — the 'direct egress'
+framing above was the gap):** the gate cards the domain a VM process
+NAMES, not the socket it opens. A fetch-style proxy API on one fixed
+granted domain (hl_edge → hospitalledger.com/api/fetch) is card-free
+because the VM process only ever names hospitalledger.com. A
+CONNECT-style proxy — the resilient-egress proxy at 127.0.0.1:8899
+included — makes the VM process name EVERY target domain in the CONNECT
+line, so every first-seen hospital domain cards exactly as if fetched
+directly, even though the process's only socket is to 127.0.0.1 and the
+proxy exits through the Mini. Proof: the counts probe carried 8899 as a
+designed method for one morning (2026-11-15) and generated ~24 cards in
+bursts at 11:03–11:13 PT, all attributed to the proxy-owning scope; the
+method was removed the same day (the ladder is now edge → mini → retry,
+retry being a time-separated second edge pass). Standing rules:
+(5) the naming test, applied when DESIGNING or choosing a fetch lane,
+not only when running one: what domains will a VM process name — to any
+gateway, proxy, or API? If the answer is 'each hospital's domain', the
+lane cards and is forbidden for hospital domains, however local or
+trusted the intermediary. Card-free lanes are exactly: the hl_edge
+fetch API; execution on another machine (Mini SSH, sandbox exec); or a
+fetch API on a single fixed domain. (6) Never edit a live runner's
+script in place while it executes — bash reads by byte offset, the edit
+corrupts the runner mid-run, and its fetcher child can outlive a service
+stop; patch, verify, then relaunch.
 **Second source, same day (17:22–17:33 PST): the campaign-driver cron
 worker.** After the scripts were proven clean at the socket level (the
 harvest process held 60 connections, ALL to 127.0.0.1; the proxy log
@@ -756,6 +786,50 @@ different string and is rejected, and after writing, the string is
 verified byte-exact against its source (mechanical diff or length +
 read-back). If no authoritative source exists for a string the work
 needs, stop and say so rather than reconstructing it.
+
+**Discovery-loop transport ladder — harvest & promote (2026-11-15,
+tutor).** The weekly discovery loop (`cms_hpt_expand.py` harvest →
+`promote_discoveries.py` verification/promotion) runs on the VM's
+egress legs, and its steps die in a class the wave-guard taxonomy
+already names: no-response-from-any-leg is transport evidence.
+Failure semantics for this class, binding on both steps (the code
+implements them since 2026-11-09; this text is what makes them
+doctrine rather than habit):
+- A step whose attempts return transport-class outcomes (no HTTP
+  answer: status −1, http-0) in excess of its HTTP answers measured
+  the transport, not the hospitals — classify the step
+  TRANSPORT-DEAD. A transport-dead step commits NOTHING, never
+  overwrites a prior alive=1 row, and exits distinctly (promote:
+  exit 3; harvest: exit 2). A step that completes with zero yield
+  while transport-class outcomes dominated is reported as a
+  transport failure, never as "0 matches found" — a plausible zero
+  is the concealer this rule exists to kill. (2026-11-15: harvest
+  exited 0 after 18,520 probes returned nothing usable; promote
+  then got 300/300 http-0 and exited 3 with zero writes. Only the
+  promote log made the morning readable as one transport event.)
+- **The ladder, in fixed order** (traverse at most once per run):
+  rung 1 — re-probe both legs (curl example.com +
+  hospitalledger.com, direct then via 127.0.0.1:8899 — the 8899 leg
+  here carries ONLY these two fixed probe URLs, never a hospital
+  domain: as a CONNECT proxy it would card every first-seen hospital
+  domain it named, per the approval-card entry's CONNECT-proxy trap;
+  a leg is healthy only on a FAST 200 — a 9-second 200 is a degraded
+  leg, not a healthy one); rung 2 — run the step under the healthy leg;
+  rung 3 — if the step dies transport-dead mid-run, re-probe and
+  re-run the STEP once under the other leg, if it is healthy;
+  rung 4 — defer to the next scheduled cycle and record the run as
+  a transport failure. Terminal stop: two consecutive
+  transport-dead weekly runs escalate to Barklee as a
+  leg-infrastructure problem, not a data result. Loop-breaker: the
+  ladder never restarts without a leg-state change (a leg that was
+  down answers fast, or vice versa) — re-running a dead step
+  against unchanged legs is the blind re-run the transport
+  discipline already forbids for SSH callers, applied here.
+  (2026-11-15 state at diagnosis time, for calibration: leg A
+  answering at 9–12 s per request, leg B connection-refused — an
+  inversion of the failed run's morning, when A failed its probe
+  and B carried the harvest. Legs invert; the ladder, not the
+  morning's winner, is the standing answer.)
 
 ## cms-hpt FIRST — the hospital's own pointer file (Barklee directive 2026-11-07)
 
@@ -1929,6 +2003,73 @@ Seeded lessons (each already cost us once; each maps to a fix above):
   lesson lives in the autoresearch-hospital-ledger skill's Campaign
   lessons log (2026-10-28 entry).
 
+## Incident analysis & continuity discipline (2026-11-15, tutor)
+
+How fleet incidents are analysed and how the lanes prove they are
+still running. (This section carries the Cook complex-systems
+doctrine into the skill itself; AGENTS.md carries it globally.)
+
+**TAC decomposition — the required form for any fleet incident
+analysis.** Every incident write-up decomposes Trigger / Amplifier /
+Concealer, names at least two jointly-necessary contributors,
+reconstructs the timeline by layer with what was visible at the
+time, and answers "why now and not before." The singular phrase
+"root cause" is banned: a trigger-only fix is labelled COSMETIC and
+is never reported as the fix. A mechanism claim (e.g. "OOM-killed")
+requires its discriminating measurement — identical symptoms in
+this fleet have repeatedly had opposite causes (the 200k-cap pair;
+the 2026-11-02 silent deaths proven lifecycle reaping, not OOM).
+An analysis that cannot yet name the trigger says TRIGGER UNPROVEN
+and lists the measurements that would prove it; it does not close.
+
+**Concealer hunt — run before any incident analysis is called
+complete.** Four concealers, each with a fleet instance:
+(1) *Silent truncation/caps* — the 200k parser cap; any limit that
+binds must fail loudly (the no-arbitrary-limits rule).
+(2) *Silent fallback/downgrade* — a lane record that says "not
+published" or "success" while reality differs: wave 65's record
+said published=false while 330154 was live; liveness is judged
+only from the store-derived live index, never from a lane's own
+record (fleet rule 4).
+(3) *Fail-plausible narration* — a worker/monitor summary is a
+claim until read back against the system of record (the 2026-11-15
+progress monitor's kill figures matched neither underlying log;
+the shape was right, the numbers were not — verify before citing).
+(4) *Stale health signals* — a health signal older than its
+cadence is reported STALE with its age, never as current state
+(the transport discipline's rule, applied to every lane's status
+artefacts, not just SSH).
+
+**Silence deadlines — every recurring lane names its artefact.**
+A lane is "running" only while its expected artefact lands by its
+deadline; no artefact by the deadline is an incident, not an
+absence. The named pairs: pricing wave → its `hl_waves.jsonl`
+record by ~04:30 PT daily; counts refresh → its status file by
+Sunday ~08:00 PT; discovery loop → its harvest + promote logs by
+Sunday ~06:00 PT; campaign driver → `hl_campaign_state.json`
+fresh within 2× its 10-minute cadence **while the campaign is
+active** — a recorded stage exhaustion is the terminal artefact
+and closes the pair until a new stage opens (an exhausted driver
+is not "silent" for failing to refresh a state file that has
+nothing left to say). (2026-11-15 lesson: the
+counts FAILED status surfaced only because a monitor noticed a
+state CHANGE; a run that dies before writing any status would
+have been invisible. Change-detection is not a silence deadline.)
+
+**Sabotage validation — a guard is evidence only after it fires.**
+Any guard/check this skill's lanes create or modify counts as
+evidence only after a planted violation has been observed firing
+on it — fixture plus recorded evidence — including, where the
+guard guards a stored record, one surface the unit tests do not
+cover. Re-validate after any edit to the guard or its target, and
+quarterly. Worked example (validated live 2026-11-15): the wave's
+holds guard — beyond its 11-test suite, a planted poisoned
+pending-publish manifest ([31001F, 33016F], both held) fed to the
+real retry entry point fired correctly: held CCNs dropped,
+manifest self-cleaned, publish machinery never entered; a mixed
+fixture ([31001F, 999999]) stripped only the held CCN. An
+unvalidated detector is indistinguishable from a vacuous one.
+
 ## Live-identity integrity sweep (2026-11-02, re-runnable recipe)
 
 Why: priced-based queues cannot see misattribution — a CCN can be live,
@@ -2254,10 +2395,12 @@ clean; 210006, 210055 repaired; the wave-5/6 recoveries rebuilt).
   being added to this list. The two named consumers are the
   fleet's own enforcement points, not the boundary of the
   adjudication. (Wave 62 published the held 31001F on 2026-11-12
-  through exactly this enumeration gap.) Current state: **57 CCNs**, sha256
-  `6a0007f8…` (the 11 Nov-9 adjudications + 13 wave-11
-  confirmed-closed/NO_FILE + 13 b81-closed suspects + 19 wave-11e
-  federal closures + 154057). CCN 150042's quarantine is separate
+  through exactly this enumeration gap.) Current state: **62 CCNs**, sha256
+  `935396dd…` at the 2026-11-15 read-back (the wave-12-era 57 —
+  the 11 Nov-9 adjudications + 13 wave-11 confirmed-closed/NO_FILE
+  + 13 b81-closed suspects + 19 wave-11e federal closures + 154057
+  — plus five later adjudications incl. 100047; verify the file
+  live before quoting any figure from this paragraph). CCN 150042's quarantine is separate
   and absolute and is NOT in the file. Holds change only by
   Barklee adjudication recorded in a wave STATE.
 - **Gate 4 — sticky REJECTs in the importer.**
@@ -2272,9 +2415,14 @@ clean; 210006, 210055 repaired; the wave-5/6 recoveries rebuilt).
   82f7c2f5, dbTomah) is diverted to header-confirmation-only —
   it can no longer auto-attribute to every claimant. Shared
   tokens are recorded in `db/cms_hpt_shared_tokens.json`.
-  Single-claim controls are unaffected. (promote_discoveries.py
-  no longer exists on the VM; the harvester is the living
-  matching layer.)
+  Single-claim controls are unaffected. (Correction 2026-11-15,
+  tutor: `promote_discoveries.py` EXISTS and runs weekly — it is
+  step 3 of the weekly discovery loop (`hl-cms-hpt-harvest`),
+  verifying and promoting the harvester's matches. An earlier
+  draft of this gate declared it gone; the harvester is the
+  matching layer, promote is the verification/promotion layer,
+  and both are governed by the discovery transport ladder in the
+  Campaign driver section.)
 - **Gate 6 — federal exclusion at verdict/import time** (same
   importer build as Gate 4): a federal-class ACCEPT carrying a
   civilian file is demoted unless the verdict detail carries

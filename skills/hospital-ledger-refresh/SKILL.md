@@ -72,7 +72,26 @@ Invariants:
   skill's hold-release standard. The pricing wave's own mechanics must
   perform this check before publishing; where the wave's tooling does
   not, the agent running or supervising the wave performs it against
-  the changed set before the publish proceeds. (Founding incident:
+  the changed set before the publish proceeds.
+  **The gate binds every WRITE of a publish set, not only the publish
+  moment (2026-11-15, tutor).** Any path that records CCNs for later
+  publish or retry — an exception handler parking a failed set, a
+  deferred/unpublished list in lane state, a pending-publish manifest —
+  filters the set against the holds file BEFORE writing it; an
+  all-held set records nothing. A publish set read back from any such
+  record is filtered again on read: a poisoned or stale record
+  (written by older code, by hand, by any lane) never reaches a
+  publish, and the strip is logged. (Second founding incident: wave
+  65, 2026-11-15 — the publish itself was correctly filtered to
+  330154, but the lock-release exception handler parked the UNFILTERED
+  changed set, including held federal closures 33016F/33019F, into the
+  retry manifest, where a later retry could have published them. The
+  wave's park path now filters at the single choke point every park
+  funnels through — `hl_wave.py` `drop_held`/`park_for_retry`,
+  regression-tested, and sabotage-validated 2026-11-15 with a planted
+  poisoned manifest fed to the real retry entry: held CCNs dropped,
+  manifest self-cleaned, publish machinery never entered. Any lane
+  adding a new deferred-set write adopts the same shape.) (Founding incident:
   pricing wave 62, 2026-11-12, published 31001F — a wave-11e federal
   closure sitting in the holds file — because no text bound this lane
   to it.)
@@ -116,10 +135,124 @@ Gate: `.venv/bin/python -c "import httpx; print(httpx.__version__)"` prints `0.2
 
 ### Phase 2 — Probe
 ```bash
-.venv/bin/python scripts/probe_mrf_urls.py --all --concurrency "$CONCURRENCY"
+.venv/bin/python scripts/probe_mrf_urls.py --all --concurrency "$CONCURRENCY" --run-id "$RUN_ID" --method edge|mini|retry
 ```
-~3,609 URLs, ~3–10 min. Gate: exit 0 and log tail shows `probe complete`.
-Recovery: re-run the phase (INSERT OR REPLACE is idempotent).
+4,335 URLs at the 2026-11-15 run; duration is egress-bound — minutes on
+healthy legs, hours when degraded. The runner drives the three methods
+in order under one run_id (see the method ladder below). Gate: coverage
+is total (answered + skipped == seeded, pending == 0 in the
+`mrf_probe_run` ledger), the probe's own `probe complete` line printed,
+AND the plausibility check below passes.
+Recovery: re-run the phase — the ledger makes it a RESUME, not a
+restart (answered items are never re-probed; a kill loses at most one
+in-flight chunk) — subject to the failure classes below.
+
+#### Phase 2 failure classes & the saturated-probe rule (2026-11-15, tutor)
+
+- **KILLED-PROBE** — the probe process dies by signal with no traceback
+  (the log's last line is a progress line, or the shell reports
+  `Killed`). The sender of the signal is UNPROVEN until measured (peak
+  RSS, journal/dmesg record captured at failure time): never write a
+  mechanism ("OOM", "reaped") into an incident record without the
+  discriminating measurement — the fleet's 2026-11-02 precedent proved
+  identical silent deaths on this VM were lifecycle reaping, NOT OOM
+  (supervised run rc=0 at 36 MB peak RSS). A killed probe is its own
+  class in the run record, with the signal/exit recorded — never folded
+  into a generic "build/validate failed".
+- **FROZEN-SIGNAL** — a progress sub-counter static while the main
+  counter advances (attempt 1, 2026-11-15: `alive` pinned at 782 across
+  1,400 consecutive probed items). This is the fleet's wedged-controller
+  signature generalized to any long probe: name it in the run record.
+  A long frozen stretch whose outcomes are transport-class is evidence
+  about the transport, not about the hospitals.
+- **SATURATED-PROBE — the publish hazard.** Probe outcomes split into
+  HTTP answers and transport-class outcomes (status −1/−2: timeout /
+  connect / protocol errors). A probe whose transport-class outcomes
+  exceed its HTTP answers measured the transport, not the hospitals:
+  classify it TRANSPORT-DEAD however it exits — never published, and
+  its rows never treated downstream as hospital deaths. A
+  `probe complete` line does NOT clear this check; the `by_status`
+  breakdown is part of the gate. (2026-11-15: both killed attempts
+  carried long transport-saturated stretches; had either run completed,
+  every prior gate would have passed it and thousands of false deaths
+  would have flowed into the counts build. The kills prevented a bad
+  publish by accident, not by design — this rule makes it design.)
+- **Instrumentation is part of the phase, not a nicety.** The
+  `by_status` breakdown must be printed periodically during the run and
+  at ANY exit, success or failure — a diagnostic reachable only on
+  success is a concealer. And a probe of this size must persist
+  incrementally (per-chunk commit) so a kill resumes instead of
+  restarting from zero. **IMPLEMENTED 2026-11-15** under Barklee's
+  self-completing-refresh directive (which supersedes, for this fix,
+  the bundle-only route and the report-only rule in "When something
+  breaks"): `probe_mrf_urls.py` sha256 `e79b4899…` (run ledger
+  `mrf_probe_run`, 50-item chunk commits, periodic + on-exit by_status,
+  per-item exception containment, advisory preflight) and
+  `hl_counts_refresh.sh` sha256 `2203836b…` — the EXECUTING copy is the
+  goal's `hidden_files/hl_counts_refresh.sh` (the systemd unit's
+  ExecStart); `pipeline/hl_counts_refresh.sh` is byte-identical to it.
+  Proven the same day on a scratch DB: a SIGKILLed 40-item probe
+  resumed and completed with every pre-kill row byte-identical (no
+  re-probe); unanswerable items skipped only after all three methods
+  with zero false deaths written; an edge-leg startup timeout caught
+  live and fixed in the same pass (preflight is advisory; one method's
+  operational failure never aborts the ladder). **Bundle hazard:**
+  Phase 0 re-pulls the pipeline bundle when its remote sha changes —
+  the next bundle build must fold in these two files at these shas or
+  the fix reverts; verify the shas after any bundle change.
+
+#### The method ladder & the skip rule (2026-11-15, Barklee directive)
+
+Phase 2 tries each item by up to **three different methods**, in order:
+(1) **edge** — the `hl_edge` Worker fetch
+(`HL_FETCH_PROXY=https://hospitalledger.com/api/fetch`), the sanctioned
+primary lane (a bare direct probe from the VM is forbidden since the
+2026-11-05 approval-card guard; the probe fails closed without
+HL_FETCH_PROXY in edge mode, and the runner stops with code 30 if the
+unit env loses it); (2) **mini** — the Mac mini's egress (curl over SSH,
+batched — the 2026-11-05 guard's own sanctioned fallback); (3) **retry**
+— a second edge pass, time-separated by the whole mini pass, eligible
+only for items both edge and mini already attempted (transient WAF /
+rate-limit windows clear, so a delayed re-ask is a genuinely different
+attempt). **Removed 2026-11-15 (approval-card bug, Barklee report):**
+the resilient-egress proxy at 127.0.0.1:8899 as method 2 — it is a
+CONNECT proxy, so the VM process names every hospital domain to the
+gateway and the approval gate cards each first-seen one (~24 cards in
+one morning, bursts 11:03–11:13 PT). A lane is card-free only when the
+VM process's peer is one fixed already-granted domain (the hl_edge
+Worker) or the fetch executes on another machine (the Mini) — see the
+fleet skill's CONNECT-proxy trap entry. Never re-add a CONNECT-proxy
+or direct method for hospital domains. The
+first method to return a real HTTP status answers the item, finally.
+A transport-class outcome (−1/−2) is not an answer: the item stays
+pending for the next method. An item still unanswered after all three
+methods is **SKIPPED**: recorded in the ledger as skipped with its
+three methods and attempts, **never written to `mrf_probe` as dead**
+(its prior probe row stands — the item keeps its last-known state),
+and counted in the run's report (`probe_skipped` in the status file).
+A skip is an exhausted no-answer, never a silent drop and never a
+hospital death. If a phase completes with **zero answered** (every leg
+dead for every item), that is a transport incident, not a data result:
+the runner stops with code 30 and it escalates as leg infrastructure —
+publishing an all-prior-data refresh would only disguise the outage.
+
+#### Self-improvement on a novel failure (auto-tutor, 2026-11-15)
+
+When a run stops on a failure shape that is **not in the failure
+classes above**, the supervising agent does not merely report it: it
+runs the AI Tutor loop on the gap in the same pass — classify the
+shape (TAC: trigger / amplifier / concealer), make the ONE minimal
+skill edit that names the class and its recovery, re-test the edited
+text with a fresh-context probe, sync the skill across the board, and
+log the iteration in the run record. A shape that is a code defect in
+the pipeline itself is fixed via /code under the same directive
+(Barklee, 2026-11-15: the refresh "should basically always keep
+running and trying to get completed" while "auto improving the
+skill") — tested before it ships, never as a way to force a check
+through: a `validate_site_data.py` FAIL is still reported as FAIL.
+Escalate to Barklee only when the shape survives the tutor loop
+unclassified, when the fix would cross a one-way door, or on the
+all-legs-dead transport incident above.
 
 ### Phase 3 — Enforcement match
 ```bash
@@ -275,8 +408,18 @@ not with this runbook's calendar.
 - exit code + log path; `generated_at`; `compliant X / Y = Z%`
 - delta vs the pre-run snapshot: newly-live and newly-dead MRF counts
   (diff `public/data/hospitals.json` before/after on `has_live_mrf`)
-- on failure: last 20 log lines verbatim; retry the run at most ONCE;
-  a second failure is reported and left for a human
+- probe accounting: answered / skipped counts from the status file —
+  skips are always reported, never folded into newly-dead
+- on failure: last 20 log lines verbatim, classified by the runner's
+  failure split — **transient classes (phase-0 transport, probe
+  operational, publish, live-check lag) resume automatically until the
+  run completes** (persistence doctrine, 2026-11-15: the refresh keeps
+  running and trying to get completed; phases are idempotent and the
+  probe resumes from its ledger, so a retry never redoes finished
+  work); **data classes (env, enforcement, build, guard, assemble,
+  validate) and the all-legs-dead incident stop the run** and engage
+  the auto-tutor step above — reported with the shape, left for a
+  human only when the tutor loop cannot classify or fix it
 - log the outcome as an activity entry on the tracked item
 
 ## Failure semantics (match the old script's exit codes)
@@ -288,9 +431,13 @@ failed. Report the code, never invent a success.
 
 The agent may patch THIS SKILL and the cron body (orchestration is
 Muse-owned). It may not patch `scripts/*.py` to force a check through — a
-`validate_site_data.py` FAIL is reported as FAIL. If a phase script itself is
-buggy, report it; the operator ships the fix in the next bundle and step 0 picks
-it up.
+`validate_site_data.py` FAIL is reported as FAIL. **Supersession
+(2026-11-15, Barklee's self-completing-refresh directive):** a phase
+script that is itself buggy is fixed in place via /code under the
+auto-tutor step — tested (syntax + smoke) before the run resumes, with
+the fix's sha recorded in this skill — instead of waiting for the next
+bundle; the bundle must then fold the fix in (see the Phase 2 bundle
+hazard). The no-force-a-check rule is unchanged.
 
 ## Lessons — 2026-10-13/14 publish-repair run (all live-verified)
 
