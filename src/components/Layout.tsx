@@ -382,10 +382,29 @@ export const Layout: FC<LayoutProps> = ({
 					</div>
 				</aside>
 				<footer class="border-t border-zinc-800 mt-10 sm:mt-12 py-6 text-center text-xs text-zinc-500">
-					<a href="/" class="hover:text-zinc-300">
-						Hospital Ledger
-					</a>{" "}
-					· © 2026 · CC0 data · No cookies, no accounts
+					<p class="mx-auto max-w-2xl px-4 leading-relaxed">
+						Hospital Ledger collects the price files U.S. hospitals
+						must publish by law and makes them searchable — every
+						price straight from the hospital's own file.
+					</p>
+					<p class="mt-2">
+						<a href="/" class="hover:text-zinc-300">
+							Hospital Ledger
+						</a>{" "}
+						·{" "}
+						<a href="/about" class="hover:text-zinc-300">
+							About
+						</a>{" "}
+						·{" "}
+						<a href="/about-the-numbers" class="hover:text-zinc-300">
+							About the numbers
+						</a>{" "}
+						·{" "}
+						<a href="/submit" class="hover:text-zinc-300">
+							Submit a file
+						</a>{" "}
+						· © 2026 · CC0 data · No cookies, no accounts
+					</p>
 				</footer>
 				{allScriptSrc.map((src) => (
 					<script src={src} defer />
