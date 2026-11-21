@@ -1476,6 +1476,64 @@ class PublishLock:
         return False
 
 
+# ---------------------------------------------------------------------------
+# Adjudicated-holds gate (2026-11-15, wave-62 incident closure).
+#
+# Wave 62 (2026-11-12) published CCN 31001F -- a Gate-6 federal closure
+# REJECTed in batch b82 and listed in the shared holds file -- because
+# this lane never consulted the file. publish_mini enforces the same
+# file at its Gate 1; the fleet skill's Gate 3 binds EVERY publishing
+# lane. This is the mechanical half of that binding for the wave lane:
+#
+#   * The ONE source of truth is adjudicated_holds.txt (canonical VM
+#     copy ~/workspace/hl-fleet/, byte-identical Mini copy ~/hl-fleet/).
+#     No copy of the list lives in this file -- a copied list is a stale
+#     list by construction.
+#   * run_publish_phase drops held CCNs from the publish set and
+#     reports them (they are also stripped from the pending manifest so
+#     the retry loop does not re-offer them forever).
+#   * publish() itself refuses, fail-closed, if a held CCN reaches it
+#     by any other path, and refuses everything when the holds file is
+#     unreadable -- an unreadable adjudication is a stop, not a pass.
+# ---------------------------------------------------------------------------
+def _holds_candidates():
+    env = os.environ.get("HL_WAVE_HOLDS_FILE")
+    cands = [env] if env else []
+    home = Path.home()
+    cands += [str(home / "workspace" / "hl-fleet" / "adjudicated_holds.txt"),
+              str(home / "hl-fleet" / "adjudicated_holds.txt")]
+    return cands
+
+
+def load_adjudicated_holds(path=None):
+    """The adjudicated hold set, or None when no holds file is readable.
+
+    Format mirrors publish_mini.load_holds: one CCN per line, first
+    token wins, '#' comments and blank lines ignored.
+    """
+    for cand in ([path] if path else _holds_candidates()):
+        if not cand:
+            continue
+        try:
+            holds = set()
+            with open(cand) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        holds.add(line.split()[0])
+            return holds
+        except OSError:
+            continue
+    return None
+
+
+def split_held(ccns, holds):
+    """(kept, held) partition of `ccns` against the adjudicated set."""
+    held = [c for c in ccns if c in holds]
+    kept = [c for c in ccns if c not in holds]
+    return kept, held
+
+
 def publish(out, updated_ccns, penv, lock_owner=None, lock_ttl=LOCK_TTL,
             lock_heartbeat_interval=LOCK_HEARTBEAT, lock_key=LOCK_KEY):
     """Upload per-CCN price files + index + meta (manifest LAST). Byte-verify each.
@@ -1485,6 +1543,20 @@ def publish(out, updated_ccns, penv, lock_owner=None, lock_ttl=LOCK_TTL,
     Returns (ok, message); published_ccns semantics: on ok=True the CCNs are
     exactly those byte-verified in R2 — no more, no fewer.
     """
+    # Adjudicated-holds backstop (2026-11-15): run_publish_phase filters
+    # held CCNs before assembly; if one reaches publish() by any other
+    # path, refuse the whole publish rather than upload it. Fail closed
+    # on an unreadable holds file.
+    _holds = load_adjudicated_holds()
+    if _holds is None:
+        return False, ("adjudicated holds file unreadable "
+                       "(HL_WAVE_HOLDS_FILE / ~/workspace/hl-fleet / "
+                       "~/hl-fleet) — failing closed, nothing published")
+    _held = [c for c in updated_ccns if c in _holds]
+    if _held:
+        return False, (f"refusing to publish adjudicated holds: {_held} "
+                       f"(adjudicated_holds.txt — wave-11d Gate 1 / fleet "
+                       f"Gate 3)")
     lock = PublishLock(penv, owner=lock_owner, ttl=lock_ttl,
                        heartbeat_interval=lock_heartbeat_interval, lock_key=lock_key)
     try:
@@ -1576,6 +1648,33 @@ def _publish_with_retry(out, publish_ccns, penv, health, attempts=3):
     return False, last or "no publish attempt made"
 
 
+def drop_held(ccns, context):
+    """Partition out adjudicated holds, loudly. Returns the kept CCNs.
+
+    2026-11-15 (wave-65 incident): the publish-phase holds filter drops
+    held CCNs from the publish set, but exception paths parked the
+    wave's UNFILTERED updated set into the pending manifest -- wave 65
+    parked held federal closures 33016F/33019F after a lock-release
+    timeout that followed a successful publish of the filtered set.
+    Held CCNs must never enter the retry manifest at all: every park
+    path funnels through here. When the holds file is unreadable the
+    set passes through unchanged (parking is not publishing; the
+    publish-side guards fail closed) with a loud warning.
+    """
+    holds = load_adjudicated_holds()
+    if holds is None:
+        log(f"WARNING: adjudicated holds file unreadable while parking "
+            f"({context}) — set passes unfiltered; publish-side guards "
+            f"still fail closed")
+        return list(ccns)
+    kept, held = split_held(list(ccns), holds)
+    if held:
+        log(f"ADJUDICATED HOLDS: dropping {len(held)} held CCN(s) at "
+            f"park time ({context}): {held} "
+            f"(adjudicated_holds.txt — never parked for publish retry)")
+    return kept
+
+
 def park_for_retry(publish_ccns, wave_no, reason, detail, attempts):
     """Park CCNs in the pending manifest with bounded backoff.
 
@@ -1583,6 +1682,12 @@ def park_for_retry(publish_ccns, wave_no, reason, detail, attempts):
     is due in min(RETRY_BASE_SECS * 2**attempts, RETRY_MAX_DELAY_SECS) --
     capped at one retry-cron tick (2026-10-23: no long backoffs; fix and
     retry immediately). Atomic write (tmp + replace)."""
+    publish_ccns = drop_held(publish_ccns, f"park_for_retry:{reason}")
+    if not publish_ccns:
+        clear_pending()
+        log(f"park_for_retry: nothing parkable after holds filter "
+            f"({reason}); pending manifest cleared")
+        return
     delay = min(RETRY_BASE_SECS * (2 ** max(0, attempts)), RETRY_MAX_DELAY_SECS)
     save_pending({
         "ts": now_iso(), "wave": wave_no,
@@ -1825,6 +1930,13 @@ def retry_pending_publish(args, env, std):
         log(f"retry-pending: still deferred ({pub.get('reason')}); "
             f"next attempt in ~{delay // 60}m")
         return 0
+    if status == "skipped":
+        # Nothing publishable -- e.g. every pending CCN was an
+        # adjudicated hold, dropped by the publish-phase holds filter
+        # (which also stripped them from the manifest). Neither a
+        # failure nor a deferral: the retry loop's work is done.
+        log("retry-pending: nothing publishable (skipped); done")
+        return 0
     # "failed": logic/validation/credential problem -- needs a human.
     return record_failure(pub.get("reason", "retry-failed"), 2, std,
                           {"attempts": attempts + 1,
@@ -1868,6 +1980,41 @@ def run_publish_phase(args, env, state, std, updated_ccns, unpublished,
     if not ((updated_ccns or unpublished) and not args.dry_run):
         return {"status": "skipped"}
     publish_ccns = list(dict.fromkeys(updated_ccns + unpublished))
+
+    # Adjudicated-holds filter (2026-11-15, wave-62 closure): a held CCN
+    # is never published, however clean its parse or header. Drop held
+    # CCNs here -- before the index patch step, which patches exactly
+    # publish_ccns into the index -- and report them loudly. Fail closed
+    # when the holds file is unreadable.
+    _holds = load_adjudicated_holds()
+    if _holds is None:
+        return {"status": "failed", "reason": "adjudicated-holds-unreadable",
+                "detail": "adjudicated holds file unreadable "
+                          "(HL_WAVE_HOLDS_FILE / ~/workspace/hl-fleet / "
+                          "~/hl-fleet) — failing closed, nothing published",
+                "publish_ccns": publish_ccns,
+                "extra": {"updated_ccns": publish_ccns,
+                          "detail": "holds file unreadable"}}
+    publish_ccns, _held_dropped = split_held(publish_ccns, _holds)
+    if _held_dropped:
+        log(f"ADJUDICATED HOLDS: dropping {len(_held_dropped)} held CCN(s) "
+            f"from the publish set: {_held_dropped} "
+            f"(adjudicated_holds.txt — never published by this lane)")
+        # Strip held CCNs from the pending manifest too, so the retry
+        # loop does not re-offer them on every pass.
+        _pend = load_pending()
+        if _pend and _pend.get("publish_ccns"):
+            _kept_pend = [c for c in _pend["publish_ccns"]
+                          if c not in _holds]
+            if len(_kept_pend) != len(_pend["publish_ccns"]):
+                if _kept_pend:
+                    _pend["publish_ccns"] = _kept_pend
+                    save_pending(_pend)
+                else:
+                    clear_pending()
+        if not publish_ccns:
+            return {"status": "skipped", "publish_ccns": [],
+                    "held_dropped": _held_dropped}
 
     def _park(reason, detail, attempts):
         state["unpublished"] = list(dict.fromkeys(
@@ -2547,7 +2694,8 @@ def main():
         # and report the wave as deferred so the retry loop owns recovery.
         detail = f"{type(exc).__name__}: {exc}"[:300]
         log(f"wave: publish phase raised {detail} -- parking the publish set")
-        _set = list(dict.fromkeys(updated_ccns + unpublished))
+        _set = drop_held(list(dict.fromkeys(updated_ccns + unpublished)),
+                         "wave publish-exception handler")
         state["unpublished"] = list(dict.fromkeys(
             (state.get("unpublished") or []) + _set))
         save_state(state)

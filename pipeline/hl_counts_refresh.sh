@@ -138,11 +138,108 @@ phase1_env() {
 }
 
 # ---------------------------------------------------------------- phase 2
+# Persistence doctrine (2026-11-15, Barklee directive): the probe is a
+# resumable ledger, not a one-shot pass. Each item is tried by up to three
+# DIFFERENT methods (edge -> mini -> retry); an item no method can answer
+# is SKIPPED (recorded, prior data kept, never a death). Phase 2 completes
+# when coverage is total: answered + skipped == seeded, pending == 0.
+#
+# Transport guard (2026-11-05, approval-card incident) — PRESERVED: on the
+# VM the probe's primary lane is hl_edge; HL_FETCH_PROXY comes from
+# hospital-ledger.env, loaded by the systemd unit's EnvironmentFile. A
+# direct-mode probe from the VM raises one Muse approval card per
+# first-seen hospital domain. If the edge env is missing, FAIL CLOSED
+# (return 2 -> stop code 30): fix the unit env, never route around it.
+# The second method IS the guard's sanctioned fallback (probe from the
+# Mac mini; results recorded back into the VM DB); the third is a
+# time-separated second edge pass.
+# CARDING-LANE REMOVAL (2026-11-15, Barklee report): the resilient-egress
+# CONNECT proxy (127.0.0.1:8899) was method 2 for one morning and carded
+# 3 first-seen hospital domains in a single burst — a CONNECT proxy makes
+# the VM process name every target domain to the gateway, which is
+# exactly what the approval gate cards. It is removed from the ladder;
+# never re-add any CONNECT-proxy or direct VM fetch for hospital domains.
+RUN_ID="counts-$TS"
+# Resume identity (2026-11-15, VM-reboot lesson): if the previous run's
+# status record is unfinished (done != true) and carries a run_id, reuse
+# it — the probe ledger is keyed by run_id, so a restarted service
+# resumes the dead run's probe instead of re-probing from zero. A
+# finished previous run (done=true) always starts a fresh run_id.
+PREV_RUN_ID="$("$VENV_PY" - "$STATUS" <<'PY' 2>/dev/null
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    if d.get("done") is not True and str(d.get("run_id") or "").startswith("counts-"):
+        print(d["run_id"])
+except Exception:
+    pass
+PY
+)"
+if [ -n "$PREV_RUN_ID" ] && [ "$PREV_RUN_ID" != "$RUN_ID" ]; then
+  RUN_ID="$PREV_RUN_ID"
+  echo "[runner] resuming unfinished run_id $RUN_ID (probe ledger carries over)"
+fi
+PROBE_ANSWERED=0; PROBE_SKIPPED=0; PROBE_PENDING=0
+
+probe_counts() {
+  local out
+  out="$("$VENV_PY" - "$ROOT/db/hospital_ledger.db" "$RUN_ID" <<'PY'
+import sqlite3, sys
+try:
+    conn = sqlite3.connect(sys.argv[1])
+    rows = dict(conn.execute(
+        "SELECT state, COUNT(*) FROM mrf_probe_run WHERE run_id=? GROUP BY state",
+        (sys.argv[2],)).fetchall())
+except Exception:
+    rows = {}
+print(rows.get('answered', 0), rows.get('skipped', 0), rows.get('pending', 0))
+PY
+)"
+  PROBE_ANSWERED="${out%% *}"; PROBE_PENDING="${out##* }"
+  PROBE_SKIPPED="$(printf '%s' "$out" | cut -d' ' -f2)"
+  echo "[phase2] coverage answered=$PROBE_ANSWERED skipped=$PROBE_SKIPPED pending=$PROBE_PENDING"
+}
+
 phase2_probe() {
-  echo "[phase2] probe --all --concurrency $CONCURRENCY"
-  "$ROOT/.venv/bin/python" "$ROOT/scripts/probe_mrf_urls.py" --all --concurrency "$CONCURRENCY" || { echo "[phase2] FAIL: probe exit nonzero"; return 1; }
-  grep -q "probe complete" "$LOG" || { echo "[phase2] FAIL: 'probe complete' not in log"; return 1; }
-  echo "[phase2] gate OK"
+  echo "[phase2] probe run_id=$RUN_ID concurrency=$CONCURRENCY (methods: edge -> mini -> retry)"
+  if [ -z "${HL_FETCH_PROXY:-}" ]; then
+    echo "[phase2] FAIL: HL_FETCH_PROXY unset — edge leg (sanctioned primary) unavailable; fail closed (2026-11-05 guard)"
+    return 2
+  fi
+  # A method's operational failure never aborts the ladder: it is recorded
+  # and the next method tries the still-pending items (2026-11-15 smoke
+  # catch — an edge preflight timeout would otherwise starve methods 2-3).
+  local method_errors=0
+  "$VENV_PY" "$ROOT/scripts/probe_mrf_urls.py" --all \
+    --concurrency "$CONCURRENCY" --run-id "$RUN_ID" --method edge \
+    || { method_errors=$((method_errors + 1)); echo "[phase2] probe (edge) operational error — continuing the ladder"; }
+  probe_counts
+  if [ "$PROBE_PENDING" -eq 0 ]; then echo "[phase2] gate OK (edge)"; return 0; fi
+  echo "[phase2] $PROBE_PENDING item(s) unanswered by edge — method 2: mini leg"
+  env -u HL_FETCH_PROXY "$VENV_PY" "$ROOT/scripts/probe_mrf_urls.py" --all \
+    --concurrency "$CONCURRENCY" --run-id "$RUN_ID" --method mini \
+    || { method_errors=$((method_errors + 1)); echo "[phase2] probe (mini) operational error — continuing the ladder"; }
+  probe_counts
+  if [ "$PROBE_PENDING" -eq 0 ]; then echo "[phase2] gate OK (mini)"; return 0; fi
+  echo "[phase2] $PROBE_PENDING item(s) unanswered by edge+mini — method 3: retry (second edge pass, time-separated)"
+  "$VENV_PY" "$ROOT/scripts/probe_mrf_urls.py" --all \
+    --concurrency "$CONCURRENCY" --run-id "$RUN_ID" --method retry \
+    || { method_errors=$((method_errors + 1)); echo "[phase2] probe (retry) operational error — continuing the ladder"; }
+  probe_counts
+  [ "$PROBE_PENDING" -eq 0 ] || { echo "[phase2] FAIL: coverage incomplete after all three methods"; return 1; }
+  echo "[phase2] gate OK (all methods; skipped=$PROBE_SKIPPED recorded in ledger, prior data kept)"
+  if [ "$PROBE_SKIPPED" -gt 0 ]; then
+    local total=$((PROBE_ANSWERED + PROBE_SKIPPED))
+    echo "[phase2] NOTE: $PROBE_SKIPPED/$total item(s) skipped after 3 methods — no-answer items, NOT deaths"
+    if [ "$PROBE_ANSWERED" -eq 0 ]; then
+      # Distinct return 2 -> run_all code 30 (STOP class): every leg dead for
+      # every item is a transport incident to escalate, not a run to loop on —
+      # the ledger is terminal for this run_id and a retry cannot change it.
+      # The next weekly cycle re-probes under a fresh run_id.
+      echo "[phase2] FAIL: zero answered — every leg is dead; transport incident, not data"
+      return 2
+    fi
+  fi
 }
 
 # ---------------------------------------------------------------- phase 3
@@ -246,18 +343,27 @@ phase7_publish() {
 # ---------------------------------------------------------------- phase 8
 phase8_livecheck() {
   echo "[phase8] live check"
+  # FIXED 2026-11-15: this gate previously polled /api/manifest for a
+  # top-level "summary_source" field that NO producer writes (grep the
+  # pipeline: the string existed only in this check and in the retired
+  # scripts/refresh_counts.sh) — the gate could never pass, and two
+  # consecutive runs failed phase 8 (code 29) on correctly published
+  # data. The source fact lives in /api/coverage, which returns
+  # {generated_at, source} for the summary the site is actually
+  # serving. The gate's intent is unchanged: the live site serves the
+  # just-published summary, sourced from R2.
   local i resp got src
   for i in $(seq 1 20); do
-    resp="$(curl -sf -m 20 "https://hospitalledger.com/api/manifest?cb=$TS-$i" 2>/dev/null)" || { sleep 10; continue; }
+    resp="$(curl -sf -m 20 "https://hospitalledger.com/api/coverage?cb=$TS-$i" 2>/dev/null)" || { sleep 10; continue; }
     got="$(printf '%s' "$resp" | "$VENV_PY" -c "import json,sys;print(json.load(sys.stdin).get('generated_at',''))" 2>/dev/null)"
-    src="$(printf '%s' "$resp" | "$VENV_PY" -c "import json,sys;print(json.load(sys.stdin).get('summary_source',''))" 2>/dev/null)"
+    src="$(printf '%s' "$resp" | "$VENV_PY" -c "import json,sys;print(json.load(sys.stdin).get('source',''))" 2>/dev/null)"
     if [ "$got" = "$GENERATED_AT" ] && [ "$src" = "r2" ]; then
-      echo "[phase8] gate OK (live generated_at matches, summary_source=r2)"
+      echo "[phase8] gate OK (live generated_at matches, source=r2)"
       return 0
     fi
     sleep 10
   done
-  echo "[phase8] FAIL: live check — last generated_at=$got summary_source=$src (wanted $GENERATED_AT/r2)"
+  echo "[phase8] FAIL: live check — last generated_at=$got source=$src (wanted $GENERATED_AT/r2)"
   return 1
 }
 
@@ -282,7 +388,8 @@ run_all() {
   phase0_self_update || return 10
   snapshot_before   || return 11
   phase1_env        || return 21
-  phase2_probe      || return 22
+  phase2_probe; local p2rc=$?
+  if [ "$p2rc" -eq 2 ]; then return 30; elif [ "$p2rc" -ne 0 ]; then return 22; fi
   phase3_enforcement|| return 23
   phase4_registry   || return 24
   phase45_guard     || return 25
@@ -304,9 +411,17 @@ map_exit() {
 }
 
 # ---------------------------------------------------------------- main
-status_write run_ts="$TS" phase="starting" done=false reported=false exit_code=null \
+# Single-instance: a still-running refresh (the keep-trying loop below can
+# legitimately run long) makes a duplicate trigger a no-op, never a race.
+exec 9>"$HIDDEN/counts-refresh.lock"
+if ! flock -n 9; then
+  echo "[runner] another counts refresh holds the lock — exiting (no-op)"
+  exit 0
+fi
+
+status_write run_ts="$TS" run_id="\"$RUN_ID\"" phase="starting" done=false reported=false exit_code=null \
   log_path="\"$LOG\"" generated_at=null compliant=null newly_live=null newly_dead=null \
-  guard_note=null error=null
+  guard_note=null error=null probe_answered=null probe_skipped=null
 
 if [ "${SMOKE_TEST:-0}" = "1" ]; then
   echo "[runner] SMOKE_TEST=1 — phases 0-1 only"
@@ -317,21 +432,39 @@ if [ "${SMOKE_TEST:-0}" = "1" ]; then
   exit "$rc"
 fi
 
+# Persistence doctrine (2026-11-15, Barklee directive — supersedes the old
+# retry-once rule): TRANSIENT failures (phase 0 transport 10, probe
+# operational 22, publish 28, live-check lag 29) resume the whole run until
+# it completes — phases are idempotent and phase 2 resumes from its ledger,
+# so a retry never redoes finished work. DATA-CLASS failures (env 21,
+# enforcement 23, build 24, guard 25, assemble 26, validate 27) and the
+# stop-class transport/environment incidents (30) STOP the run: the run
+# record + status file carry the shape, and the refresh skill's auto-tutor
+# step engages on it instead of a bare retry or a bare escalation.
+is_transient() { case "$1" in 10|22|28|29) return 0 ;; *) return 1 ;; esac }
+
 attempt=1
-run_all; rc=$?
-if [ "$rc" -ne 0 ] && [ "$attempt" -eq 1 ]; then
-  echo "[runner] attempt 1 failed (code $rc) — retrying once per runbook"
-  status_write phase="retry" error="\"attempt 1 failed code $rc; retrying\""
-  attempt=2
+while : ; do
   run_all; rc=$?
-fi
+  [ "$rc" -eq 0 ] && break
+  if ! is_transient "$rc"; then
+    echo "[runner] stop-class failure (code $rc, attempt $attempt) — run stops; auto-tutor/escalation engages from the record"
+    break
+  fi
+  echo "[runner] transient failure (code $rc, attempt $attempt) — resuming in 300s (retry until complete)"
+  status_write phase="retry" attempt="$attempt" error="\"transient code $rc; resuming\""
+  attempt=$((attempt + 1))
+  sleep 300
+done
 
 EXIT_CODE="$(map_exit "$rc")"
 compute_delta
+probe_counts >/dev/null 2>&1 || true
 status_write phase="finished" done=true exit_code="$EXIT_CODE" \
   generated_at="\"$GENERATED_AT\"" compliant="\"$COMPLIANT_LINE\"" \
   newly_live="\"$NEWLY_LIVE\"" newly_dead="\"$NEWLY_DEAD\"" \
-  guard_note="\"$GUARD_NOTE\"" error="\"run_all code $rc (attempt $attempt)\""
+  guard_note="\"$GUARD_NOTE\"" error="\"run_all code $rc (attempt $attempt)\"" \
+  probe_answered="$PROBE_ANSWERED" probe_skipped="$PROBE_SKIPPED"
 
 timeline "- exit=$EXIT_CODE (run_all code $rc, attempt $attempt)
 - log: $LOG
