@@ -20,6 +20,7 @@ import {
 import { r2Passthrough, readR2Json } from "./lib/r2";
 import { wideEvent } from "./lib/wide-event";
 import { aboutNumbersPageHandler } from "./routes/about-the-numbers";
+import { aboutPageHandler } from "./routes/about";
 import { complianceRankingHandler } from "./routes/api/compliance-ranking";
 import { coverageHandler } from "./routes/api/coverage";
 import { cptIndexHandler } from "./routes/api/cpt-index";
@@ -380,6 +381,7 @@ app.get("/sitemap.xml", async (c) => {
 	const urls: string[] = [
 		`<url><loc>${SITE}/</loc><lastmod>${lastmod}</lastmod><priority>1.0</priority></url>`,
 		`<url><loc>${SITE}/about-the-numbers</loc><lastmod>${lastmod}</lastmod><priority>0.8</priority></url>`,
+		`<url><loc>${SITE}/about</loc><lastmod>${lastmod}</lastmod><priority>0.8</priority></url>`,
 		`<url><loc>${SITE}/submit</loc><lastmod>${lastmod}</lastmod><priority>0.6</priority></url>`,
 		`<url><loc>${SITE}/hospitals</loc><lastmod>${lastmod}</lastmod><priority>0.9</priority></url>`,
 	];
@@ -430,6 +432,10 @@ app.get("/", homePageHandler);
 // SSR methodology page explaining the gap between CMS-required, live MRF,
 // and standardized-price counts. Linked from the home-page hero + Section 03.
 app.get("/about-the-numbers", aboutNumbersPageHandler);
+
+// SSR story page: what the site is, how to use it, why it matters, and how
+// it was built. Linked from the site footer.
+app.get("/about", aboutPageHandler);
 
 // Hospital file submissions: the form + status pages, and the multipart
 // upload API behind them (processing itself runs in the fleet — see
