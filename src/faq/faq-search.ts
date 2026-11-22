@@ -341,7 +341,14 @@ const FANOUT_BATCH = 8;
 /** Rows shown per procedure in the results document. */
 export const TOP_ROWS = 8;
 
-type Priced = { ccn: string; name: string; cash: number | null; gross: number | null };
+type Priced = {
+	ccn: string;
+	name: string;
+	cash: number | null;
+	gross: number | null;
+	/** How many DISTINCT cash prices the file lists for the code (0 when none). */
+	cashCount?: number;
+};
 
 function money(v: number): string {
 	return `$${v.toLocaleString("en-US", {
@@ -355,8 +362,51 @@ function rowLine(r: Priced, i: number): string {
 		r.cash !== null
 			? `discounted cash price ${money(r.cash)}`
 			: `gross charge ${money(r.gross ?? 0)} (no discounted cash price published)`;
+	const lowest =
+		r.cash !== null && (r.cashCount ?? 0) > 1
+			? ` (lowest of ${r.cashCount} different cash prices its file lists for this code)`
+			: "";
 
-	return `${i + 1}. ${r.name} — ${price}${r.cash !== null && r.gross !== null ? ` (gross charge ${money(r.gross)})` : ""} — ${SITE_ORIGIN}/hospital/${r.ccn}`;
+	return `${i + 1}. ${r.name} — ${price}${lowest}${r.cash !== null && r.gross !== null ? ` (gross charge ${money(r.gross)})` : ""} — ${SITE_ORIGIN}/hospital/${r.ccn}`;
+}
+
+/**
+ * One hospital's price for one code, aggregated over every row its file carries
+ * for that code. A file may list a code several times — different service lines
+ * or descriptions — at different prices, or with a price on one row and none on
+ * another (measured live 2026-11-21: UCSF Langley Porter's file carries 70551
+ * at $432.30 and again with no price; Stroger's carries 45378 at $321.30 and
+ * $1,663.20). Taking the first row would report whichever the file happened to
+ * order first; the price the hospital publishes for the code is the lowest of
+ * them, and the gross shown is the one on that same row.
+ */
+export function codePrices(
+	data: HospitalData,
+	code: string,
+): { listed: boolean; cash: number | null; gross: number | null; cashCount: number } {
+	const items = (data.items ?? []).filter((it) => String(it.code) === code);
+
+	if (items.length === 0)
+		return { listed: false, cash: null, gross: null, cashCount: 0 };
+	const withCash = items
+		.filter((it) => it.cash != null)
+		.sort((a, b) => (a.cash ?? 0) - (b.cash ?? 0));
+
+	if (withCash.length > 0)
+		return {
+			listed: true,
+			cash: withCash[0].cash,
+			gross: withCash[0].gross ?? null,
+			cashCount: new Set(withCash.map((it) => it.cash)).size,
+		};
+	const withGross = items
+		.filter((it) => it.gross != null)
+		.sort((a, b) => (a.gross ?? 0) - (b.gross ?? 0));
+
+	if (withGross.length > 0)
+		return { listed: true, cash: null, gross: withGross[0].gross, cashCount: 0 };
+
+	return { listed: true, cash: null, gross: null, cashCount: 0 };
 }
 
 type Section = { code: string; lines: string[] };
@@ -380,20 +430,20 @@ async function hospitalSection(
 	)?.coverage;
 
 	for (const code of codes) {
-		const item = (data.items ?? []).find((it) => String(it.code) === code);
+		const agg = codePrices(data, code);
 		const desc = descs.get(code) ?? code;
 
-		if (!item) {
+		if (!agg.listed) {
 			lines.push(
 				`Its published file does not list ${desc} (CPT ${code}).`,
 			);
-		} else if (item.cash !== null && item.cash !== undefined) {
+		} else if (agg.cash !== null) {
 			lines.push(
-				`For ${desc} (CPT ${code}) its published discounted cash price is ${money(item.cash)}${item.gross != null ? ` and its gross charge is ${money(item.gross)}` : ""}.`,
+				`For ${desc} (CPT ${code}) its published discounted cash price is ${money(agg.cash)}${agg.cashCount > 1 ? ` (the lowest of ${agg.cashCount} different cash prices its file lists for this code)` : ""}${agg.gross != null ? ` and its gross charge is ${money(agg.gross)}` : ""}.`,
 			);
-		} else if (item.gross !== null && item.gross !== undefined) {
+		} else if (agg.gross !== null) {
 			lines.push(
-				`For ${desc} (CPT ${code}) it publishes a gross charge of ${money(item.gross)} and no discounted cash price.`,
+				`For ${desc} (CPT ${code}) it publishes a gross charge of ${money(agg.gross)} and no discounted cash price.`,
 			);
 		} else {
 			lines.push(
@@ -440,13 +490,11 @@ async function citySection(
 
 			if (!data) continue;
 			loaded += 1;
-			const item = (data.items ?? []).find(
-				(it) => String(it.code) === code,
-			);
+			const agg = codePrices(data, code);
 
-			if (!item) continue;
+			if (!agg.listed) continue;
 
-			if (item.cash == null && item.gross == null) {
+			if (agg.cash == null && agg.gross == null) {
 				listedNoPrice += 1;
 				continue;
 			}
@@ -454,8 +502,9 @@ async function citySection(
 			found.push({
 				ccn: checked[i + j].ccn,
 				name: data.hospital_name,
-				cash: item.cash ?? null,
-				gross: item.gross ?? null,
+				cash: agg.cash,
+				gross: agg.gross,
+				cashCount: agg.cashCount,
 			});
 		}
 	}
