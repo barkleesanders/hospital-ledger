@@ -409,7 +409,61 @@ export function codePrices(
 	return { listed: true, cash: null, gross: null, cashCount: 0 };
 }
 
-type Section = { code: string; lines: string[] };
+type Section = { code: string; lines: string[]; url?: string };
+
+/**
+ * The standard basket for "which hospital is the best deal overall" questions —
+ * common services most hospitals publish a cash price for. An overall ranking is
+ * the median of a hospital's cash prices across the basket services it lists.
+ */
+export const BASKET: ReadonlyArray<readonly [string, string]> = [
+	["70551", "brain MRI"],
+	["72148", "lower-spine MRI"],
+	["73721", "joint MRI"],
+	["45378", "colonoscopy"],
+	["27447", "knee replacement"],
+	["27130", "hip replacement"],
+	["66984", "cataract surgery"],
+	["47562", "gallbladder removal"],
+	["93306", "echocardiogram"],
+	["74177", "CT scan of the abdomen and pelvis"],
+];
+
+/** A hospital needs cash prices for at least this many basket services to be ranked. */
+export const BASKET_MIN_PRICES = 4;
+
+function median(values: number[]): number {
+	const sorted = [...values].sort((a, b) => a - b);
+	const mid = Math.floor(sorted.length / 2);
+
+	return sorted.length % 2 === 1
+		? sorted[mid]
+		: (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/** Cash prices a hospital publishes across the basket, with its file's cash coverage. */
+function basketPrices(
+	data: HospitalData,
+): { cashes: number[]; cashPct: number | undefined } {
+	const cashes: number[] = [];
+
+	for (const [code] of BASKET) {
+		const agg = codePrices(data, code);
+
+		if (agg.cash !== null) cashes.push(agg.cash);
+	}
+	const coverage = (
+		data.compliance as { coverage?: { cash_pct?: number } } | undefined
+	)?.coverage;
+
+	return { cashes, cashPct: coverage?.cash_pct };
+}
+
+function cityCandidates(place: Place, live: Set<string>): GeoEntry[] {
+	return (BY_CITY.get(place.city ?? "") ?? []).filter(
+		(g) => live.has(g.ccn) && (!place.state || g.state === place.state),
+	);
+}
 
 async function hospitalSection(
 	env: Bindings,
@@ -470,9 +524,7 @@ async function citySection(
 	const detail = await loadProcedure(env, request, code);
 
 	if (!detail) return null;
-	const inCity = (BY_CITY.get(place.city ?? "") ?? []).filter(
-		(g) => live.has(g.ccn) && (!place.state || g.state === place.state),
-	);
+	const inCity = cityCandidates(place, live);
 	const checked = inCity.slice(0, MAX_CITY_FILES);
 	const found: Priced[] = [];
 	let listedNoPrice = 0;
@@ -549,6 +601,116 @@ async function citySection(
 	return { code, lines };
 }
 
+/**
+ * "Best deal overall" in a city: rank the city's hospitals by the median of
+ * their cash prices across the standard basket. The method is stated in the
+ * document itself, so the answer explains the ranking instead of crowning a
+ * winner the data cannot support.
+ */
+async function basketSection(
+	env: Bindings,
+	request: Request,
+	place: Place,
+	live: Set<string>,
+): Promise<Section | null> {
+	const inCity = cityCandidates(place, live);
+	const checked = inCity.slice(0, MAX_CITY_FILES);
+	const ranked: Array<{
+		ccn: string;
+		name: string;
+		median: number;
+		count: number;
+		cashPct: number | undefined;
+	}> = [];
+	let loaded = 0;
+
+	for (let i = 0; i < checked.length; i += FANOUT_BATCH) {
+		const batch = await Promise.all(
+			checked
+				.slice(i, i + FANOUT_BATCH)
+				.map((g) => loadHospital(env, request, g.ccn)),
+		);
+
+		for (let j = 0; j < batch.length; j++) {
+			const data: HospitalData | null = batch[j];
+
+			if (!data) continue;
+			loaded += 1;
+			const { cashes, cashPct } = basketPrices(data);
+
+			if (cashes.length >= BASKET_MIN_PRICES)
+				ranked.push({
+					ccn: checked[i + j].ccn,
+					name: data.hospital_name,
+					median: median(cashes),
+					count: cashes.length,
+					cashPct,
+				});
+		}
+	}
+
+	if (ranked.length === 0) return null;
+	ranked.sort((a, b) => a.median - b.median);
+	const placeLabel = `${titleCase(place.city ?? "")}, ${place.state ?? ""}`;
+	const basketList = BASKET.map(([, label]) => label).join(", ");
+	const lines = [
+		`Question type: which hospital is the best overall deal in ${placeLabel} — no single procedure was named.`,
+		`Method: each hospital is ranked by the MEDIAN of its published discounted cash prices across a standard basket of ${BASKET.length} common services (${basketList}), counting only the services that hospital publishes a cash price for. Hospitals with cash prices for fewer than ${BASKET_MIN_PRICES} of the ${BASKET.length} are not ranked.`,
+		`Place searched: ${placeLabel} — ${inCity.length} hospitals are on the site for this city; ${loaded} price files were read; ${ranked.length} could be ranked.`,
+		`Hospitals in ${placeLabel} ranked by that median, lowest first:`,
+		...ranked
+			.slice(0, TOP_ROWS)
+			.map(
+				(r, i) =>
+					`${i + 1}. ${r.name} — median cash price ${money(r.median)} across ${r.count} of the ${BASKET.length} basket services${r.cashPct !== undefined ? `; publishes a cash price for ${r.cashPct}% of its file` : ""} — ${SITE_ORIGIN}/hospital/${r.ccn}`,
+			),
+		`There is no single best hospital for everything: this ranking compares the basket only, and the right choice depends on the care needed. For one specific service, ask about that service and the answer will use its exact prices.`,
+	];
+
+	return { code: "", lines, url: SITE_ORIGIN };
+}
+
+/** A named hospital with no procedure named: its file's shape, not a punt. */
+async function hospitalProfileSection(
+	env: Bindings,
+	request: Request,
+	ccn: string,
+	name: string,
+): Promise<Section | null> {
+	const data = await loadHospital(env, request, ccn);
+
+	if (!data) return null;
+	const { cashes, cashPct } = basketPrices(data);
+	const compliance = data.compliance as
+		| { score?: number; grade?: string }
+		| undefined;
+	const lines = [`Hospital asked about: ${name}`];
+
+	lines.push(
+		`Its published file lists ${(data.items ?? []).length.toLocaleString("en-US")} priced items.`,
+	);
+
+	if (cashPct !== undefined)
+		lines.push(
+			`It publishes a discounted cash price for ${cashPct}% of its listed items.`,
+		);
+
+	if (compliance?.grade !== undefined && compliance?.score !== undefined)
+		lines.push(
+			`Its price-file compliance grade on this site is ${compliance.grade} (score ${compliance.score} out of 100).`,
+		);
+
+	if (cashes.length > 0)
+		lines.push(
+			`Across the standard basket of ${BASKET.length} common services, it publishes a cash price for ${cashes.length}, with a median of ${money(median(cashes))}.`,
+		);
+	lines.push(
+		`For the exact price of one service, ask about that service and the answer will use its published price.`,
+	);
+
+	return { code: "", lines, url: `${SITE_ORIGIN}/hospital/${ccn}` };
+}
+
 async function regionSection(
 	env: Bindings,
 	request: Request,
@@ -619,12 +781,35 @@ export async function askSearchDoc(
 	request: Request,
 ): Promise<FaqCorpusDoc | null> {
 	const codes = parseProcedureCodes(question);
-
-	if (codes.length === 0) return null;
 	const live = await liveIndex(env);
 
 	if (!live) return null;
 	const place = parsePlace(question);
+
+	if (codes.length === 0) {
+		// No procedure named: a named hospital gets its file's profile, and a
+		// city gets the overall-value basket ranking. Anything else is a site
+		// question, answered from the pages as before.
+		const named = parseNamedHospital(question, live.names);
+		const section =
+			named && live.ccns.has(named.ccn)
+				? await hospitalProfileSection(env, request, named.ccn, named.name)
+				: place.city
+					? await basketSection(env, request, place, live.ccns)
+					: null;
+
+		if (!section) return null;
+
+		return {
+			title: "Live price search, run for this question",
+			url: section.url ?? SITE_ORIGIN,
+			text: [
+				"These results were computed for this question from the hospitals' own published price files — the same files the hospital and procedure pages show. Answer from these rows and copy the prices whole.",
+				...section.lines,
+			].join("\n"),
+		};
+	}
+
 	const descs = new Map<string, string>();
 
 	for (const code of codes) {
@@ -668,7 +853,7 @@ export async function askSearchDoc(
 
 	return {
 		title: "Live price search, run for this question",
-		url: `${SITE_ORIGIN}/procedure/${sections[0].code}`,
+		url: sections[0].url ?? `${SITE_ORIGIN}/procedure/${sections[0].code}`,
 		text: [
 			"These results were computed for this question from the hospitals' own published price files — the same files the hospital and procedure pages show. Answer from these rows and copy the prices whole.",
 			...sections.flatMap((s) => s.lines),

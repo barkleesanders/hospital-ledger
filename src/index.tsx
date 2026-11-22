@@ -17,6 +17,7 @@ import {
 	type FaqRateLimiter,
 	mountInfiniteFaq,
 } from "./faq/faq-route";
+import { agentProfileBackend } from "./faq/faq-ai";
 import { askSearchDoc } from "./faq/faq-search";
 import { r2Passthrough, readR2Json } from "./lib/r2";
 import { wideEvent } from "./lib/wide-event";
@@ -57,8 +58,11 @@ export type Env = {
 		HL_MRF_RAW: R2Bucket;
 		ASSETS: Fetcher;
 		SITE_NAME: string;
-		/** Workers AI (wrangler.jsonc `ai`) — the "Ask anything" row's model. */
+		/** Workers AI (wrangler.jsonc `ai`) — the "Ask anything" row's fallback model. */
 		AI: FaqAi;
+		/** Agentprofile front-door token (secret) — when set, the ask row is
+		 * answered by gpt-6.2-astra via the front door (src/faq/faq-ai.ts). */
+		AGENTPROFILE_TOKEN?: string;
 		/** Cloudflare Rate Limiting (wrangler.jsonc `ratelimits`) for /api/faq/ask: per IP. */
 		FAQ_RATE_LIMITER?: FaqRateLimiter;
 		/** The account-wide budget for /api/faq/ask, one shared key. */
@@ -168,10 +172,12 @@ app.use("*", async (c, next) => {
 	return next();
 });
 
-// "Ask anything" — POST /api/faq/ask streams a Workers AI answer grounded in the
+// "Ask anything" — POST /api/faq/ask streams a model answer grounded in the
 // site's own pages (src/faq/faq-corpus.ts), in a live search of the site's price
 // data run for the question itself (src/faq/faq-search.ts), and, on a detail page,
-// in the record on screen. Registered with the API routes, above every SSR handler. The rules below
+// in the record on screen. The model is gpt-6.2-astra via the agentprofile front
+// door when its token is configured, else Workers AI (src/faq/faq-ai.ts).
+// Registered with the API routes, above every SSR handler. The rules below
 // are the site's anti-fabrication contract: this is a price database, so a number the
 // model "completes" is worse than no answer.
 mountInfiniteFaq(app, {
@@ -180,6 +186,7 @@ mountInfiniteFaq(app, {
 	corpus: loadFaqCorpus,
 	contextDoc: recordContextDoc,
 	searchDoc: askSearchDoc,
+	backend: (env) => agentProfileBackend(env),
 	rateLimiter: (env) => env.FAQ_RATE_LIMITER,
 	globalRateLimiter: (env) => env.FAQ_RATE_LIMITER_GLOBAL,
 	extraRules: [
