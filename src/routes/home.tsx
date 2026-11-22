@@ -109,8 +109,13 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						<span class="font-semibold text-white tab-num">
 							{fmt(totalFacilities)}
 						</span>{" "}
-						on CMS's list — and we put their files into one standard format
-						you can search.
+						on CMS's list. For{" "}
+						<span class="font-semibold text-white tab-num">
+							{fmt(standardizedPriceHospitals)}
+						</span>{" "}
+						of them, a verified price file is here now, in one standard
+						format you can search; the rest are still being found and
+						checked.
 					</p>
 					{/* "Ask anything" — the first interactive control on the page, in the
 					    same column as the lead paragraph (max-w-2xl). The hero's own CTA
