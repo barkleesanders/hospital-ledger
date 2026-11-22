@@ -81,41 +81,75 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						</span>{" "}
 						U.S. hospitals. Every price comes straight from that hospital's
 						own published price file — the file federal law requires it to
-						post. Of the{" "}
+						post.
+					</p>
+					<p class="mt-4 text-base sm:text-lg md:text-xl text-zinc-400 max-w-2xl leading-snug">
+						How it works: CMS makes hospitals post their prices, but it
+						doesn't collect them in one place — each file sits on its own
+						hospital's website, in its own format. We find each hospital's
+						file, verify it is the live one, and convert it into one
+						standard format you can search.
+					</p>
+					<p class="mt-4 text-base sm:text-lg md:text-xl text-zinc-400 max-w-2xl leading-snug">
+						The law covers{" "}
 						<span
 							id="hero-required-visible"
 							class="font-semibold text-white tab-num"
 						>
 							{fmt(cmsRequiredTotal)}
 						</span>{" "}
-						hospitals the law covers, we have verified a live file for{" "}
+						hospitals, and we have verified a live file for{" "}
 						<span
 							id="hero-live-mrf-count"
 							class="font-semibold text-white tab-num"
 						>
 							{fmt(liveMrfRequired)}
-						</span>
-						.
-					</p>
-					<p class="mt-4 text-base sm:text-lg md:text-xl text-zinc-400 max-w-2xl leading-snug">
-						CMS makes hospitals post their prices, but it doesn't collect
-						them in one place — each file sits on its own hospital's
-						website, in its own format, and CMS's list leaves out some
-						facilities that do post one. We track{" "}
+						</span>{" "}
+						of them.
+						{coverage ? (
+							<>
+								{" "}
+								<span class="font-semibold text-white tab-num">
+									{fmt(coverage.required_live_price_hospitals)}
+								</span>{" "}
+								of those have prices you can search here — the other{" "}
+								<span class="font-semibold text-white tab-num">
+									{fmt(
+										coverage.required_live_zero_price_hospitals +
+											coverage.required_live_unindexed_hospitals,
+									)}
+								</span>{" "}
+								are in the index without prices yet, or not yet indexed.
+								Another{" "}
+								<span class="font-semibold text-white tab-num">
+									{fmt(coverage.price_hospitals_outside_required_live)}
+								</span>{" "}
+								hospitals post a file even though they aren't on CMS's
+								required list:{" "}
+								<span class="font-semibold text-white tab-num">
+									{fmt(coverage.required_live_price_hospitals)}
+								</span>{" "}
+								+{" "}
+								<span class="font-semibold text-white tab-num">
+									{fmt(coverage.price_hospitals_outside_required_live)}
+								</span>{" "}
+								is the{" "}
+								<span class="font-semibold text-white tab-num">
+									{fmt(standardizedPriceHospitals)}
+								</span>{" "}
+								in the headline.
+							</>
+						) : null}{" "}
+						Our registry tracks{" "}
 						<span class="font-semibold text-white tab-num">
 							{fmt(REGISTRY_TRACKED_FACILITIES)}
 						</span>{" "}
-						facilities — more than the{" "}
+						facilities in all — more than the{" "}
 						<span class="font-semibold text-white tab-num">
 							{fmt(totalFacilities)}
 						</span>{" "}
-						on CMS's list. For{" "}
-						<span class="font-semibold text-white tab-num">
-							{fmt(standardizedPriceHospitals)}
-						</span>{" "}
-						of them, a verified price file is here now, in one standard
-						format you can search; the rest are still being found and
-						checked.
+						on CMS's list — and the ones not here yet are still being
+						found and checked.
 					</p>
 					{/* "Ask anything" — the first interactive control on the page, in the
 					    same column as the lead paragraph (max-w-2xl). The hero's own CTA
@@ -127,7 +161,14 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 					<p class="mt-5 text-sm sm:text-base text-zinc-400 max-w-2xl leading-relaxed">
 						<span class="font-semibold text-zinc-200">How we count:</span> the
 						headline number counts only hospitals whose file gave us at least
-						one usable price. The full counts are in{" "}
+						one usable price, and an entry with no prices doesn't mean the
+						hospital broke the rule — its file may have failed to download
+						or parse, and those are still being investigated. The index
+						holds{" "}
+						<span class="tab-num text-zinc-200">
+							{fmt(standardizedPriceRows)}
+						</span>{" "}
+						prices. The full counts are in{" "}
 						<a
 							href="/data/summary.json"
 							class="underline hover:text-emerald-300"
@@ -141,88 +182,36 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						>
 							/api/prices-index
 						</a>
-						. Our registry tracks{" "}
-						<span class="tab-num text-zinc-200">
-							{fmt(REGISTRY_TRACKED_FACILITIES)}
-						</span>{" "}
-						facilities. For scale, the American Hospital
-						Association counts 6,100 U.S. hospitals, and CMS says the rule
-						reaches over 7,000 licensed facilities — details in{" "}
-						<a
-							href="/about-the-numbers"
-							class="underline hover:text-emerald-300"
-						>
-							/about-the-numbers
-						</a>
-						. The index holds{" "}
-						<span class="tab-num text-zinc-200">
-							{fmt(standardizedPriceRows)}
-						</span>{" "}
-						prices.
-					</p>
-					<div
-						id="coverage-gap"
-						class="mt-5 text-sm sm:text-base text-zinc-400 max-w-2xl leading-relaxed"
-					>
-						<p class="font-semibold text-zinc-200">
-							Why isn't every hospital here?
-						</p>
 						{coverage ? (
 							<>
-								<p class="mt-1.5">
-									Of the {fmt(liveMrfRequired)} hospitals the law covers
-									that have a verified live file,{" "}
-									{fmt(coverage.required_live_price_hospitals)} have prices
-									you can search here. The other{" "}
-									{fmt(
-										coverage.required_live_zero_price_hospitals +
-											coverage.required_live_unindexed_hospitals,
-									)}{" "}
-									don't yet:
-								</p>
-								<ul class="mt-2.5 space-y-2.5 list-disc pl-6 marker:text-emerald-400">
-									<li>
-										{fmt(coverage.required_live_zero_price_hospitals)} are in
-										the index, but their entry has no prices in it yet.
-									</li>
-									<li>
-										{fmt(coverage.required_live_unindexed_hospitals)} aren't
-										in the price index yet.
-									</li>
-								</ul>
-								<p class="mt-2.5">
-									The headline also counts{" "}
-									{fmt(coverage.price_hospitals_outside_required_live)}{" "}
-									hospitals outside that group — they post files even though
-									they aren't on CMS's required list. The groups are counted
-									differently, so the totals don't add up.
-								</p>
+								; the method and the hospital-by-hospital breakdown are
+								in{" "}
+								<a
+									href="/about-the-numbers"
+									class="underline hover:text-emerald-300"
+								>
+									/about-the-numbers
+								</a>{" "}
+								and{" "}
+								<a
+									href="/api/coverage"
+									class="underline hover:text-emerald-300"
+								>
+									/api/coverage
+								</a>
 							</>
 						) : (
-							<p class="mt-1.5">
-								The two totals count different groups of hospitals. We don't
-								subtract one from the other to guess the gap — a consistent
-								hospital-by-hospital breakdown isn't available yet.
-							</p>
+							<>
+								{" "}
+								— a consistent hospital-by-hospital breakdown isn't
+								available yet
+							</>
 						)}
-						<p class="mt-2.5">
-							An entry with no prices doesn't mean the hospital's file is
-							empty or that it broke the rule — the file may have failed to
-							download or parse, and those are still being investigated. Full
-							breakdown at{" "}
-							<a
-								href="/about-the-numbers"
-								class="underline hover:text-emerald-300"
-							>
-								/about-the-numbers
-							</a>{" "}
-							and{" "}
-							<a href="/api/coverage" class="underline hover:text-emerald-300">
-								/api/coverage
-							</a>
-							.
-						</p>
-					</div>
+						. For scale, the American Hospital Association counts 6,100 U.S.
+						hospitals, and CMS says the rule reaches over 7,000 licensed
+						facilities.
+					</p>
+					
 					<p class="mt-6 max-w-2xl border-t border-zinc-800 pt-4 text-sm text-zinc-400 leading-relaxed">
 						<span class="font-semibold text-zinc-200">Disclaimer:</span> prices
 						are reproduced as published in each hospital's machine-readable file

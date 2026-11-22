@@ -67,9 +67,19 @@ const FILES: Record<string, unknown> = {
 		{ code: "70551", cash: null, gross: null },
 		{ code: "70551", cash: 2089.85, gross: 5971 },
 		{ code: "70551", cash: 2500, gross: 6100 },
+		// Basket services (overall-value ranking): cashes 900 / 1750 / 1848 /
+		// 2089.85 / 8000 → median 1848.
+		{ code: "72148", cash: 1848, gross: 4200 },
+		{ code: "73721", cash: 1750, gross: 3900 },
+		{ code: "45378", cash: 900, gross: 2100 },
+		{ code: "27447", cash: 8000, gross: 21000 },
 	]),
 	"prices/050457.json": hospitalFile("UCSF HEALTH ST. MARY'S HOSPITAL", 42, [
 		{ code: "70551", cash: 3388.7, gross: 4841 },
+		// Basket: cashes 1200 / 3000 / 3388.7 / 9000 → median 3194.35.
+		{ code: "72148", cash: 3000, gross: 5100 },
+		{ code: "45378", cash: 1200, gross: 2600 },
+		{ code: "27130", cash: 9000, gross: 24000 },
 	]),
 	"prices/050454.json": hospitalFile("UCSF MEDICAL CENTER", 0, []),
 	"prices/050047.json": hospitalFile("CALIFORNIA PACIFIC MEDICAL CENTER- VAN NESS CAMPUS", 66.4, [
@@ -182,6 +192,41 @@ describe("askSearchDoc", () => {
 		expect(text).toContain("$1,700.00");
 		// The cheaper Ohio row must not leak into a Texas answer.
 		expect(text).not.toContain("BARNESVILLE");
+	});
+
+	it("ranks a city's hospitals by basket median for an overall-value question", async () => {
+		const { askSearchDoc } = await search();
+		const doc = await askSearchDoc(
+			envWith(FILES),
+			"Which hospital is the best deal overall to go to in San Francisco?",
+			REQ,
+		);
+		const text = doc?.text ?? "";
+
+		expect(text).toContain("standard basket of 10 common services");
+		expect(text).toContain("2 could be ranked");
+		expect(text).toContain("median cash price $1,848.00 across 5 of the 10");
+		expect(text).toContain("median cash price $3,194.35 across 4 of the 10");
+		expect(text.indexOf("KAISER FOUNDATION")).toBeLessThan(
+			text.indexOf("ST. MARY'S"),
+		);
+		expect(text).toContain("no single best hospital for everything");
+		expect(doc?.url).toBe("https://hospitalledger.com");
+	});
+
+	it("profiles a named hospital when no procedure is named", async () => {
+		const { askSearchDoc } = await search();
+		const doc = await askSearchDoc(
+			envWith(FILES),
+			"Is UCSF a good deal?",
+			REQ,
+		);
+		const text = doc?.text ?? "";
+
+		expect(text).toContain("Hospital asked about: UCSF MEDICAL CENTER");
+		expect(text).toContain("lists 0 priced items");
+		expect(text).toContain("0% of its listed items");
+		expect(doc?.url).toBe("https://hospitalledger.com/hospital/050454");
 	});
 
 	it("returns null for a question with no recognisable procedure", async () => {

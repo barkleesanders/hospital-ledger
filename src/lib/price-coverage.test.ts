@@ -127,10 +127,21 @@ describe("old producer compatibility, served pages and FAQ", () => {
 			const response = await app.request(path, {}, env);
 			expect(response.status).toBe(200);
 			const text = pageText(await response.text());
-			expect(text).toContain(
-				"Of the 3 hospitals the law covers that have a verified live file, 1 have prices you can search here",
-			);
-			expect(text).toContain("1 aren't in the price index yet");
+
+			if (path === "/") {
+				// The hero states the reconciliation in one section (2026-11-21
+				// rewrite): the required-with-prices count, the gap, and the
+				// headline arithmetic, all in the lead.
+				expect(text).toContain(
+					"1 of those have prices you can search here — the other 2 are in the index without prices yet, or not yet indexed",
+				);
+				expect(text).toContain("1 + 3 is the 4 in the headline");
+			} else {
+				expect(text).toContain(
+					"Of the 3 hospitals the law covers that have a verified live file, 1 have prices you can search here",
+				);
+				expect(text).toContain("1 aren't in the price index yet");
+			}
 			expect(text).not.toContain(
 				"Every CMS-required hospital with a live file is now accounted for",
 			);
@@ -148,7 +159,9 @@ describe("old producer compatibility, served pages and FAQ", () => {
 		const raw = await app.request("/data/summary.json", {}, env);
 		expect(await raw.text()).toBe(JSON.stringify(legacySummary));
 		const docs = await loadFaqCorpus(env);
-		expect(docs[0].text).toContain("The other 2 don't yet");
+		expect(docs[0].text).toContain(
+			"the other 2 are in the index without prices yet, or not yet indexed",
+		);
 		expect(docs[1].text).toContain("The 2-hospital gap");
 	});
 

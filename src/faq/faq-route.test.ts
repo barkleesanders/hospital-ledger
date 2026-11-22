@@ -4,6 +4,7 @@ import { z } from "zod/mini";
 import {
 	type FaqAi,
 	type FaqCorpusDoc,
+	type FaqModel,
 	type FaqRateLimiter,
 	LOCAL_BUCKET_MAX_KEYS,
 	localBucketAllows,
@@ -90,6 +91,9 @@ function build(options: {
 		question: string,
 		request: Request,
 	) => Promise<FaqCorpusDoc | null>;
+	backend?: (
+		env: TestEnv,
+	) => { ai: FaqAi; model: FaqModel } | undefined;
 }) {
 	const ip = `203.0.113.${nextIp++}`;
 	const calls: RunInput[] = [];
@@ -130,6 +134,7 @@ function build(options: {
 				: null;
 		},
 		searchDoc: options.searchDoc,
+		backend: options.backend,
 		extraRules: ["Never say whether a hospital is breaking the law."],
 	});
 	const env: TestEnv = { AI: ai, FAQ_RATE_LIMITER: options.limiter };
@@ -766,6 +771,40 @@ describe("systemPrompt", () => {
 		expect(
 			systemPrompt("S", FALLBACK, "corpus", null, [], true),
 		).toContain("live price search run on this site's own price database");
+	});
+});
+
+describe("POST /api/faq/ask — alternate model backend", () => {
+	it("answers through the backend's ai + model when one is configured", async () => {
+		const seen: string[] = [];
+		const backendAi: FaqAi = {
+			run: async (model) => {
+				seen.push(model);
+
+				return new ReadableStream<Uint8Array>({
+					start(controller) {
+						const enc = new TextEncoder();
+
+						controller.enqueue(
+							enc.encode(
+								'data: {"response":"Front door answer"}\n\ndata: [DONE]\n\n',
+							),
+						);
+						controller.close();
+					},
+				});
+			},
+		};
+		const { ask, calls } = build({
+			backend: () => ({ ai: backendAi, model: "gpt-6.2-astra" }),
+		});
+		const res = await ask("How does this site count hospitals?");
+
+		expect(res.status).toBe(200);
+		expect(await res.text()).toContain("Front door answer");
+		expect(seen).toEqual(["gpt-6.2-astra"]);
+		// The env binding's ai (which records into `calls`) was never used.
+		expect(calls).toHaveLength(0);
 	});
 });
 
