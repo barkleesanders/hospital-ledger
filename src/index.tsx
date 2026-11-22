@@ -17,6 +17,7 @@ import {
 	type FaqRateLimiter,
 	mountInfiniteFaq,
 } from "./faq/faq-route";
+import { askSearchDoc } from "./faq/faq-search";
 import { r2Passthrough, readR2Json } from "./lib/r2";
 import { wideEvent } from "./lib/wide-event";
 import { aboutNumbersPageHandler } from "./routes/about-the-numbers";
@@ -168,8 +169,9 @@ app.use("*", async (c, next) => {
 });
 
 // "Ask anything" — POST /api/faq/ask streams a Workers AI answer grounded in the
-// site's own pages (src/faq/faq-corpus.ts) and, on a detail page, in the record on
-// screen. Registered with the API routes, above every SSR handler. The rules below
+// site's own pages (src/faq/faq-corpus.ts), in a live search of the site's price
+// data run for the question itself (src/faq/faq-search.ts), and, on a detail page,
+// in the record on screen. Registered with the API routes, above every SSR handler. The rules below
 // are the site's anti-fabrication contract: this is a price database, so a number the
 // model "completes" is worse than no answer.
 mountInfiniteFaq(app, {
@@ -177,6 +179,7 @@ mountInfiniteFaq(app, {
 	fallbackUrl: `${SITE_ORIGIN}/about-the-numbers`,
 	corpus: loadFaqCorpus,
 	contextDoc: recordContextDoc,
+	searchDoc: askSearchDoc,
 	rateLimiter: (env) => env.FAQ_RATE_LIMITER,
 	globalRateLimiter: (env) => env.FAQ_RATE_LIMITER_GLOBAL,
 	extraRules: [

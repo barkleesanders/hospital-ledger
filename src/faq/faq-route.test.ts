@@ -85,6 +85,11 @@ function build(options: {
 	limiter?: FaqRateLimiter;
 	globalLimiter?: FaqRateLimiter;
 	runImpl?: FaqAi["run"];
+	searchDoc?: (
+		env: TestEnv,
+		question: string,
+		request: Request,
+	) => Promise<FaqCorpusDoc | null>;
 }) {
 	const ip = `203.0.113.${nextIp++}`;
 	const calls: RunInput[] = [];
@@ -124,6 +129,7 @@ function build(options: {
 					}
 				: null;
 		},
+		searchDoc: options.searchDoc,
 		extraRules: ["Never say whether a hospital is breaking the law."],
 	});
 	const env: TestEnv = { AI: ai, FAQ_RATE_LIMITER: options.limiter };
@@ -751,5 +757,57 @@ describe("systemPrompt", () => {
 		expect(systemPrompt("S", FALLBACK, "corpus", "payer")).toContain(
 			"one insurance plan's page",
 		);
+	});
+
+	it("carries the search intro only when a live search ran", () => {
+		expect(systemPrompt("S", FALLBACK, "corpus")).not.toContain(
+			"live price search",
+		);
+		expect(
+			systemPrompt("S", FALLBACK, "corpus", null, [], true),
+		).toContain("live price search run on this site's own price database");
+	});
+});
+
+describe("POST /api/faq/ask — live search grounding", () => {
+	const SEARCH_DOC: FaqCorpusDoc = {
+		title: "Live price search, run for this question",
+		url: "https://hospitalledger.com/procedure/70551",
+		text: "KAISER FOUNDATION HOSPITAL - SAN FRANCISCO — discounted cash price $2,089.85",
+	};
+
+	it("places the search document first and frames it in the prompt", async () => {
+		const { ask, calls } = build({ searchDoc: async () => SEARCH_DOC });
+		const res = await ask("Where is the cheapest MRI in San Francisco?");
+
+		expect(res.status).toBe(200);
+		expect(calls).toHaveLength(1);
+		const system = calls[0].messages[0].content;
+
+		expect(system).toContain("live price search run on this site's own price database");
+		expect(system.indexOf("$2,089.85")).toBeLessThan(
+			system.indexOf("About the numbers"),
+		);
+	});
+
+	it("runs no search framing when the search returns null", async () => {
+		const { ask, calls } = build({ searchDoc: async () => null });
+		const res = await ask("How does this site count hospitals?");
+
+		expect(res.status).toBe(200);
+		expect(calls[0].messages[0].content).not.toContain("live price search");
+	});
+
+	it("degrades to the corpus when the search throws", async () => {
+		const { ask, calls } = build({
+			searchDoc: async () => {
+				throw new Error("store unavailable");
+			},
+		});
+		const res = await ask("Where is the cheapest MRI in San Francisco?");
+
+		expect(res.status).toBe(200);
+		expect(calls).toHaveLength(1);
+		expect(calls[0].messages[0].content).not.toContain("live price search");
 	});
 });
