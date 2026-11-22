@@ -64,10 +64,17 @@ describe("agentProfileBackend", () => {
 		const sent = JSON.parse(init.body as string) as {
 			model: string;
 			stream: boolean;
+			max_completion_tokens?: number;
+			max_tokens?: number;
+			temperature?: number;
 		};
 
 		expect(sent.model).toBe("gpt-6.2-astra");
 		expect(sent.stream).toBe(true);
+		// The Astra lane rejects max_tokens and any non-default temperature.
+		expect(sent.max_completion_tokens).toBe(1200);
+		expect(sent.max_tokens).toBeUndefined();
+		expect(sent.temperature).toBeUndefined();
 	});
 
 	it("falls back to Workers AI llama when the front door refuses", async () => {

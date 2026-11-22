@@ -207,7 +207,9 @@ const DEFAULT_MODEL: FaqModel = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 const DEFAULT_MAX_TOKENS: Record<FaqModel, number> = {
 	"@cf/meta/llama-3.3-70b-instruct-fp8-fast": 800,
 	"@cf/openai/gpt-oss-120b": 2048,
-	"gpt-6.2-astra": 1200,
+	// Astra reasons before it answers (same shape as gpt-oss): the budget must
+	// cover reasoning + the answer or the answer comes back empty.
+	"gpt-6.2-astra": 2048,
 };
 
 const Question = z.string().trim().min(1).max(MAX_QUESTION_CHARS);

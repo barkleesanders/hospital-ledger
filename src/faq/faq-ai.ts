@@ -9,6 +9,10 @@ import type { FaqAi, FaqModel, FaqRunOutput } from "./faq-route";
  * Without a token the Workers AI binding answers with llama, exactly as
  * before; and if the front door refuses a call (HTTP error, no body), that
  * call falls back to the binding rather than failing the visitor's question.
+ *
+ * The Astra lane's parameter contract (measured against the front door,
+ * 2026-11-21): it rejects `max_tokens` (use `max_completion_tokens`) and
+ * rejects any temperature but the default — so neither is sent.
  */
 export const FRONT_DOOR_MODEL: FaqModel = "gpt-6.2-astra";
 
@@ -37,8 +41,7 @@ export function agentProfileBackend(env: {
 					body: JSON.stringify({
 						model: FRONT_DOOR_MODEL,
 						messages: input.messages,
-						max_tokens: input.max_tokens,
-						temperature: input.temperature,
+						max_completion_tokens: input.max_tokens,
 						stream: true,
 					}),
 				});
