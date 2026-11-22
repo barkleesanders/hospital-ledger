@@ -62,7 +62,11 @@ const FILES: Record<string, unknown> = {
 	"aggregates/cpt-detail/70551.json": DETAIL_70551,
 	"aggregates/cpt-detail/27447.json": DETAIL_27447,
 	"prices/050076.json": hospitalFile("KAISER FOUNDATION HOSPITAL - SAN FRANCISCO", 100, [
+		// One code listed three times: no price, the real price, a higher price.
+		// The search must aggregate (lowest cash), never take the first row.
+		{ code: "70551", cash: null, gross: null },
 		{ code: "70551", cash: 2089.85, gross: 5971 },
+		{ code: "70551", cash: 2500, gross: 6100 },
 	]),
 	"prices/050457.json": hospitalFile("UCSF HEALTH ST. MARY'S HOSPITAL", 42, [
 		{ code: "70551", cash: 3388.7, gross: 4841 },
@@ -118,6 +122,7 @@ describe("askSearchDoc", () => {
 		const text = doc?.text ?? "";
 
 		expect(text).toContain("$2,089.85");
+		expect(text).toContain("lowest of 2 different cash prices");
 		expect(text.indexOf("KAISER FOUNDATION")).toBeLessThan(
 			text.indexOf("ST. MARY'S"),
 		);
