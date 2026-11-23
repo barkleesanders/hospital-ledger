@@ -1,0 +1,12 @@
+{
+  "unproven": "refuse",
+  "overrides": [
+    {
+      "hospital_id": "372004",
+      "accepted_names": ["Curahealth Oklahoma LLC", "PAM Health Specialty Hospital of Oklahoma City"],
+      "reason": "Same facility rebranded under PAM Health. The publisher registry has no row for 372004 (mrf_seed names it 'Curahealth Oklahoma City'), and its store canonical carries no source_identity, so identity rests on the W12/b83 adjudication of 2026-11-10: the file's own header (re-fetched and read directly) names 'Curahealth Oklahoma LLC', location 'PAM Health Specialty Hospital of Oklahoma City', 1407 North Robinson Avenue, Oklahoma City, OK 73103, NPI 1447601877. Recorded as the known false refusal in PR2B-RESULT.md. Approved by the owner 2026-11-23. Covers this one file only.",
+      "source_url": "https://sthpiprd.blob.core.windows.net/machine-readable-files/10000/812471465_curahealth-oklahoma-llc_standardcharges.csv",
+      "anchor": {"city": "Oklahoma City", "state": "OK", "zip": "73103"}
+    }
+  ]
+}

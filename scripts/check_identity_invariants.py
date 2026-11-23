@@ -24,7 +24,11 @@ WHAT IT CHECKS (exit 0 clean / 1 violations / 2 could not measure)
    `identity_gate` must import hl_admission. scripts/hl_publish_gate.py (the publisher-facing
    gate) and scripts/process_submissions.py both do; a standalone gate with its own logic
    is the production publisher's shape (it passed 11/14 known-wrong pairs).
-4. POSITIVE CONTROL: the identity paths exist and parse, hl_admission still defines
+4. STRICT POLICY (step 2c): hl_publish_gate's `DEFAULT_UNPROVEN` must be `UNPROVEN_REFUSE`
+   and the committed gate policy (scripts/hl_publish_gate_policy.json) must exist, be a JSON
+   object, and not set `unproven` to anything but "refuse". Unproven data does not publish;
+   loosening that is an owner decision made in a PR that edits this lint on purpose.
+5. POSITIVE CONTROL: the identity paths exist and parse, hl_admission still defines
    `admit` / `accept_row`, hl_publish_gate still defines `identity_gate`; an empty scan is
    UNMEASURED, never a pass.
 
@@ -36,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -45,6 +50,7 @@ IDENTITY_PATHS = ("scripts/hl_admission.py", "scripts/process_submissions.py",
                   "scripts/hl_publish_gate.py")
 ADMISSION_MODULE = "scripts/hl_admission.py"
 PUBLISH_GATE_MODULE = "scripts/hl_publish_gate.py"
+POLICY_FILE = "scripts/hl_publish_gate_policy.json"
 BAD_MODULES = {"difflib", "rapidfuzz", "fuzzywuzzy", "jellyfish", "Levenshtein", "thefuzz", "textdistance"}
 BAD_NAMES = {"SequenceMatcher", "get_close_matches", "jaro", "jaro_winkler", "levenshtein",
              "fuzz", "token_set_ratio", "token_sort_ratio", "partial_ratio"}
@@ -149,6 +155,38 @@ def second_gate_violations(tree: ast.AST, rel: str) -> list[str]:
     return out
 
 
+def strict_policy_violations(root: Path, gate_tree: ast.AST) -> list[str]:
+    """Step 2c: the strict default must survive in code AND in the shipped policy file."""
+    out = []
+    strict_default = False
+    for node in ast.walk(gate_tree):
+        if (isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "DEFAULT_UNPROVEN"
+                                                 for t in node.targets)
+                and isinstance(node.value, ast.Name) and node.value.id == "UNPROVEN_REFUSE"):
+            strict_default = True
+    if not strict_default:
+        out.append(f"{PUBLISH_GATE_MODULE}: `DEFAULT_UNPROVEN` is not `UNPROVEN_REFUSE`. The owner's "
+                   "policy (2026-11-23) is that an unproven hospital/owner pair is refused by default; "
+                   "rebrands go through the named override list in "
+                   f"{POLICY_FILE}, not through a lenient default.")
+    policy_path = root / POLICY_FILE
+    if not policy_path.is_file():
+        out.append(f"{POLICY_FILE} is missing: the publisher gate policy (strict default + named "
+                   "overrides) must be committed beside the gate")
+        return out
+    try:
+        doc = json.loads(policy_path.read_text())
+    except (OSError, ValueError) as exc:
+        out.append(f"{POLICY_FILE} is not valid JSON: {exc}")
+        return out
+    if not isinstance(doc, dict):
+        out.append(f"{POLICY_FILE} must be a JSON object")
+    elif doc.get("unproven", "refuse") != "refuse":
+        out.append(f"{POLICY_FILE}: `unproven` is {doc.get('unproven')!r}; the owner's policy is "
+                   "\"refuse\" (unproven data does not publish)")
+    return out
+
+
 def audit(root: Path) -> list[str]:
     problems: list[str] = []
     for rel in IDENTITY_PATHS:
@@ -162,6 +200,7 @@ def audit(root: Path) -> list[str]:
     gate_tree = parse(root, PUBLISH_GATE_MODULE)
     if "identity_gate" not in {n.name for n in ast.walk(gate_tree) if isinstance(n, ast.FunctionDef)}:
         problems.append(f"{PUBLISH_GATE_MODULE} no longer defines `identity_gate`: the publisher-facing gate moved or was removed")
+    problems += strict_policy_violations(root, gate_tree)
     for rel in IDENTITY_PATHS:
         problems += fuzzy_violations(parse(root, rel), rel)
     scanned = 0

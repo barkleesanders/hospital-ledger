@@ -186,9 +186,12 @@ mut drop-ein           '    if file_ein and win_ein and file_ein != win_ein:' ' 
 mut refuse-not-blocking '    if verdict.outcome == hl_admission.REFUSE:' '    if False:' \
   "test_every_wrong_pair_is_refused" "known-wrong pairs would PUBLISH"
 mut strict-is-noop     '            return f"identity unproven: {verdict.detail}", warnings' '            pass' \
-  "test_name_without_address_refuses_when_strict"
-mut production-name-rule 'verdict = hl_admission.admit(ccn, registry, source_from_identity(si))' \
-  'verdict = hl_admission.admit(ccn, dict(registry or {}, name=source_from_identity(si)["hospital_name"] or (registry or {}).get("name")), source_from_identity(si))  # SABOTAGE: name never separates a same-state-and-city pair' \
+  "test_name_without_address_refuses_by_default"
+# step 2c moved this anchor: the single admit() call now takes the local `source`.
+mut production-name-rule 'verdict = hl_admission.admit(ccn, registry, source)
+    ov = overrides.get(ccn)' \
+  'verdict = hl_admission.admit(ccn, dict(registry or {}, name=source["hospital_name"] or (registry or {}).get("name")), source)  # SABOTAGE: name never separates a same-state-and-city pair
+    ov = overrides.get(ccn)' \
   "test_state_and_city_equal_pairs_are_refused_on_the_name"
 
 # ---------------------------------------------------------------- Q4 lint sabotage
