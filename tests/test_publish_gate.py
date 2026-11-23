@@ -160,6 +160,116 @@ class AddressShapes(unittest.TestCase):
         self.assertIn("city", reason or "")
 
 
+class LocationNameIsOneOfTheFilesOwnNames(unittest.TestCase):
+    """Remediation Wave 4, lane C1. A header's `hospital_name` is often the legal entity and its
+    `location_name` the facility the registry knows (010108: "The Health Care Authority for
+    Baptist Health ..." / "Prattville Baptist Hospital"). Reading only `hospital_name` refused 105
+    true owners as name mismatches. A location is still only a NAME: the address test is
+    unchanged and is run on that location's own address, never on a sibling campus's."""
+    REG = {"name": "PRATTVILLE BAPTIST HOSPITAL", "city": "PRATTVILLE", "state": "AL", "zip": "36067"}
+    ENTITY = "THE HEALTH CARE AUTHORITY FOR BAPTIST HEALTH AN AFFILIATE OF UABHS"
+    QUAIL = {"name": "QUAIL CREEK SURGICAL HOSPITAL", "city": "AMARILLO", "state": "TX", "zip": "79124"}
+
+    def go(self, si, reg=None):
+        return pg.identity_gate("010108", {"source_url": "", "source_identity": si},
+                                reg or self.REG, holds=set())
+
+    def si(self, **kw):
+        base = {"hospital_name": self.ENTITY, "location_name": "Prattville Baptist Hospital",
+                "hospital_address": "124 South Memorial Drive, Prattville, AL 36067"}
+        base.update(kw)
+        return {k: v for k, v in base.items() if v is not None}
+
+    def test_legal_entity_header_with_the_facility_as_its_location_publishes(self):
+        self.assertEqual(self.go(self.si()), (None, []))
+
+    def test_the_facility_may_be_any_one_of_several_locations(self):
+        si = self.si(location_name="Prattville Baptist Hospital | Prattville Baptist Hospital Geriatric Behavioral Health",
+                     hospital_address="124 South Memorial Drive, Prattville, AL 36067 | 124 South Memorial Drive, Prattville, AL 36067")
+        self.assertEqual(self.go(si), (None, []))
+
+    def test_right_location_name_wrong_city_is_refused(self):
+        reason, _ = self.go(self.si(hospital_address="100 Main Street, Nowhereville, AL 00000"))
+        self.assertIn("identity mismatch", reason or "")
+        self.assertIn("city", reason)
+
+    def test_right_location_name_wrong_state_is_refused(self):
+        reason, _ = self.go(self.si(hospital_address="100 Main Street, Prattville, TX 36067"))
+        self.assertIn("identity mismatch", reason or "")
+        self.assertIn("state", reason)
+
+    def test_right_location_name_with_no_address_is_unproven_not_accepted(self):
+        reason, _ = self.go(self.si(hospital_address=None))
+        self.assertIn("identity unproven", reason or "")
+
+    def test_a_location_that_does_not_name_the_registry_hospital_is_still_a_mismatch(self):
+        reason, _ = self.go(self.si(location_name="Montgomery Baptist Medical Center South"))
+        self.assertIn("does not match the registry name", reason or "")
+
+    def test_a_location_is_anchored_by_its_own_address_not_a_siblings(self):
+        # Quail Creek's own (second) address is Lubbock; the sibling's address is the registry's
+        # Amarillo. A gate that let any campus vouch would publish this.
+        si = {"hospital_name": "Physicians Surgical Hospitals LLC",
+              "location_name": "Panhandle Surgical Hospital | Quail Creek Surgical Hospital",
+              "hospital_address": "7100 SW 9th Ave, Amarillo, TX 79124 | 1 Plum Creek Drive, Lubbock, TX 79401"}
+        reason, _ = self.go(si, self.QUAIL)
+        self.assertIn("identity mismatch", reason or "")
+        self.assertIn("Lubbock", reason)
+
+    def test_the_paired_address_publishes_when_it_is_the_registrys(self):
+        si = {"hospital_name": "Physicians Surgical Hospitals LLC",
+              "location_name": "Panhandle Surgical Hospital | Quail Creek Surgical Hospital",
+              "hospital_address": "7100 SW 9th Ave, Amarillo, TX 79106 | 6819 Plum Creek Drive, Amarillo, TX 79124"}
+        self.assertEqual(self.go(si, self.QUAIL), (None, []))
+
+    def test_a_paired_location_whose_own_address_does_not_parse_is_unproven(self):
+        si = {"hospital_name": "Physicians Surgical Hospitals LLC",
+              "location_name": "Panhandle Surgical Hospital | Quail Creek Surgical Hospital",
+              "hospital_address": "7100 SW 9th Ave, Amarillo, TX 79124 | somewhere near the river"}
+        reason, _ = self.go(si, self.QUAIL)
+        self.assertIn("identity unproven", reason or "")
+
+    def test_locations_and_addresses_in_different_numbers_cannot_be_paired(self):
+        si = {"hospital_name": "Physicians Surgical Hospitals LLC",
+              "location_name": "Panhandle Surgical Hospital | Quail Creek Surgical Hospital",
+              "hospital_address": "1 A St, Amarillo, TX 79124 | 2 B St, Amarillo, TX 79124 | 3 C St, Amarillo, TX 79124"}
+        reason, _ = self.go(si, self.QUAIL)
+        self.assertIn("identity unproven", reason or "")
+        self.assertIn("cannot be paired", reason)
+
+    def test_one_location_with_several_addresses_may_use_any_of_them(self):
+        si = self.si(hospital_address="1 Other St, Montgomery, AL 36116 | 124 South Memorial Drive, Prattville, AL 36067")
+        self.assertEqual(self.go(si), (None, []))
+
+    def test_a_matching_hospital_name_is_judged_exactly_as_before(self):
+        si = self.si(hospital_name="Prattville Baptist Hospital", location_name="Some Other Campus | And Another",
+                     hospital_address="1 Other St, Montgomery, AL 36116 | 124 South Memorial Drive, Prattville, AL 36067")
+        self.assertEqual(self.go(si), (None, []))
+
+    def test_the_wrong_pairs_stay_refused_when_the_header_also_lists_the_registry_name(self):
+        # The strongest name forgery: the wrong file's header gains the registry's own name as a
+        # location. Every pair whose address contradicts the registry must still be refused.
+        # (050663 and 184004 share the registry's city; for those a header that itself names the
+        # registry hospital at the registry's city IS the standard's proof, so they are excluded
+        # here and stay covered, with their real headers, by KnownWrongPairsAtThePublisher.)
+        passed = []
+        for p in FX["wrong_pairs"]:
+            if p["ccn"] in ("050663", "184004"):
+                continue
+            head = head_of(p)
+            head["source_identity"]["location_name"] = p["registry"]["name"]
+            reason, _ = pg.identity_gate(p["ccn"], head, reg_of(p), holds=set())
+            if reason is None:
+                passed.append(p["ccn"])
+        self.assertEqual(passed, [])
+
+    def test_admit_ignores_malformed_location_entries(self):
+        reg = dict(self.REG)
+        src = {"hospital_name": self.ENTITY, "addresses": [{"city": "Prattville", "state": "AL", "zip": "36067"}],
+               "locations": ["Prattville Baptist Hospital", {"name": ""}, None]}
+        self.assertEqual(ha.admit("010108", reg, src).outcome, ha.REFUSE)
+
+
 class HoldsAndFailClosed(unittest.TestCase):
     def setUp(self):
         self.c = FX["true_owner_controls"][0]
