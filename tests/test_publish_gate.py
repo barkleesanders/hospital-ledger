@@ -176,12 +176,13 @@ class HoldsAndFailClosed(unittest.TestCase):
     def test_other_ccns_on_the_hold_list_do_not_block(self):
         self.assertEqual(gate(self.c, holds={"999999"}), (None, []))
 
-    def test_no_head_is_a_warning_by_default_and_a_refusal_when_strict(self):
-        reason, warns = pg.identity_gate("1", None, {}, holds=set())
+    def test_no_head_is_a_refusal_by_default_and_a_warning_only_when_asked(self):
+        # step 2c: unproven data does not publish. The lenient value is explicit, never default.
+        reason, _ = pg.identity_gate("1", None, {}, holds=set())
+        self.assertIsNotNone(reason)
+        reason, warns = pg.identity_gate("1", None, {}, holds=set(), unproven="warn")
         self.assertIsNone(reason)
         self.assertTrue(warns)
-        reason, _ = pg.identity_gate("1", None, {}, holds=set(), unproven="refuse")
-        self.assertIsNotNone(reason)
 
 
 class RejectedUrlAndEin(unittest.TestCase):
@@ -221,29 +222,35 @@ class RejectedUrlAndEin(unittest.TestCase):
 
 
 class UnprovenPolicy(unittest.TestCase):
+    """Step 2c: refuse is the DEFAULT; warn is an explicit opt-in, tested both ways."""
     REG = {"name": "EXAMPLE GENERAL HOSPITAL", "city": "Springfield", "state": "CA", "zip": "90210"}
 
     def go(self, si, **kw):
         return pg.identity_gate("050075", {"source_url": "", "source_identity": si}, self.REG,
                                 holds=set(), **kw)
 
-    def test_name_without_address_warns_by_default(self):
-        reason, warns = self.go({"hospital_name": "Example General Hospital"})
+    def test_the_default_is_the_strict_policy(self):
+        self.assertEqual(pg.DEFAULT_UNPROVEN, pg.UNPROVEN_REFUSE)
+
+    def test_name_without_address_refuses_by_default(self):
+        reason, _ = self.go({"hospital_name": "Example General Hospital"})
+        self.assertIn("unproven", reason)
+
+    def test_name_without_address_warns_only_when_asked(self):
+        reason, warns = self.go({"hospital_name": "Example General Hospital"}, unproven="warn")
         self.assertIsNone(reason)
         self.assertTrue(any("unproven" in w for w in warns))
 
-    def test_name_without_address_refuses_when_strict(self):
-        reason, _ = self.go({"hospital_name": "Example General Hospital"}, unproven="refuse")
-        self.assertIn("unproven", reason)
-
     def test_legacy_canonical_with_no_identity(self):
-        self.assertIsNone(self.go({})[0])
-        self.assertIsNotNone(self.go({}, unproven="refuse")[0])
+        self.assertIsNotNone(self.go({})[0])
+        self.assertIsNone(self.go({}, unproven="warn")[0])
 
     def test_no_registry_row_is_unproven_not_accepted(self):
-        reason, warns = pg.identity_gate("9", {"source_url": "", "source_identity": {
-            "hospital_name": "Example General Hospital", "hospital_address": "1 A St, X, CA 90210"}},
-            None, holds=set())
+        head = {"source_url": "", "source_identity": {
+            "hospital_name": "Example General Hospital", "hospital_address": "1 A St, X, CA 90210"}}
+        reason, _ = pg.identity_gate("9", head, None, holds=set())
+        self.assertIn("unproven", reason)
+        reason, warns = pg.identity_gate("9", head, None, holds=set(), unproven="warn")
         self.assertIsNone(reason)
         self.assertTrue(warns)
 
