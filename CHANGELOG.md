@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-11-22 — One gate battery, no orphaned tests (G0)
+
+- `scripts/verify.sh` is the only gate battery (there is no CI since `fa6142a`).
+  `npm run predeploy` is now the network copy-truth audit followed by
+  `scripts/verify.sh`, so the deploy path can no longer pass while verify is red.
+- Ten regression tests that ran in no gate are wired in (`test_mrf_parse_guard`,
+  `test_mrf_parse_decompile`, `test_r2_put_get`, `test_hl_edge`, `test_source_updated`,
+  `test_hl_self_heal`, `test_lessons_gate`, `test_gate_hook_integration`,
+  `test_hl_wave_concurrency`, `test_hl_wave_holds`), plus `csp_audit.py` and
+  `lint:observability`, which were deploy-only.
+- `scripts/check_gate_coverage.py` fails the battery if any test file is run by no gate,
+  a gate is swallowed with `|| true`, or predeploy stops invoking verify. Its sabotage
+  proofs against the past-mistake commits are `scripts/prove_gate_coverage.sh`.
+- verify now fails if the battery modifies tracked files. Three suites were rewriting
+  `data/header_aliases.json` and `ops/wave/hl_lessons_debt.json`; they now write to temp copies.
+- `tools/test-harness.mjs` was red on main since PR #91 removed the home page's
+  `#coverage-gap` block: the contrast scope silently widened to the whole `<main>`. The
+  hero's accounting paragraph carries `id="coverage-gap"` again and the harness now fails
+  by name when that anchor is missing. The 179 contrast findings the widened scope
+  exposes on the home page (zinc-500 text, white on emerald-600) are not fixed here.
+
 ## 2026-10-14 — Refresh pipeline: current-setup sync
 
 - Documented the pipeline as it runs today in `ops/current-pipeline.md`
