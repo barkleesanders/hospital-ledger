@@ -24,6 +24,7 @@ GOOD_VERIFY = """#!/usr/bin/env bash
 set -euo pipefail
 TREE_BEFORE="$(bash scripts/tracked_tree_fingerprint.sh)"
 python3 scripts/check_gate_coverage.py
+python3 scripts/check_identity_invariants.py
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 python3 scripts/test_extra.py
 python3 scripts/csp_audit.py
@@ -157,6 +158,11 @@ class AuditCase(unittest.TestCase):
     def test_checker_must_gate_itself(self):
         p = self.problems(verify=GOOD_VERIFY.replace("python3 scripts/check_gate_coverage.py\n", ""))
         self.assertProblem(p, "check_gate_coverage.py")
+
+    def test_missing_identity_lint_is_flagged(self):
+        # INVENTORY M2: the identity lint must stay in the battery (batch-000, 2026-11-02).
+        p = self.problems(verify=GOOD_VERIFY.replace("python3 scripts/check_identity_invariants.py\n", ""))
+        self.assertProblem(p, "check_identity_invariants.py")
 
     def test_missing_tree_fingerprint_is_flagged(self):
         p = self.problems(verify=GOOD_VERIFY.replace('TREE_AFTER="$(bash scripts/tracked_tree_fingerprint.sh)"\n', ""))

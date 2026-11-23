@@ -65,6 +65,9 @@ import urllib.request
 import zipfile
 from collections import Counter, defaultdict
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import hl_admission  # noqa: E402  (the one admission function; INVENTORY M2)
+
 PROCESSOR_VERSION = "1.0.0"
 
 HOME = os.path.expanduser("~")
@@ -401,65 +404,54 @@ def extract_identity_csv(raw_head, mp):
     return out
 
 
-def identity_gate(extracted, claimed_name, db, ccn, pm):
+def identity_gate(extracted, claimed_name, db, ccn, pm=None):
     """VERIFIED / MISMATCH / UNVERIFIABLE for the file's own identity
-    against the claimed CCN's registry row."""
+    against the claimed CCN's registry row.
+
+    The decision is hl_admission.admit (INVENTORY M2): ACCEPT -> VERIFIED,
+    REFUSE -> MISMATCH, UNPROVEN -> UNVERIFIABLE. `pm` is accepted for
+    signature compatibility and is no longer consulted: the name tokenizer
+    is the repo's own, so identity no longer depends on the Mini's copy."""
     row = db.execute("SELECT * FROM hospitals WHERE ccn = ?", (ccn,)).fetchone()
     if row is None:
         return "UNVERIFIABLE", f"CCN {ccn} is not in the CMS registry the fleet carries"
     seeds = db.execute(
         "SELECT entity_name_legal, entity_name_common FROM mrf_seed WHERE ccn = ?",
         (ccn,)).fetchall()
-    candidates = [row["name"]] + [
-        s[k] for s in seeds for k in ("entity_name_legal", "entity_name_common") if s[k]]
-    name_in_file = (extracted.get("hospital_name") or "").strip()
-    if not name_in_file and extracted.get("meta_cells"):
+    aliases = [s[k] for s in seeds for k in ("entity_name_legal", "entity_name_common")
+               if s[k]]
+    registry_row = {"name": row["name"], "city": row["city"], "state": row["state"],
+                    "zip": row["zip"], "aliases": aliases}
+    source = dict(extracted)
+    if not (source.get("hospital_name") or "").strip() and source.get("meta_cells"):
         # CSV: any registry-name candidate token-consistent with the
         # metadata cells counts as the file naming the facility.
-        joined = " ".join(extracted["meta_cells"])
-        for cand in candidates:
-            if pm._name_consistent(joined, [cand.lower()]):
-                name_in_file = cand
+        joined = " ".join(source["meta_cells"])
+        for cand in [row["name"]] + aliases:
+            if hl_admission.name_consistent(joined, [cand]):
+                source["hospital_name"] = cand
                 break
-    if not name_in_file:
-        return ("UNVERIFIABLE",
-                "the file carries no in-file hospital identity (no JSON header "
-                "name, no CSV metadata naming the facility)")
-    if not any(pm._name_consistent(name_in_file, [c.lower()])
-               for c in candidates):
+    v = hl_admission.admit(ccn, registry_row, source)
+    if v.outcome == hl_admission.ACCEPT:
+        return "VERIFIED", v.detail
+    if v.outcome == hl_admission.UNPROVEN:
+        if v.reason == hl_admission.R_NO_FILE_NAME:
+            return ("UNVERIFIABLE",
+                    "the file carries no in-file hospital identity (no JSON header "
+                    "name, no CSV metadata naming the facility)")
+        return "UNVERIFIABLE", v.detail
+    if v.reason == hl_admission.R_NAME_MISMATCH:
         # Name a different facility? Check whether it matches ANOTHER
         # registry row — that is the mis-seed signature.
-        others = db.execute("SELECT ccn, name FROM hospitals").fetchall()
-        for other in others:
-            if other["ccn"] != ccn and pm._name_consistent(
-                    name_in_file, [other["name"].lower()]):
+        name_in_file = (source.get("hospital_name") or "").strip()
+        for other in db.execute("SELECT ccn, name FROM hospitals").fetchall():
+            if other["ccn"] != ccn and hl_admission.name_consistent(
+                    name_in_file, [other["name"]]):
                 return ("MISMATCH",
                         f"the file's own header names '{name_in_file}', which is "
                         f"{other['name']} (CCN {other['ccn']}), not the claimed "
                         f"{row['name']} (CCN {ccn})")
-        return ("MISMATCH",
-                f"the file's own header names '{name_in_file}', which does not "
-                f"match the claimed hospital {row['name']} (CCN {ccn})")
-    # Name agrees. Require one corroborating signal: state, city, or
-    # license presence in the file.
-    state_f = (extracted.get("state") or "").upper()
-    city_f = (extracted.get("city") or "").lower()
-    if state_f and row["state"] and state_f != row["state"].upper():
-        return ("MISMATCH",
-                f"file header state {state_f} contradicts the registry state "
-                f"{row['state']} for CCN {ccn}, though the name matches")
-    corroborated = (
-        (state_f and state_f == (row["state"] or "").upper()) or
-        (city_f and city_f == (row["city"] or "").lower()) or
-        bool(extracted.get("license")))
-    if not corroborated:
-        return ("UNVERIFIABLE",
-                f"file header names '{name_in_file}' (matches CCN {ccn}) but "
-                "carries no state, city, or license to corroborate it")
-    return ("VERIFIED",
-            f"file header names '{name_in_file}'; registry CCN {ccn} is "
-            f"{row['name']} ({row['city']}, {row['state']}); corroborated by "
-            + ("state" if state_f else "city" if city_f else "license"))
+    return "MISMATCH", v.detail
 
 
 # ------------------------------------------------------------- source count
@@ -859,8 +851,12 @@ def write_verdict(rec, identity_detail, verified_domain, file_header_name):
         f"returned VERIFIED against the claimed CCN {rec['ccn_claimed']} "
         f"({identity_detail}); completeness reconciled against the source "
         f"file's own entry count; provenance class: hospital-submitted.")
-    row = f"{rec['ccn_claimed']}\thttps://hospitalledger.com/submit/status/{rec['id']}" \
-          f"\tACCEPT\t{detail}\n"
+    # The ACCEPT row is rendered only by the admission module, which refuses
+    # to render one that carries no identity evidence (INVENTORY M2).
+    row = hl_admission.accept_row(
+        rec["ccn_claimed"],
+        f"https://hospitalledger.com/submit/status/{rec['id']}",
+        detail, evidence=(identity_detail,))
     for d in (VERDICTS_DIR, VERDICTS_PENDING_DIR):
         os.makedirs(d, exist_ok=True)
         path = os.path.join(d, fname)

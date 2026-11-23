@@ -14,6 +14,10 @@ VERIFY_PYTHON="${HOSPITAL_LEDGER_TEST_PYTHON:-python3}"
 TREE_BEFORE="$(bash scripts/tracked_tree_fingerprint.sh)"
 TREE_FILES_BEFORE="$(bash scripts/tracked_tree_fingerprint.sh --files)"
 "$VERIFY_PYTHON" scripts/check_gate_coverage.py
+# Identity admission (INVENTORY M2): no similarity matching in identity paths, no raw
+# ACCEPT verdict outside hl_admission. tests/test_admission.py (unittest discover below)
+# holds the frozen known-wrong pairs.
+"$VERIFY_PYTHON" scripts/check_identity_invariants.py
 "$VERIFY_PYTHON" -m unittest discover -s tests -p 'test_*.py' -v
 "$VERIFY_PYTHON" ops/wave/test_hl_wave_fixes.py
 "$VERIFY_PYTHON" ops/wave/test_hl_wave_chunk.py
