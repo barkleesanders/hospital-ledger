@@ -25,6 +25,13 @@ HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("hl_wave", HERE / "hl_wave.py")
 hw = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hw)
+# record_chunk registers a lessons debt through hl_lessons_gate; its default
+# DEBT_PATH is the tracked ops/wave/hl_lessons_debt.json, so an un-patched run
+# of this suite appended ~87 lines of fake chunk debts to the real registry
+# (measured 2026-11-22 at 94bddbd). Each test points it at its own temp file.
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+import hl_lessons_gate as lessons_gate
 
 CCNS = ["450001", "450002", "450003", "450004", "450005"]
 
@@ -52,6 +59,8 @@ class ChunkMode(unittest.TestCase):
         hw.GOAL = t
         hw.INDEX_PATH = t / "index.json"
         hw.ROOT = t / "root"
+        self._saved_debt_path = lessons_gate.DEBT_PATH
+        lessons_gate.DEBT_PATH = t / "hl_lessons_debt.json"
         hw.INDEX_PATH.write_text(json.dumps(
             {"hospitals": [{"ccn": f"{i:06d}"} for i in range(3001)]}))
         hw.STATE_PATH.write_text(json.dumps(
@@ -68,6 +77,7 @@ class ChunkMode(unittest.TestCase):
     def tearDown(self):
         for attr, val in self._saved.items():
             setattr(hw, attr, val)
+        lessons_gate.DEBT_PATH = self._saved_debt_path
         self.tmp.cleanup()
 
     # -- helpers ---------------------------------------------------------

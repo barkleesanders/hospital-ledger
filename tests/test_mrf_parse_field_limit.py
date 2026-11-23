@@ -14,13 +14,23 @@ These tests pin both the limit and the parse outcomes.
 """
 import csv
 import importlib.util
+import os
 from pathlib import Path
+import shutil
+import tempfile
 import unittest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 spec = importlib.util.spec_from_file_location("mrf_parse", SCRIPTS / "mrf_parse.py")
 mp = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mp)
+# mrf_parse persists learned header aliases to data/header_aliases.json; an
+# un-redirected run of this suite wrote ~51 lines of fixture aliases into the
+# tracked file (measured 2026-11-22 at 94bddbd). Seed a temp copy and redirect.
+_ALIAS_COPY = os.path.join(tempfile.mkdtemp(prefix="hl-header-aliases-"), "header_aliases.json")
+if os.path.exists(mp.HEADER_ALIASES_PATH):
+    shutil.copyfile(mp.HEADER_ALIASES_PATH, _ALIAS_COPY)
+mp.HEADER_ALIASES_PATH = _ALIAS_COPY
 
 META = (
     "hospital_name,last_updated_on,version,hospital_location,license_number\r\n"
