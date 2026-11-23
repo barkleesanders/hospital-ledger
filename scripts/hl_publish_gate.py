@@ -201,13 +201,43 @@ def parse_addresses(address: Optional[str]) -> list:
     """`hospital_address` -> [{'city','state','zip'}, ...]; campuses are `|`-separated.
     A street is optional, a state may be spelled out. A part that does not parse is
     dropped, never guessed: an empty list means UNPROVEN downstream, not a match."""
-    out = []
-    for part in str(address or "").split("|"):
-        m = _CAMPUS.search(part.strip())
-        if m:
-            out.append({"city": m.group(1).strip(), "state": _state_code(m.group(2)),
-                        "zip": m.group(3) or ""})
-    return out
+    return [a for a in (_parse_campus(part) for part in _pipe_parts(address)) if a]
+
+
+def _pipe_parts(text) -> list:
+    """The non-blank `|`-separated parts of a header field, in the header's own order."""
+    return [p.strip() for p in str(text or "").split("|") if p.strip()]
+
+
+def _parse_campus(part: str) -> Optional[dict]:
+    m = _CAMPUS.search(part.strip())
+    if not m:
+        return None
+    return {"city": m.group(1).strip(), "state": _state_code(m.group(2)), "zip": m.group(3) or ""}
+
+
+def _locations(si: Mapping, addrs: list) -> list:
+    """The header's `location_name` entries, each with the addresses that are ITS OWN.
+
+    A location match must never be anchored by a sibling campus's address (a system file listing
+    "Memorial Hospital | Memorial Hospital North" with two addresses would otherwise let the
+    wrong one vouch). So:
+      * as many addresses as locations (more than one of each): paired by position, the header's
+        own order; a part that does not parse leaves that location with no address;
+      * a single location, or at most one address: there is nothing to mis-pair, the location
+        gets every address the header carries;
+      * several of each in different numbers: unpairable, `addresses` is None (UNPROVEN in admit).
+    """
+    names = _pipe_parts(si.get("location_name"))
+    raw = _pipe_parts(si.get("hospital_address"))
+    if len(names) > 1 and len(raw) > 1:
+        if len(names) == len(raw):
+            own = [[a] if a else [] for a in (_parse_campus(p) for p in raw)]
+        else:
+            own = [None] * len(names)
+    else:
+        own = [list(addrs) for _ in names]
+    return [{"name": n, "addresses": a} for n, a in zip(names, own)]
 
 
 def source_from_identity(si: Optional[Mapping]) -> dict:
@@ -220,7 +250,7 @@ def source_from_identity(si: Optional[Mapping]) -> dict:
         addrs.append({"city": si.get("hospital_address_city") or "",
                       "state": _state_code(si.get("hospital_address_state") or ""),
                       "zip": si.get("hospital_address_zip") or ""})
-    return {"hospital_name": name, "addresses": addrs}
+    return {"hospital_name": name, "addresses": addrs, "locations": _locations(si, addrs)}
 
 
 def _norm_url(url: Optional[str]) -> str:

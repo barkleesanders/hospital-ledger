@@ -197,6 +197,48 @@ mut production-name-rule 'verdict = hl_admission.admit(ccn, registry, source)
     ov = overrides.get(ccn)' \
   "test_state_and_city_equal_pairs_are_refused_on_the_name"
 
+# ---------------------------------------------------------------- Q6 location_name (remediation wave 4, lane C1)
+# The new tests must FAIL on the parent tree's gate (the shape of the past mistake: a legal-entity
+# hospital_name refused a true owner whose location_name is the registry's hospital), and each way
+# of making the new read too generous must fail a named test.
+S="$SCRATCH/q6-parent"; fresh_scratch "$S"
+PARENT="$(git merge-base HEAD origin/main 2>/dev/null || true)"
+if [ -n "$PARENT" ] && git show "$PARENT:scripts/hl_admission.py" > "$S/scripts/hl_admission.py" 2>/dev/null \
+   && git show "$PARENT:scripts/hl_publish_gate.py" > "$S/scripts/hl_publish_gate.py" 2>/dev/null \
+   && ! git diff --quiet "$PARENT" -- scripts/hl_admission.py; then
+  run_tests "$S" "$PROOF_DIR/q6-parent-gate.log"; RC=$?
+  expect_fail "Q6[parent gate ($(git rev-parse --short "$PARENT")) under the new tests]" "$PROOF_DIR/q6-parent-gate.log" $RC \
+    "test_legal_entity_header_with_the_facility_as_its_location_publishes"
+else
+  say "UNMEASURED  Q6[parent gate] - no merge-base with origin/main that predates the location_name read. Not counted as a pass."
+  FAILS=$((FAILS + 1))
+fi
+mutf() { # name file old new needle...
+  local name="$1" file="$2" old="$3" new="$4"; shift 4
+  S="$SCRATCH/q-$name"; fresh_scratch "$S"
+  if ! mutate_file "$S" "$file" "$old" "$new" > "$PROOF_DIR/q-$name.apply.log" 2>&1; then
+    say "UNMEASURED  Q[$name] - mutation did not apply: $(cat "$PROOF_DIR/q-$name.apply.log")"; FAILS=$((FAILS + 1)); return
+  fi
+  run_tests "$S" "$PROOF_DIR/q-$name.log"; local rc=$?
+  expect_fail "Q[$name]" "$PROOF_DIR/q-$name.log" $rc "$@"
+}
+mutf location-ignored scripts/hl_admission.py \
+  'hits = [loc for loc in _locations(source) if name_consistent(loc["name"], names)]' 'hits = []' \
+  "test_legal_entity_header_with_the_facility_as_its_location_publishes"
+mutf location-name-is-sufficient scripts/hl_admission.py \
+  'addrs = [a for loc in hits for a in (loc["addresses"] or ())]' \
+  'addrs = [{"city": registry.get("city"), "state": registry.get("state"), "zip": registry.get("zip")}]  # SABOTAGE: a location name alone admits' \
+  "test_right_location_name_wrong_city_is_refused" "test_right_location_name_with_no_address_is_unproven_not_accepted"
+mutf sibling-campus-vouches scripts/hl_publish_gate.py \
+  'own = [[a] if a else [] for a in (_parse_campus(p) for p in raw)]' 'own = [list(addrs) for _ in names]' \
+  "test_a_location_is_anchored_by_its_own_address_not_a_siblings"
+mutf unpairable-uses-every-address scripts/hl_publish_gate.py \
+  'own = [None] * len(names)' 'own = [list(addrs) for _ in names]' \
+  "test_locations_and_addresses_in_different_numbers_cannot_be_paired"
+mutf any-location-matches scripts/hl_admission.py \
+  'hits = [loc for loc in _locations(source) if name_consistent(loc["name"], names)]' 'hits = _locations(source)' \
+  "test_a_location_that_does_not_name_the_registry_hospital_is_still_a_mismatch"
+
 # ---------------------------------------------------------------- Q4 lint sabotage
 S="$SCRATCH/q4a"; fresh_scratch "$S"
 printf '%s\n' 'def identity_gate(ccn, head, registry):' '    return None if head else "no head"' > "$S/scripts/sabotage_gate.py"

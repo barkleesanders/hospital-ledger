@@ -153,6 +153,27 @@ def _addresses(source: Mapping) -> list:
     return out
 
 
+def _locations(source: Mapping) -> list:
+    """The header's own `location_name` entries as [{'name', 'addresses'}]. `addresses` is the
+    list of addresses that BELONG to that location, or None when the header gives no way to
+    tell which address is its (the caller pairs them; see hl_publish_gate.source_from_identity).
+    Malformed entries are dropped, never guessed."""
+    out = []
+    for loc in source.get("locations") or ():
+        if not isinstance(loc, Mapping):
+            continue
+        name = str(loc.get("name") or "").strip()
+        if not name:
+            continue
+        addrs = loc.get("addresses")
+        if addrs is not None:
+            addrs = [{"city": a.get("city", ""), "state": a.get("state", ""),
+                      "zip": a.get("zip", "") or a.get("zip_code", "")}
+                     for a in addrs if isinstance(a, Mapping)]
+        out.append({"name": name, "addresses": addrs})
+    return out
+
+
 def _judge_address(reg_state, reg_city, reg_zip, addr, reg_city_raw="") -> tuple:
     """-> (outcome, reason, evidence_str) for ONE file address vs the registry."""
     f_state, f_city, f_zip = _norm_state(addr["state"]), _norm_city(addr["city"]), _zip5(addr["zip"])
@@ -203,15 +224,34 @@ def admit(ccn: str,
         return Verdict(UNPROVEN, R_NO_FILE_NAME,
                        detail="the file carries no in-file hospital name")
     names = [registry.get("name")] + list(registry.get("aliases") or ())
+    addrs = _addresses(source)
+    matched_name, name_evidence = file_name, f"name '{file_name}' consistent with registry '{registry.get('name')}'"
     if not name_consistent(file_name, names):
-        return Verdict(REFUSE, R_NAME_MISMATCH,
-                       detail=f"the file's own header names '{file_name}', which does not "
-                              f"match the registry name '{registry.get('name')}' for CCN {ccn}")
+        # The header's hospital_name is often the legal entity ("The Health Care Authority for
+        # Baptist Health") while its location_name is the facility the registry knows
+        # ("Prattville Baptist Hospital"). A location_name the header itself lists is one of the
+        # file's OWN names. It is still only the necessary half: the address test below is
+        # unchanged, and it is run on that location's own address, never on a sibling campus's.
+        hits = [loc for loc in _locations(source) if name_consistent(loc["name"], names)]
+        if not hits:
+            return Verdict(REFUSE, R_NAME_MISMATCH,
+                           detail=f"the file's own header names '{file_name}', which does not "
+                                  f"match the registry name '{registry.get('name')}' for CCN {ccn}")
+        matched_name = hits[0]["name"]
+        if all(loc["addresses"] is None for loc in hits):
+            return Verdict(UNPROVEN, R_NO_ADDRESS,
+                           detail=f"file lists location '{matched_name}' (matches CCN {ccn}) but its "
+                                  "locations and addresses cannot be paired, so no address in the "
+                                  "file is known to be this location's; state/city/zip in the "
+                                  "file do not anchor the registry address")
+        addrs = [a for loc in hits for a in (loc["addresses"] or ())]
+        name_evidence = (f"location_name '{matched_name}' consistent with registry "
+                         f"'{registry.get('name')}' (header hospital_name is '{file_name}')")
+        file_name = matched_name
 
     reg_state = _norm_state(registry.get("state"))
     reg_city = _norm_city(registry.get("city"))
     reg_zip = _zip5(registry.get("zip"))
-    addrs = _addresses(source)
     if not addrs:
         return Verdict(UNPROVEN, R_NO_ADDRESS,
                        detail=f"file names '{file_name}' (matches CCN {ccn}) but carries no "
@@ -221,8 +261,7 @@ def admit(ccn: str,
               for a in addrs]
     for outcome, reason, why in judged:
         if outcome == ACCEPT:
-            return Verdict(ACCEPT, reason, evidence=(
-                f"name '{file_name}' consistent with registry '{registry.get('name')}'", why),
+            return Verdict(ACCEPT, reason, evidence=(name_evidence, why),
                 detail=f"file header names '{file_name}'; registry CCN {ccn} is "
                        f"{registry.get('name')} ({registry.get('city')}, {registry.get('state')}); "
                        f"corroborated by {why}")
