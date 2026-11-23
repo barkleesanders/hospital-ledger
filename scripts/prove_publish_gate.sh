@@ -201,18 +201,21 @@ mut production-name-rule 'verdict = hl_admission.admit(ccn, registry, source)
 # The new tests must FAIL on the parent tree's gate (the shape of the past mistake: a legal-entity
 # hospital_name refused a true owner whose location_name is the registry's hospital), and each way
 # of making the new read too generous must fail a named test.
-S="$SCRATCH/q6-parent"; fresh_scratch "$S"
-PARENT="$(git merge-base HEAD origin/main 2>/dev/null || true)"
-if [ -n "$PARENT" ] && git show "$PARENT:scripts/hl_admission.py" > "$S/scripts/hl_admission.py" 2>/dev/null \
-   && git show "$PARENT:scripts/hl_publish_gate.py" > "$S/scripts/hl_publish_gate.py" 2>/dev/null \
-   && ! git diff --quiet "$PARENT" -- scripts/hl_admission.py; then
-  run_tests "$S" "$PROOF_DIR/q6-parent-gate.log"; RC=$?
-  expect_fail "Q6[parent gate ($(git rev-parse --short "$PARENT")) under the new tests]" "$PROOF_DIR/q6-parent-gate.log" $RC \
-    "test_legal_entity_header_with_the_facility_as_its_location_publishes"
-else
-  say "UNMEASURED  Q6[parent gate] - no merge-base with origin/main that predates the location_name read. Not counted as a pass."
-  FAILS=$((FAILS + 1))
-fi
+parent_gate() { # name commit needle...   (the gate as it was at <commit>, under today's tests)
+  local name="$1" commit="$2"; shift 2
+  S="$SCRATCH/parent-$commit"; fresh_scratch "$S"
+  if git show "$commit:scripts/hl_admission.py" > "$S/scripts/hl_admission.py" 2>/dev/null \
+     && git show "$commit:scripts/hl_publish_gate.py" > "$S/scripts/hl_publish_gate.py" 2>/dev/null; then
+    run_tests "$S" "$PROOF_DIR/parent-$commit.log"; local rc=$?
+    expect_fail "$name" "$PROOF_DIR/parent-$commit.log" $rc "$@"
+  else
+    say "UNMEASURED  $name - commit $commit is not in this clone's history. Not counted as a pass."
+    FAILS=$((FAILS + 1))
+  fi
+}
+# bda51cf is main immediately before the location_name read landed (PR #100).
+parent_gate "Q6[gate at bda51cf, before the location_name read, under the new tests]" bda51cf \
+  "test_legal_entity_header_with_the_facility_as_its_location_publishes"
 mutf() { # name file old new needle...
   local name="$1" file="$2" old="$3" new="$4"; shift 4
   S="$SCRATCH/q-$name"; fresh_scratch "$S"
@@ -238,6 +241,17 @@ mutf unpairable-uses-every-address scripts/hl_publish_gate.py \
 mutf any-location-matches scripts/hl_admission.py \
   'hits = [loc for loc in _locations(source) if name_consistent(loc["name"], names)]' 'hits = _locations(source)' \
   "test_a_location_that_does_not_name_the_registry_hospital_is_still_a_mismatch"
+
+# ---------------------------------------------------------------- Q7 `City, ST, ZIP` and ZIP+4 (remediation wave 4, lane C2)
+# cac7ca6 is main immediately before the address read landed (the merge of PR #100).
+parent_gate "Q7[gate at cac7ca6, before the address read, under the new tests]" cac7ca6 \
+  "test_comma_between_state_and_zip" "test_nine_digit_zip_with_and_without_the_hyphen"
+mut zip-any-digit-run '(\d{5})(?:-?\d{4})?)?\s*$", re.IGNORECASE)' '(\d{5})\d*(?:-?\d{4})?)?\s*$", re.IGNORECASE)' \
+  "test_a_digit_run_that_is_not_a_zip_is_dropped_never_guessed"
+mut zip-anywhere-after-state '(?:(?:\s+|\s*,\s*)(\d{5})' '(?:(?:\s+|\s*,\s*).*?(\d{5})' \
+  "test_a_digit_run_that_is_not_a_zip_is_dropped_never_guessed"
+mut comma-zip-not-read '(?:(?:\s+|\s*,\s*)(\d{5})' '(?:(?:\s+)(\d{5})' \
+  "test_comma_between_state_and_zip"
 
 # ---------------------------------------------------------------- Q4 lint sabotage
 S="$SCRATCH/q4a"; fresh_scratch "$S"
