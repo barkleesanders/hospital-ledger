@@ -64,6 +64,8 @@ NON_EXECUTING = {"shasum", "cmp", "cat", "grep", "rg", "echo", "ls", "test", "gi
 REQUIRED_VERIFY_STEPS = (
     ("scripts/csp_audit.py", "csp_audit.py (CSP guard from f32fdc1; deploy-only until d930135 showed it rotting red)"),
     ("scripts/check_gate_coverage.py", "check_gate_coverage.py (this check; it must gate itself)"),
+    ("scripts/check_identity_invariants.py",
+     "check_identity_invariants.py (identity lint, INVENTORY M2; batch-000 admitted wrong CCNs on name similarity)"),
 )
 REQUIRED_VERIFY_NPM = (
     ("lint:observability", "npm run lint:observability (was predeploy-only)"),

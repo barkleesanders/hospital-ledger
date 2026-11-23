@@ -1,0 +1,214 @@
+{
+  "_comment": "FROZEN. Known-wrong (CCN, file) pairs from the 2026-11-02 batch-000 mis-seed family, adjudicated by hand in waves W12/W13 on 2026-11-10 (INVENTORY M2, step 2a). Do not edit a pair to make a check pass; add a pair or fix the admission code. 'registry' is the tracked db/hospital_ledger.db hospitals row read 2026-11-23 and matches the registry identity quoted in each adjudication. 'source' is the file's OWN header as quoted in the adjudication ('header read directly at adjudication'); 'header_quote' is that quote verbatim. Where the quoted address spells a state out ('Illinois') 'source.state' is the two-letter code, set by hand. 'expected_reason' is the hl_admission reason code the pair must be refused with.",
+  "provenance_files": {
+    "b83": "~/hl-fleet/verdicts/d1_verdicts_b83.tsv (W12)",
+    "b84": "~/hl-fleet/verdicts/d1_verdicts_b84.tsv (W13)"
+  },
+  "wrong_pairs": [
+    {
+      "ccn": "010089",
+      "registry": {"name": "WALKER BAPTIST MEDICAL CENTER", "city": "JASPER", "state": "AL", "zip": "35502"},
+      "source": {"hospital_name": "Missouri Baptist Medical Center", "city": "Saint Louis", "state": "MO", "zip": "63131"},
+      "header_quote": "hospital_name 'Missouri Baptist Medical Center', hospital_address '3015 N Ballas Rd, Saint Louis, MO 63131'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED", "true_owner_ccn": "260108"},
+      "expected_reason": "name-mismatch"
+    },
+    {
+      "ccn": "010101",
+      "registry": {"name": "CITIZENS BAPTIST MEDICAL CENTER", "city": "TALLADEGA", "state": "AL", "zip": "35160"},
+      "source": {"hospital_name": "Missouri Baptist Medical Center", "city": "Saint Louis", "state": "MO", "zip": "63131"},
+      "header_quote": "hospital_name 'Missouri Baptist Medical Center', hospital_address '3015 N Ballas Rd, Saint Louis, MO 63131'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED", "true_owner_ccn": "260108"},
+      "expected_reason": "name-mismatch"
+    },
+    {
+      "ccn": "050663",
+      "registry": {"name": "LOS ANGELES COMMUNITY HOSPITAL", "city": "LOS ANGELES", "state": "CA", "zip": "90023"},
+      "source": {"hospital_name": "Kindred Hospital Los Angeles", "city": "Los Angeles", "state": "CA", "zip": "90056"},
+      "header_quote": "hospital_name 'Kindred Hospital Los Angeles', hospital_address '5525 W Slauson Avenue, Los Angeles, CA 90056'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED", "note": "state AND city equal: the name is the only thing that separates this pair"},
+      "expected_reason": "name-mismatch"
+    },
+    {
+      "ccn": "141305",
+      "registry": {"name": "MEMORIAL HOSPITAL", "city": "CARTHAGE", "state": "IL", "zip": "62321"},
+      "source": {"hospital_name": "Alton Memorial Hospital", "city": "Alton", "state": "IL", "zip": "62202"},
+      "header_quote": "hospital_name 'Alton Memorial Hospital', hospital_address 'One Memorial Drive, Alton, IL 62202'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED", "true_owner_ccn": "140002", "note": "name is a token-subset AND state equal: only the city/zip anchor separates this pair"},
+      "expected_reason": "city-contradiction"
+    },
+    {
+      "ccn": "150082",
+      "registry": {"name": "DEACONESS HOSPITAL INC", "city": "EVANSVILLE", "state": "IN", "zip": "47747"},
+      "source": {"hospital_name": "Deaconess Regional Medical Center", "city": "Bozeman", "state": "MT", "zip": "59715"},
+      "header_quote": "hospital_name 'Deaconess Regional Medical Center', hospital_address '915 Highland Blvd, Bozeman, MT 59715', license_number '12933' (MT), EIN 474717998 (Bozeman Health)",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED", "note": "the file carries a license number; a license is not identity"},
+      "license": "12933",
+      "expected_reason": "name-mismatch"
+    },
+    {
+      "ccn": "150169",
+      "registry": {"name": "COMMUNITY HOSPITAL NORTH", "city": "INDIANAPOLIS", "state": "IN", "zip": "46256"},
+      "source": {"hospital_name": "Naples Community Hospital", "city": "Naples", "state": "FL", "zip": "34102"},
+      "header_quote": "hospital_name 'Naples Community Hospital', hospital_address '350 7TH ST N, Naples, FL 34102'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED", "true_owner_ccn": "100018"},
+      "expected_reason": "name-mismatch"
+    },
+    {
+      "ccn": "161382",
+      "registry": {"name": "ST ANTHONY REGIONAL HOSPITAL & NURSING HOME", "city": "CARROLL", "state": "IA", "zip": "51401"},
+      "source": {"hospital_name": "ST JOSEPH REGIONAL HEALTH CENTER", "city": "Bryan", "state": "TX", "zip": "77802"},
+      "header_quote": "hospital_name 'ST JOSEPH REGIONAL HEALTH CENTER', hospital_address '2801 Franciscan Drive, Bryan, TX 77802'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED"},
+      "expected_reason": "name-mismatch"
+    },
+    {
+      "ccn": "184004",
+      "registry": {"name": "EASTERN STATE HOSPITAL", "city": "LEXINGTON", "state": "KY", "zip": "40511"},
+      "source": {"hospital_name": "University of Kentucky Hospital", "city": "Lexington", "state": "KY", "zip": "40536"},
+      "header_quote": "hospital_name 'University of Kentucky Hospital', hospital_address '800 Rose Street, Lexington, KY 40536'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED", "true_owner_ccn": "180067", "note": "state AND city equal: the name is the only thing that separates this pair"},
+      "expected_reason": "name-mismatch"
+    },
+    {
+      "ccn": "193300",
+      "registry": {"name": "CHILDRENS HOSPITAL", "city": "NEW ORLEANS", "state": "LA", "zip": "70118"},
+      "source": {
+        "hospital_name": "Children's Specialized Hospital",
+        "addresses": [
+          {"city": "Mountainside", "state": "NJ", "zip": "07092"},
+          {"city": "New Brunswick", "state": "NJ", "zip": "08901"},
+          {"city": "Toms River", "state": "NJ", "zip": "08755"}
+        ]
+      },
+      "header_quote": "hospital_name \"Children's Specialized Hospital\", hospital_address '150 New Providence Rd, Mountainside, NJ 07092 | 200 Somerset St., New Brunswick, NJ 08901 | 94 Stevens Road, Toms River, NJ 08755', type_2_npi '1396886297'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED", "true_owner_ccn": "313300", "note": "name is a token-subset after apostrophe folding; every campus is in NJ"},
+      "expected_reason": "state-contradiction"
+    },
+    {
+      "ccn": "210008",
+      "registry": {"name": "MERCY MEDICAL CENTER INC", "city": "BALTIMORE", "state": "MD", "zip": "21202"},
+      "source": {"hospital_name": "Mercy Medical Center", "city": "Aurora", "state": "IL", "zip": "60506"},
+      "header_quote": "hospital_name 'Mercy Medical Center', hospital_address '1325 N. Highland, Aurora, Illinois 60506'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED", "note": "name is a token-subset; state set to IL by hand from 'Illinois'"},
+      "expected_reason": "state-contradiction"
+    },
+    {
+      "ccn": "250151",
+      "registry": {"name": "ALLIANCE HEALTH CENTER", "city": "MERIDIAN", "state": "MS", "zip": "39301"},
+      "source": {"hospital_name": "Alliance Community Hospital", "city": "Alliance", "state": "OH", "zip": "44601"},
+      "header_quote": "hospital_name 'Alliance Community Hospital', hospital_address '200 East State Street, Alliance, OH 44601'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED", "true_owner_ccn": "360131"},
+      "expected_reason": "name-mismatch"
+    },
+    {
+      "ccn": "281349",
+      "registry": {"name": "PENDER COMMUNITY HOSPITAL", "city": "PENDER", "state": "NE", "zip": "68047"},
+      "source": {"hospital_name": "Pender Memorial Hospital, Incorporated", "city": "Burgaw", "state": "NC", "zip": "28425"},
+      "header_quote": "hospital_name 'Pender Memorial Hospital, Incorporated', location_name 'Novant Health Pender Medical Center', hospital_address '507 E Fremont St, Burgaw, NC 28425', type_2_npi '1295703130'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED", "true_owner_ccn": "341307"},
+      "expected_reason": "name-mismatch"
+    },
+    {
+      "ccn": "380090",
+      "registry": {"name": "BAY AREA HOSPITAL", "city": "COOS BAY", "state": "OR", "zip": "97420"},
+      "source": {"hospital_name": "Kindred Hospital Bay Area - St. Petersburg", "city": "St. Petersburg", "state": "FL", "zip": "33712"},
+      "header_quote": "hospital_name 'Kindred Hospital Bay Area - St. Petersburg', hospital_address '3030 6th Street South, St. Petersburg, FL 33712'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED", "note": "registry name is a token-subset of the file name"},
+      "expected_reason": "state-contradiction"
+    },
+    {
+      "ccn": "500108",
+      "registry": {"name": "ST JOSEPH MEDICAL CENTER", "city": "TACOMA", "state": "WA", "zip": "98405"},
+      "source": {"hospital_name": "Saint Joseph Medical Center - Joliet", "city": "Joliet", "state": "IL", "zip": "60435"},
+      "header_quote": "hospital_name 'Saint Joseph Medical Center - Joliet', hospital_address '333 Madison St., Joliet, Illinois 60435'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "adjudication": "W13 2026-11-10 CONFIRMED MIS-SEED", "note": "St/Saint spelling differs: only normalisation makes the names consistent; state set to IL by hand from 'Illinois'"},
+      "expected_reason": "state-contradiction"
+    }
+  ],
+  "held_pair": {
+    "ccn": "154057",
+    "registry": {"name": "OPTIONS BEHAVIORAL HEALTH SYSTEM", "city": "INDIANAPOLIS", "state": "IN", "zip": "46226"},
+    "source": {"hospital_name": "Mercyhealth Janesville"},
+    "holds": {"154057": "W12 2026-11-10 NO_FILE: facility closed, stays on adjudicated_holds.txt"},
+    "header_quote": "NOT QUOTED in the adjudication: b83 names the file only as 'the Mercyhealth Janesville file' (URL .../390816848-mercyjanesvillehospital-standardcharges.json); the source name here is taken from that wording, not from a header read",
+    "provenance": {"file": "d1_verdicts_b83.tsv", "batch": "b83", "adjudication": "W12 2026-11-10 CONFIRMED MIS-SEED + NO_FILE", "true_owner_ccn": "520066"},
+    "expected_reason_with_hold": "hold",
+    "expected_reason_without_hold": "name-mismatch"
+  },
+  "true_owner_controls": [
+    {
+      "ccn": "140002",
+      "registry": {"name": "ALTON MEMORIAL HOSPITAL", "city": "ALTON", "state": "IL", "zip": "62002"},
+      "source": {"hospital_name": "Alton Memorial Hospital", "city": "Alton", "state": "IL", "zip": "62202"},
+      "header_quote": "hospital_name 'Alton Memorial Hospital', hospital_address 'One Memorial Drive, Alton, IL 62202'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "note": "header quoted in the 141305 adjudication; city equal, zip5 differs (62002 vs 62202): city anchors"}
+    },
+    {
+      "ccn": "260108",
+      "registry": {"name": "MISSOURI BAPTIST MEDICAL CENTER", "city": "SAINT LOUIS", "state": "MO", "zip": "63131"},
+      "source": {"hospital_name": "Missouri Baptist Medical Center", "city": "Saint Louis", "state": "MO", "zip": "63131"},
+      "header_quote": "hospital_name 'Missouri Baptist Medical Center', hospital_address '3015 N Ballas Rd, Saint Louis, MO 63131'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "note": "header quoted in the 010089/010101 adjudications"}
+    },
+    {
+      "ccn": "100018",
+      "registry": {"name": "NAPLES COMMUNITY HOSPITAL", "city": "NAPLES", "state": "FL", "zip": "34102"},
+      "source": {"hospital_name": "Naples Community Hospital", "city": "Naples", "state": "FL", "zip": "34102"},
+      "header_quote": "hospital_name 'Naples Community Hospital', hospital_address '350 7TH ST N, Naples, FL 34102'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "note": "header quoted in the 150169 adjudication"}
+    },
+    {
+      "ccn": "180067",
+      "registry": {"name": "UNIVERSITY OF KENTUCKY HOSPITAL", "city": "LEXINGTON", "state": "KY", "zip": "40536"},
+      "source": {"hospital_name": "University of Kentucky Hospital", "city": "Lexington", "state": "KY", "zip": "40536"},
+      "header_quote": "hospital_name 'University of Kentucky Hospital', hospital_address '800 Rose Street, Lexington, KY 40536'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "note": "header quoted in the 184004 adjudication"}
+    },
+    {
+      "ccn": "313300",
+      "registry": {"name": "CHILDREN'S SPECIALIZED HOSPITAL", "city": "NEW BRUNSWICK", "state": "NJ", "zip": "08901"},
+      "source": {
+        "hospital_name": "Children's Specialized Hospital",
+        "addresses": [
+          {"city": "Mountainside", "state": "NJ", "zip": "07092"},
+          {"city": "New Brunswick", "state": "NJ", "zip": "08901"},
+          {"city": "Toms River", "state": "NJ", "zip": "08755"}
+        ]
+      },
+      "header_quote": "hospital_name \"Children's Specialized Hospital\", hospital_address '150 New Providence Rd, Mountainside, NJ 07092 | 200 Somerset St., New Brunswick, NJ 08901 | 94 Stevens Road, Toms River, NJ 08755'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "note": "multi-campus header quoted in the 193300 adjudication; one campus anchors the registry address"}
+    },
+    {
+      "ccn": "341307",
+      "registry": {"name": "PENDER MEMORIAL HOSPITAL", "city": "BURGAW", "state": "NC", "zip": "28425"},
+      "source": {"hospital_name": "Pender Memorial Hospital, Incorporated", "city": "Burgaw", "state": "NC", "zip": "28425"},
+      "header_quote": "hospital_name 'Pender Memorial Hospital, Incorporated', hospital_address '507 E Fremont St, Burgaw, NC 28425'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "note": "header quoted in the 281349 adjudication"}
+    },
+    {
+      "ccn": "360131",
+      "registry": {"name": "ALLIANCE COMMUNITY HOSPITAL", "city": "ALLIANCE", "state": "OH", "zip": "44601"},
+      "source": {"hospital_name": "Alliance Community Hospital", "city": "Alliance", "state": "OH", "zip": "44601"},
+      "header_quote": "hospital_name 'Alliance Community Hospital', hospital_address '200 East State Street, Alliance, OH 44601'",
+      "provenance": {"file": "d1_verdicts_b84.tsv", "batch": "b84", "note": "header quoted in the 250151 adjudication"}
+    }
+  ],
+  "unproven_controls": {
+    "_comment": "W12 (b83) reassignments: the file header is quoted in the adjudication, but these ten CCNs (nine here, the tenth under name_differs_known_false_refusal) are NOT rows of the tracked db hospitals table (only mrf_seed carries a name and a state), so the registry has no city or zip to anchor an address to. They must come out UNPROVEN (or REFUSE on a name that genuinely differs), never ACCEPT: a name plus a state is not identity. 'registry' is the mrf_seed identity (name + state only).",
+    "pairs": [
+      {"ccn": "052036", "registry": {"name": "Kindred Hospital - San Diego", "state": "CA"}, "source": {"hospital_name": "Kindred Hospital San Diego", "city": "San Diego", "state": "CA", "zip": "92104"}, "expected_outcome": "UNPROVEN"},
+      {"ccn": "132002", "registry": {"name": "Vibra Hospital Of Boise", "state": "ID"}, "source": {"hospital_name": "Vibra Hospital of Boise", "city": "Boise", "state": "ID", "zip": "83709"}, "expected_outcome": "UNPROVEN"},
+      {"ccn": "152007", "registry": {"name": "Kindred Hospital Indianapolis", "state": "IN"}, "source": {"hospital_name": "Kindred Hospital Indianapolis", "city": "Indianapolis", "state": "IN", "zip": "46222"}, "expected_outcome": "UNPROVEN"},
+      {"ccn": "182001", "registry": {"name": "Kindred Hospital Louisville", "state": "KY"}, "source": {"hospital_name": "Kindred Hospital Louisville", "city": "Louisville", "state": "KY", "zip": "40204"}, "expected_outcome": "UNPROVEN"},
+      {"ccn": "332006", "registry": {"name": "Calvary Hospital Inc", "state": "NY"}, "source": {"hospital_name": "Calvary Hospital", "city": "Bronx", "state": "NY", "zip": "10461"}, "expected_outcome": "UNPROVEN"},
+      {"ccn": "352004", "registry": {"name": "Vibra Hospital Of Fargo", "state": "ND"}, "source": {"hospital_name": "Vibra Hospital of Fargo", "city": "Fargo", "state": "ND", "zip": "58103"}, "expected_outcome": "UNPROVEN"},
+      {"ccn": "362033", "registry": {"name": "Kindred Hospitals-dayton", "state": "OH"}, "source": {"hospital_name": "Kindred Hospital Dayton", "city": "Dayton", "state": "OH", "zip": "45417"}, "expected_outcome": "UNPROVEN"},
+      {"ccn": "392027", "registry": {"name": "Kindred Hospital Philadelphia", "state": "PA"}, "source": {"hospital_name": "Kindred Hospital Philadelphia", "city": "Philadelphia", "state": "PA", "zip": "19111"}, "expected_outcome": "UNPROVEN"},
+      {"ccn": "452023", "registry": {"name": "Kindred Hospital Houston Medical Center", "state": "TX"}, "source": {"hospital_name": "Kindred Hospital Houston Medical Center", "city": "Houston", "state": "TX", "zip": "77030"}, "expected_outcome": "UNPROVEN"}
+    ],
+    "name_differs_known_false_refusal": [
+      {"ccn": "372004", "registry": {"name": "Curahealth Oklahoma City", "state": "OK"}, "source": {"hospital_name": "Curahealth Oklahoma LLC", "city": "Oklahoma City", "state": "OK", "zip": "73103"}, "expected_outcome": "REFUSE", "note": "same facility rebranded (b83): the seed name and the header name are not token-consistent, so admission fails closed. Reported, not hidden."}
+    ]
+  }
+}
