@@ -112,7 +112,10 @@ def prod(p):
     with gzip.open(os.path.join(store, f"{p['ccn']}.json.gz"), "wt") as f: f.write(body)
     r = p["registry"]
     pm._REGISTRY_CACHE[p["ccn"]] = {"name": r["name"], "address": "", "city": r["city"], "state": r["state"], "zip": r["zip"]}
-    return pm.identity_gate(p["ccn"], store_dir=store, verdicts_dir=verdicts, holds_path=holds)[0]
+    # After the step 2c cut-over `identity_gate` IS the repo gate; the legacy production gate this proof
+    # measures is retained in the file as `_legacy_identity_gate`.
+    legacy = getattr(pm, "_legacy_identity_gate", None) or pm.identity_gate
+    return legacy(p["ccn"], store_dir=store, verdicts_dir=verdicts, holds_path=holds)[0]
 
 def repo_gate(p):
     return pg.identity_gate(p["ccn"], head_of(p), dict(p["registry"]), holds=set())[0]

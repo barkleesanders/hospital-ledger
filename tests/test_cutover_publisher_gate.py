@@ -317,10 +317,22 @@ class InstallPatchesAndDelegates(Base):
         self.assertIn("failing closed", reason or "")
 
     @unittest.skipUnless(os.path.isfile(REAL_PUBLISHER), "the real ~/hl-fleet/publish_mini.py is not on this machine")
-    def test_the_patch_applies_to_the_real_publisher_shape(self):
-        out = cg.patched_source(get(REAL_PUBLISHER))
-        self.assertIn(cg.MARKER, out)
-        self.assertEqual(out.count("def identity_gate("), 1)
+    def test_the_real_publisher_is_in_a_state_the_tool_understands(self):
+        # The real file is either still the legacy shape (the patch must apply) or already cut over
+        # (it must carry exactly one live gate plus the renamed legacy one, compile, and refuse a
+        # second patch). This test originally assumed the legacy shape only, and began failing the
+        # repo's own gate on the Mini the moment the cut-over succeeded.
+        src = get(REAL_PUBLISHER)
+        if cg.MARKER in src:
+            compile(src, REAL_PUBLISHER, "exec")
+            self.assertEqual(src.count("def identity_gate("), 1)
+            self.assertIn("def _legacy_identity_gate(", src)
+            with self.assertRaises(cg.CutoverError):
+                cg.patched_source(src)
+        else:
+            out = cg.patched_source(src)
+            self.assertIn(cg.MARKER, out)
+            self.assertEqual(out.count("def identity_gate("), 1)
 
 
 class RollbackIsExact(Base):
