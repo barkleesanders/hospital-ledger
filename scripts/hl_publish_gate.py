@@ -187,9 +187,13 @@ _STATES = {
 }
 _STATE_NAME_RE = "|".join(sorted((re.escape(n) for n in _STATES), key=len, reverse=True))
 # one campus: [street,] City, ST [ZIP]   (street optional; ST may be spelled out)
+# The ZIP may follow the state after a space OR a comma ("Springerville, AZ, 85938": 46 of the 98
+# name-but-no-address headers in the Wave 3 scratch census), and may be ZIP+4 with or without
+# the hyphen ("859385104"). Exactly 5 or 9 digits: any other run does not parse and the part is
+# dropped, never guessed.
 _CAMPUS = re.compile(
     r"(?:^|,)\s*([^,|]+?)\s*,\s*([A-Za-z]{2}|" + _STATE_NAME_RE + r")\.?"
-    r"(?:\s+(\d{5})(?:-\d{4})?)?\s*$", re.IGNORECASE)
+    r"(?:(?:\s+|\s*,\s*)(\d{5})(?:-?\d{4})?)?\s*$", re.IGNORECASE)
 
 
 def _state_code(text: str) -> str:

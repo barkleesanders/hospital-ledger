@@ -144,6 +144,55 @@ class AddressShapes(unittest.TestCase):
         self.assertEqual(pg.parse_addresses("somewhere near the river"), [])
         self.assertEqual(pg.parse_addresses(None), [])
 
+    # --- Remediation Wave 4, lane C2: `City, ST, ZIP` and unhyphenated ZIP+4 -----------------
+    # 031315 White Mountain Regional's header says '118 S MOUNTAIN AVE, SPRINGERVILLE, AZ,
+    # 859385104'. The parser read no location from it, so a true owner was "name but no address".
+    def test_comma_between_state_and_zip(self):
+        self.assertEqual(pg.parse_addresses("164 S 5th Street, Montpelier, ID, 83254"),
+                         [{"city": "Montpelier", "state": "ID", "zip": "83254"}])
+        self.assertEqual(pg.parse_addresses("1 Childrens Way,Little Rock,AR,72202"),
+                         [{"city": "Little Rock", "state": "AR", "zip": "72202"}])
+        self.assertEqual(pg.parse_addresses("4023 Reas Lane,,New Albany,IN,47150"),
+                         [{"city": "New Albany", "state": "IN", "zip": "47150"}])
+
+    def test_nine_digit_zip_with_and_without_the_hyphen(self):
+        self.assertEqual(pg.parse_addresses("118 S MOUNTAIN AVE, SPRINGERVILLE, AZ, 859385104"),
+                         [{"city": "SPRINGERVILLE", "state": "AZ", "zip": "85938"}])
+        self.assertEqual(pg.parse_addresses("PO Box 170, MAYAGUEZ, PR 006804833"),
+                         [{"city": "MAYAGUEZ", "state": "PR", "zip": "00680"}])
+        self.assertEqual(pg.parse_addresses("602 Chase Ave, Cordova, AK, 99574-0160"),
+                         [{"city": "Cordova", "state": "AK", "zip": "99574"}])
+
+    def test_a_digit_run_that_is_not_a_zip_is_dropped_never_guessed(self):
+        for bad in ("1 A St, Aurora, IL, 6050", "1 A St, Aurora, IL, 605061", "1 A St, Aurora, IL 60506123",
+                    "1 A St, Aurora, IL, 6050612345"):
+            with self.subTest(address=bad):
+                self.assertEqual(pg.parse_addresses(bad), [])
+
+    def test_comma_zip_true_owner_publishes_and_wrong_city_is_refused(self):
+        reg = {"name": "WHITE MOUNTAIN REGIONAL MEDICAL CENTER", "city": "SPRINGERVILLE", "state": "AZ",
+               "zip": "85938"}
+
+        def go(addr):
+            si = {"hospital_name": "White Mountain Regional Medical Center", "hospital_address": addr}
+            return pg.identity_gate("031315", {"source_url": "", "source_identity": si}, reg, holds=set())[0]
+        self.assertIsNone(go("118 S MOUNTAIN AVE, SPRINGERVILLE, AZ, 859385104"))
+        self.assertIn("city", go("100 Main Street, Nowhereville, AZ, 00000") or "")
+        self.assertIn("state", go("118 S MOUNTAIN AVE, SPRINGERVILLE, TX, 859385104") or "")
+
+    def test_the_wrong_pairs_stay_refused_in_the_comma_zip_shape(self):
+        # the same 14 wrong files, their real addresses rewritten into the newly readable shape
+        passed = []
+        for p in FX["wrong_pairs"]:
+            head = head_of(p)
+            a = head["source_identity"]["hospital_address"]
+            head["source_identity"]["hospital_address"] = " | ".join(
+                re.sub(r"\s+(\d{5})(-\d{4})?\s*$", r", \1", part.strip()) for part in a.split("|"))
+            self.assertNotEqual(head["source_identity"]["hospital_address"], a, p["ccn"])
+            if pg.identity_gate(p["ccn"], head, reg_of(p), holds=set())[0] is None:
+                passed.append(p["ccn"])
+        self.assertEqual(passed, [])
+
     def test_explicit_city_state_fields_are_honoured(self):
         si = {"hospital_name": "Example General Hospital", "hospital_address_city": "Springfield",
               "hospital_address_state": "California", "hospital_address_zip": "90210"}
