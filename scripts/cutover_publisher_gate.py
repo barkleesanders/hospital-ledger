@@ -19,6 +19,13 @@ files and removes what the install added.
             and patch publish_mini.py so `identity_gate` delegates to them (the legacy gate is
             renamed `_legacy_identity_gate` and never called). A missing/invalid gate or policy
             REFUSES; it never falls back to the legacy gate. Idempotent.
+  install-skip-report
+            (step 2d; needs --backup, and a publisher already cut over by `install`) install
+            hl_publish_run.py into <fleet>/gate/ and patch publish_mini.py's `main` so a run
+            decides EVERY item (or every store canonical with --all), SKIPS the items a guard
+            refuses (never uploaded) and reports them, instead of aborting on the first refusal.
+            The previous `main` is kept as `_legacy_main` and never called. It changes no gate
+            file and no gate policy. Use `backup --prefix pr2d` first.
   status    is the publisher patched; shas of publish_mini.py and the installed gate files.
   rollback  (needs --backup) restore every backed-up file byte-for-byte, delete the files the
             install added, and re-verify against the manifest.
@@ -45,6 +52,114 @@ LEGACY_RENAMED = ("def _legacy_identity_gate(ccn, store_dir=None, verdicts_dir=N
                   "                         holds_path=None):\n")
 MAIN_ANCHOR = "\n\ndef main():\n"
 FIXED_FILES = ("publish_mini.py", "process_submissions.py", "adjudicated_holds.txt", "publish-state.json")
+RUN_FILE = "hl_publish_run.py"   # step 2d: skip-and-report orchestration, installed beside the gate
+MARKER_2D = "PR2D-SKIP-AND-REPORT"
+LEGACY_MAIN_DEF = "def main():\n"
+LEGACY_MAIN_RENAMED = "def _legacy_main():\n"
+
+# Plain string (not an f-string): the publisher's own f-strings stay readable and unescaped.
+NEW_MAIN_BLOCK = '''
+
+# ---------------------------------------------------------------------------
+# PR2D-SKIP-AND-REPORT (INVENTORY M2, step 2d; owner decision 2026-11-23)
+# A run decides EVERY requested item (or, with --all, every canonical in the store). An item a
+# guard refuses (quarantine, key guard, identity gate) is SKIPPED, never uploaded, and listed in
+# a refusal report (hospital id, guard reason, override status) in this log and in REPORT_DIR;
+# accepted items publish as before. The gate policy is unchanged. The previous abort-on-first-
+# refusal main() is kept as _legacy_main and is never called. A missing run module fails CLOSED.
+# Exit: 0 all accepted and published; 2 nothing accepted (unchanged for one refused CCN);
+# 10 the run completed with refusals; a publish failure keeps its own code (1/3/4/9).
+# ---------------------------------------------------------------------------
+REPORT_DIR = os.environ.get("HL_PUBLISH_REPORT_DIR") or os.path.join(FLEET, "refusal-reports")
+QUARANTINED = ("150042",)
+
+
+def _run_module():
+    """hl_publish_run, pinned to GATE_DIR exactly like the gate module."""
+    path = os.path.join(GATE_DIR, "hl_publish_run.py")
+    if not os.path.isfile(path):
+        raise ImportError(f"{path} not found")
+    if GATE_DIR not in sys.path:
+        sys.path.insert(0, GATE_DIR)
+    import hl_publish_run
+    if os.path.dirname(os.path.realpath(hl_publish_run.__file__)) != os.path.realpath(GATE_DIR):
+        raise ImportError(f"hl_publish_run resolved to {hl_publish_run.__file__}, not {GATE_DIR}")
+    return hl_publish_run
+
+
+def _quarantine_guard(ccn):
+    return (f"{ccn} is quarantined - always excluded" if ccn in QUARANTINED else None), []
+
+
+def _key_guard(ccn):
+    why = key_refusal(ccn)
+    if why is not None:
+        return why, []
+    if not re.fullmatch(r"\\d{6}", ccn):
+        return None, [f"suffixed CCN {ccn} admitted: registry-ACCEPT provenance "
+                      "+ canonical-header identity verified"]
+    return None, []
+
+
+def main():
+    args = sys.argv[1:]
+    dry_run = "--dry-run" in args
+    run_all = "--all" in args
+    ccns = [a for a in args if not a.startswith("--")]
+    if run_all and ccns:
+        log("FATAL: --all takes no CCN arguments")
+        return 2
+    if not ccns and not run_all:
+        print(__doc__)
+        print("  --all: decide every canonical in the store; refused items are skipped and reported")
+        return 2
+    try:
+        run = _run_module()
+    except Exception as exc:  # never degrade to abort-on-first, and never publish ungated
+        log(f"FATAL: skip-and-report module unavailable, failing closed ({type(exc).__name__}: {exc})")
+        return 2
+    if run_all:
+        ccns = run.enumerate_store(STORE)
+        if not ccns:
+            log(f"FATAL: no canonicals under {STORE}: an empty store is not a clean run")
+            return 2
+    try:
+        override_ids = set(_gate_module().load_policy(GATE_POLICY).overrides)
+    except Exception:  # an invalid policy makes the gate refuse everything; nothing to attribute
+        override_ids = set()
+    guards = [("quarantine", _quarantine_guard), ("key-guard", _key_guard),
+              (run.GUARD_IDENTITY, identity_gate)]
+    decisions = run.decide_all(ccns, guards, override_ids)
+    report = run.build_report(decisions, dry_run, "all-store" if run_all else "explicit", STORE)
+    for line in run.log_lines(report):
+        log(line)
+    path = run.write_report(report, REPORT_DIR)
+    if path:
+        log(f"refusal report written: {path}")
+    else:
+        log(f"WARNING: could not write the refusal report under {REPORT_DIR}; the log lines above are the record")
+    accepted = run.accepted_ccns(decisions)
+    refused = len(decisions) - len(accepted)
+    publish_rc = 0
+    if not accepted:
+        log("nothing accepted: no publish performed")
+    elif not os.path.isdir(TREE):
+        log(f"FATAL: publish tree missing: {TREE}")
+        publish_rc = 1
+    else:
+        lock = Lock()
+        if not lock.acquire():
+            publish_rc = 9
+        else:
+            try:
+                publish_rc = _publish(accepted, dry_run)
+            finally:
+                lock.release()
+    rc = run.exit_code(len(accepted), refused, publish_rc)
+    log(f"RUN COMPLETE requested={len(decisions)} accepted={len(accepted)} refused={refused} "
+        f"publish_rc={publish_rc} exit={rc}")
+    return rc
+'''
 
 NEW_GATE_BLOCK = f'''
 
@@ -141,10 +256,10 @@ def fleet_inventory(fleet: str) -> list:
     return rels
 
 
-def cmd_backup(fleet: str, backups: str, stamp=None) -> str:
+def cmd_backup(fleet: str, backups: str, stamp=None, prefix: str = "pr2c") -> str:
     if not os.path.isfile(os.path.join(fleet, "publish_mini.py")):
         raise CutoverError(f"{fleet}/publish_mini.py not found: nothing to back up")
-    dest = os.path.join(backups, f"pr2c-{stamp or utc_stamp()}")
+    dest = os.path.join(backups, f"{prefix}-{stamp or utc_stamp()}")
     if os.path.exists(dest):
         raise CutoverError(f"backup path already exists, refusing to overwrite: {dest}")
     os.makedirs(dest)
@@ -158,7 +273,7 @@ def cmd_backup(fleet: str, backups: str, stamp=None) -> str:
         files.append({"rel": rel, "sha256": sha256(dst), "size": os.path.getsize(dst),
                       "mode": os.stat(src).st_mode & 0o7777})
     manifest = {"created_utc": dt.datetime.now(dt.timezone.utc).isoformat(), "fleet": fleet,
-                "files": files, "installed_new": [], "note": "step 2c publisher gate cut-over"}
+                "files": files, "installed_new": [], "note": f"{prefix} publisher cut-over backup"}
     with open(os.path.join(dest, "MANIFEST.json"), "w") as fh:
         json.dump(manifest, fh, indent=1)
     write_restore_script(dest, fleet, files)
@@ -270,12 +385,66 @@ def repo_commit(repo_scripts: str) -> str:
         return "unknown"
 
 
+def patched_source_2d(src: str) -> str:
+    """Stage 2d: the publisher must already be cut over (2c) and must still carry exactly one
+    abort-on-first-refusal `main`. The old `main` is renamed and a new one is added after it."""
+    if MARKER not in src:
+        raise CutoverError("publisher is not cut over to the gate (no PR2C marker): run `install` first")
+    if MARKER_2D in src:
+        raise CutoverError("already patched for skip-and-report")
+    if src.count(MAIN_ANCHOR) != 1 or src.count(LEGACY_MAIN_DEF) != 1:
+        raise CutoverError("publish_mini.py is not the shape this stage patches: expected exactly one "
+                           "`def main():`")
+    out = src.replace(MAIN_ANCHOR, "\n\n" + LEGACY_MAIN_RENAMED)
+    # the new main goes right after the renamed one (the file ends with the __main__ guard, which
+    # calls main(); anchor on it so the new definition is bound before it runs)
+    tail = '\n\nif __name__ == "__main__":\n'
+    if out.count(tail) != 1:
+        raise CutoverError("publish_mini.py has no single `if __name__ == \"__main__\":` guard to anchor on")
+    out = out.replace(tail, NEW_MAIN_BLOCK + tail)
+    compile(out, "publish_mini.py", "exec")  # a syntax error must never reach the publisher
+    return out
+
+
+def cmd_install_skip_report(fleet: str, repo_scripts: str, backup: str, force_running: bool = False) -> list:
+    n = cmd_verify(backup)
+    running = publish_running(fleet)
+    if running and not force_running:
+        raise CutoverError(f"refusing to install under a running publish: {running}")
+    if not os.path.isfile(os.path.join(repo_scripts, RUN_FILE)):
+        raise CutoverError(f"{RUN_FILE} not found in {repo_scripts}")
+    gdir = os.path.join(fleet, "gate")
+    for g in GATE_FILES:
+        if not os.path.isfile(os.path.join(gdir, g)):
+            raise CutoverError(f"{gdir}/{g} missing: the gate cut-over (`install`) must be in place first")
+    pm_path = os.path.join(fleet, "publish_mini.py")
+    with open(pm_path) as fh:
+        new_src = patched_source_2d(fh.read())  # raises before anything is written
+    manifest = load_manifest(backup)
+    existed = {f["rel"] for f in manifest["files"]}
+    dst = os.path.join(gdir, RUN_FILE)
+    with open(os.path.join(repo_scripts, RUN_FILE), "rb") as fh:
+        atomic_write(dst, fh.read(), 0o644)
+    added = [] if f"gate/{RUN_FILE}" in existed else [f"gate/{RUN_FILE}"]
+    atomic_write(pm_path, new_src.encode(), os.stat(pm_path).st_mode & 0o7777)
+    manifest["installed_new"] = sorted(set(manifest.get("installed_new", [])) | set(added))
+    manifest["installed_skip_report_utc"] = dt.datetime.now(dt.timezone.utc).isoformat()
+    manifest["installed_sha256_2d"] = {RUN_FILE: sha256(dst), "publish_mini.py": sha256(pm_path),
+                                       **{g: sha256(os.path.join(gdir, g)) for g in GATE_FILES}}
+    manifest["repo_commit_2d"] = repo_commit(repo_scripts)
+    with open(os.path.join(backup, "MANIFEST.json"), "w") as fh:
+        json.dump(manifest, fh, indent=1)
+    print(f"installed {RUN_FILE} into {gdir}; patched {pm_path} for skip-and-report; backup verified ({n} files)")
+    return added
+
+
 def cmd_status(fleet: str) -> dict:
     pm = os.path.join(fleet, "publish_mini.py")
     with open(pm) as fh:
         src = fh.read()
-    out = {"fleet": fleet, "patched": MARKER in src, "publish_mini_sha256": sha256(pm), "gate": {}}
-    for g in GATE_FILES:
+    out = {"fleet": fleet, "patched": MARKER in src, "skip_report": MARKER_2D in src,
+           "publish_mini_sha256": sha256(pm), "gate": {}}
+    for g in GATE_FILES + (RUN_FILE,):
         p = os.path.join(fleet, "gate", g)
         out["gate"][g] = sha256(p) if os.path.isfile(p) else None
     return out
@@ -312,25 +481,28 @@ def cmd_rollback(fleet: str, backup: str) -> None:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("backup", "verify", "install", "status", "rollback"):
+    for name in ("backup", "verify", "install", "install-skip-report", "status", "rollback"):
         p = sub.add_parser(name)
         p.add_argument("--fleet", default=os.path.expanduser("~/hl-fleet"))
         if name == "backup":
             p.add_argument("--backups", default=os.path.expanduser("~/hl-fleet-backups"))
             p.add_argument("--stamp")
-        if name in ("verify", "install", "rollback"):
+            p.add_argument("--prefix", default="pr2c")
+        if name in ("verify", "install", "install-skip-report", "rollback"):
             p.add_argument("--backup", required=True)
-        if name == "install":
+        if name in ("install", "install-skip-report"):
             p.add_argument("--repo-scripts", default=os.path.dirname(os.path.abspath(__file__)))
             p.add_argument("--force-running", action="store_true")
     a = ap.parse_args(argv)
     try:
         if a.cmd == "backup":
-            print(cmd_backup(a.fleet, a.backups, a.stamp))
+            print(cmd_backup(a.fleet, a.backups, a.stamp, a.prefix))
         elif a.cmd == "verify":
             print(f"backup verified: {cmd_verify(a.backup)} files match the manifest")
         elif a.cmd == "install":
             cmd_install(a.fleet, a.repo_scripts, a.backup, a.force_running)
+        elif a.cmd == "install-skip-report":
+            cmd_install_skip_report(a.fleet, a.repo_scripts, a.backup, a.force_running)
         elif a.cmd == "status":
             print(json.dumps(cmd_status(a.fleet), indent=1))
         else:
