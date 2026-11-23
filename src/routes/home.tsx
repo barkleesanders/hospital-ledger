@@ -90,7 +90,10 @@ export function homePage(url: string, SITE_COUNTS: Summary = bundledSummary) {
 						file, verify it is the live one, and convert it into one
 						standard format you can search.
 					</p>
-					<p class="mt-4 text-base sm:text-lg md:text-xl text-zinc-400 max-w-2xl leading-snug">
+					<p
+						id="coverage-gap"
+						class="mt-4 text-base sm:text-lg md:text-xl text-zinc-400 max-w-2xl leading-snug"
+					>
 						The law covers{" "}
 						<span
 							id="hero-required-visible"

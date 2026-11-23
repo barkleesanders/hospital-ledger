@@ -14,13 +14,23 @@ file with stray tabs, never a TSV header. Genuine TSV files (whose cells
 carry no commas) must keep sniffing as tab.
 """
 import importlib.util
+import os
 from pathlib import Path
+import shutil
+import tempfile
 import unittest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 spec = importlib.util.spec_from_file_location("mrf_parse", SCRIPTS / "mrf_parse.py")
 mp = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mp)
+# mrf_parse persists learned header aliases to data/header_aliases.json; an
+# un-redirected run of this suite wrote fixture aliases into the tracked file
+# (measured 2026-11-22 at 94bddbd). Seed a temp copy and redirect.
+_ALIAS_COPY = os.path.join(tempfile.mkdtemp(prefix="hl-header-aliases-"), "header_aliases.json")
+if os.path.exists(mp.HEADER_ALIASES_PATH):
+    shutil.copyfile(mp.HEADER_ALIASES_PATH, _ALIAS_COPY)
+mp.HEADER_ALIASES_PATH = _ALIAS_COPY
 
 # Synthetic V3.0.0 dual-header shape: metadata header + identity row
 # (tabs embedded in header field names), then the data header and rows.
