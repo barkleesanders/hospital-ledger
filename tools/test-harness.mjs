@@ -317,6 +317,17 @@ try {
 					"rgb(9, 9, 11)",
 		);
 		await page.evaluate(() => document.fonts.ready);
+		// measure() scopes to #coverage-gap and silently falls back to the whole
+		// <main> when it is missing. PR #91 removed the home page's #coverage-gap
+		// block, so "/" silently widened from one paragraph to the entire page and
+		// the gate went red on 179 pre-existing contrast findings it had never
+		// measured (94bddbd). A missing anchor must fail by name, not change scope.
+		if (path === "/" || path === "/about-the-numbers")
+			assert.equal(
+				await page.locator("#coverage-gap").count(),
+				1,
+				`${path}: #coverage-gap anchor missing; the contrast scope would silently widen to <main>`,
+			);
 		if (path === "/")
 			await page.waitForFunction(() =>
 				document.querySelector("#state")?.textContent.includes("CA"),
