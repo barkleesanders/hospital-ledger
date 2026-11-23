@@ -295,6 +295,11 @@ def cmd_rollback(fleet: str, backup: str) -> None:
         if os.path.exists(p):
             os.unlink(p)
     gdir = os.path.join(fleet, "gate")
+    # Running the patched publisher makes Python drop gate/__pycache__; it is ours, not the owner's.
+    # Only remove it when the install created the gate dir (no gate/ file was in the backup).
+    if os.path.isdir(os.path.join(gdir, "__pycache__")) and not any(
+            f["rel"].startswith("gate/") for f in m["files"]):
+        shutil.rmtree(os.path.join(gdir, "__pycache__"))
     if os.path.isdir(gdir) and not os.listdir(gdir):
         os.rmdir(gdir)
     bad = [f["rel"] for f in m["files"] if not f["rel"].startswith("verdicts/")
