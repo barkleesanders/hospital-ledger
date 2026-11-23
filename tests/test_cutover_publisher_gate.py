@@ -337,6 +337,26 @@ class RollbackIsExact(Base):
         self.assertFalse(os.path.exists(os.path.join(self.fleet, "gate")))
         self.assertFalse(cg.cmd_status(self.fleet)["patched"])
 
+    def test_rollback_after_the_patched_publisher_ran_leaves_no_gate_dir(self):
+        # the dress rehearsal on a copy of the real fleet found this: importing the installed gate
+        # makes Python write gate/__pycache__, which used to stop the empty-dir cleanup.
+        bk = self.backup()
+        self.install(bk)
+        os.makedirs(os.path.join(self.fleet, "gate", "__pycache__"))
+        put(os.path.join(self.fleet, "gate", "__pycache__", "hl_publish_gate.cpython-313.pyc"), "x")
+        with contextlib.redirect_stdout(io.StringIO()):
+            cg.cmd_rollback(self.fleet, bk)
+        self.assertFalse(os.path.exists(os.path.join(self.fleet, "gate")))
+
+    def test_rollback_keeps_a_preexisting_gate_dirs_pycache(self):
+        os.makedirs(os.path.join(self.fleet, "gate", "__pycache__"))
+        put(os.path.join(self.fleet, "gate", "keep.txt"), "mine\n")
+        bk = self.backup()
+        self.install(bk)
+        with contextlib.redirect_stdout(io.StringIO()):
+            cg.cmd_rollback(self.fleet, bk)
+        self.assertTrue(os.path.isdir(os.path.join(self.fleet, "gate", "__pycache__")))
+
     def test_rollback_refuses_a_tampered_backup(self):
         bk = self.backup()
         self.install(bk)
