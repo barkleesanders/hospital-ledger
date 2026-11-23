@@ -20,8 +20,13 @@ WHAT IT CHECKS (exit 0 clean / 1 violations / 2 could not measure)
    other than scripts/hl_admission.py (and tests, which assert on it) may carry a
    bare "ACCEPT" string literal. Verdict rows are rendered by `hl_admission.accept_row`,
    which refuses to render one with no evidence.
-3. POSITIVE CONTROL: the identity paths exist and parse, and hl_admission still defines
-   `admit` / `accept_row`; an empty scan is UNMEASURED, never a pass.
+3. ONE DECISION (step 2b): any non-test module that defines a function named
+   `identity_gate` must import hl_admission. scripts/hl_publish_gate.py (the publisher-facing
+   gate) and scripts/process_submissions.py both do; a standalone gate with its own logic
+   is the production publisher's shape (it passed 11/14 known-wrong pairs).
+4. POSITIVE CONTROL: the identity paths exist and parse, hl_admission still defines
+   `admit` / `accept_row`, hl_publish_gate still defines `identity_gate`; an empty scan is
+   UNMEASURED, never a pass.
 
 Run: `python3 scripts/check_identity_invariants.py [--root DIR]`. `--root` audits any
 tree (scripts/prove_admission.sh replays the past-mistake shapes through it).
@@ -36,8 +41,10 @@ import sys
 from pathlib import Path
 
 DEFAULT_ROOT = Path(__file__).resolve().parent.parent
-IDENTITY_PATHS = ("scripts/hl_admission.py", "scripts/process_submissions.py")
+IDENTITY_PATHS = ("scripts/hl_admission.py", "scripts/process_submissions.py",
+                  "scripts/hl_publish_gate.py")
 ADMISSION_MODULE = "scripts/hl_admission.py"
+PUBLISH_GATE_MODULE = "scripts/hl_publish_gate.py"
 BAD_MODULES = {"difflib", "rapidfuzz", "fuzzywuzzy", "jellyfish", "Levenshtein", "thefuzz", "textdistance"}
 BAD_NAMES = {"SequenceMatcher", "get_close_matches", "jaro", "jaro_winkler", "levenshtein",
              "fuzz", "token_set_ratio", "token_sort_ratio", "partial_ratio"}
@@ -118,6 +125,30 @@ def raw_accept_violations(tree: ast.AST, rel: str) -> list[str]:
     return out
 
 
+def imports_admission(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import) and any(a.name.split(".")[-1] == "hl_admission" for a in node.names):
+            return True
+        if isinstance(node, ast.ImportFrom) and ((node.module or "").split(".")[-1] == "hl_admission"
+                                                 or any(a.name == "hl_admission" for a in node.names)):
+            return True
+    return False
+
+
+def second_gate_violations(tree: ast.AST, rel: str) -> list[str]:
+    """A module that defines its own `identity_gate` must take the decision from
+    hl_admission. One admission function, not a second, independent opinion."""
+    out = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "identity_gate" and not imports_admission(tree):
+            out.append(
+                f"{rel}:{node.lineno}: defines `identity_gate` without importing hl_admission: a second, "
+                "independent identity decision. Delegate to hl_admission.admit (scripts/hl_publish_gate.py "
+                "is the publisher-facing gate). The production publisher passed 11/14 known-wrong pairs on "
+                "its own logic (INVENTORY M2, step 2b; batch-000, 2026-11-02).")
+    return out
+
+
 def audit(root: Path) -> list[str]:
     problems: list[str] = []
     for rel in IDENTITY_PATHS:
@@ -128,6 +159,9 @@ def audit(root: Path) -> list[str]:
     for needed in ("admit", "accept_row", "Verdict"):
         if needed not in defined:
             problems.append(f"{ADMISSION_MODULE} no longer defines `{needed}`: the admission function moved or was removed")
+    gate_tree = parse(root, PUBLISH_GATE_MODULE)
+    if "identity_gate" not in {n.name for n in ast.walk(gate_tree) if isinstance(n, ast.FunctionDef)}:
+        problems.append(f"{PUBLISH_GATE_MODULE} no longer defines `identity_gate`: the publisher-facing gate moved or was removed")
     for rel in IDENTITY_PATHS:
         problems += fuzzy_violations(parse(root, rel), rel)
     scanned = 0
@@ -135,7 +169,9 @@ def audit(root: Path) -> list[str]:
         if rel == ADMISSION_MODULE or _is_test(rel):
             continue
         scanned += 1
-        problems += raw_accept_violations(parse(root, rel), rel)
+        tree = parse(root, rel)
+        problems += raw_accept_violations(tree, rel)
+        problems += second_gate_violations(tree, rel)
     if scanned == 0:
         raise Unmeasured("no non-test python sources scanned for raw ACCEPT verdicts")
     return problems
