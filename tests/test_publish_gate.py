@@ -193,6 +193,52 @@ class AddressShapes(unittest.TestCase):
                 passed.append(p["ccn"])
         self.assertEqual(passed, [])
 
+    # --- Remediation Wave 6, lane C3: no comma before the state, and a trailing country -------
+    # 'Street City ST ZIP' parsed to no location (76 of 114 name-but-no-address headers in the
+    # Wave 5 scratch census). The city cannot be told from the street, so only state + zip are read.
+    def test_no_comma_before_the_state_reads_state_and_zip_only(self):
+        self.assertEqual(pg.parse_addresses("7150 Tampa Ave Reseda CA 91335"),
+                         [{"city": "", "state": "CA", "zip": "91335"}])
+        self.assertEqual(pg.parse_addresses("17300 N Dysart Rd, Surprise AZ 85378"),
+                         [{"city": "", "state": "AZ", "zip": "85378"}])
+        self.assertEqual(pg.parse_addresses("351 E PRIDDY ST Magazine Arkansas 72943-8503"),
+                         [{"city": "", "state": "AR", "zip": "72943"}])
+
+    def test_no_comma_needs_a_real_state_and_a_whole_zip(self):
+        for bad in ("1 Main St Springfield ZZ 12345", "7150 Tampa Ave Reseda CA", "7150 Tampa Ave Reseda CA 9133",
+                    "7150 Tampa Ave Reseda CA 913351", "7150 Tampa Ave Reseda 91335"):
+            with self.subTest(address=bad):
+                self.assertEqual(pg.parse_addresses(bad), [])
+
+    def test_no_comma_true_owner_publishes_on_the_zip_and_only_on_the_zip(self):
+        reg = {"name": "DESTINY SPRINGS HEALTHCARE", "city": "SURPRISE", "state": "AZ", "zip": "85378"}
+
+        def go(addr):
+            si = {"hospital_name": "Destiny Springs Healthcare", "hospital_address": addr}
+            return pg.identity_gate("034034", {"source_url": "", "source_identity": si}, reg, holds=set())[0]
+        self.assertIsNone(go("17300 N Dysart Rd, Surprise AZ 85378"))
+        self.assertIn("unproven", go("17300 N Dysart Rd, Surprise AZ 85374") or "")   # right state, other zip
+        self.assertIn("state", go("17300 N Dysart Rd, Surprise TX 85378") or "")
+
+    def test_trailing_country_is_not_part_of_the_address(self):
+        self.assertEqual(pg.parse_addresses("4102 Shore Dr, Indianapolis, IN 46254, United States"),
+                         [{"city": "Indianapolis", "state": "IN", "zip": "46254"}])
+        self.assertEqual(pg.parse_addresses("401 6th Avenue, Montgomery, West Virginia 25136, USA"),
+                         [{"city": "Montgomery", "state": "WV", "zip": "25136"}])
+
+    def test_the_wrong_pairs_stay_refused_in_the_no_comma_shape(self):
+        # the same 14 wrong files, their real addresses rewritten with every comma removed
+        passed = []
+        for p in FX["wrong_pairs"]:
+            head = head_of(p)
+            a = head["source_identity"]["hospital_address"]
+            head["source_identity"]["hospital_address"] = " | ".join(
+                part.replace(",", " ") for part in a.split("|"))
+            self.assertNotEqual(head["source_identity"]["hospital_address"], a, p["ccn"])
+            if pg.identity_gate(p["ccn"], head, reg_of(p), holds=set())[0] is None:
+                passed.append(p["ccn"])
+        self.assertEqual(passed, [])
+
     def test_explicit_city_state_fields_are_honoured(self):
         si = {"hospital_name": "Example General Hospital", "hospital_address_city": "Springfield",
               "hospital_address_state": "California", "hospital_address_zip": "90210"}

@@ -253,6 +253,21 @@ mut zip-anywhere-after-state '(?:(?:\s+|\s*,\s*)(\d{5})' '(?:(?:\s+|\s*,\s*).*?(
 mut comma-zip-not-read '(?:(?:\s+|\s*,\s*)(\d{5})' '(?:(?:\s+)(\d{5})' \
   "test_comma_between_state_and_zip"
 
+# ---------------------------------------------------------------- Q8 no comma before the state (remediation wave 6, lane C3)
+# 80d8cb6 is main immediately before the trailing `ST ZIP` read landed (the merge of PR #102).
+parent_gate "Q8[gate at 80d8cb6, before the trailing state+zip read, under the new tests]" 80d8cb6 \
+  "test_no_comma_before_the_state_reads_state_and_zip_only" "test_trailing_country_is_not_part_of_the_address"
+mut trailing-any-two-letters '        if state in _STATE_CODES:' '        if state:' \
+  "test_no_comma_needs_a_real_state_and_a_whole_zip"
+mut trailing-zip-optional '))\.?,?\s+(\d{5})(?:-?\d{4})?\s*$",' '))\.?,?\s*(\d{5})?(?:-?\d{4})?\s*$",' \
+  "test_no_comma_needs_a_real_state_and_a_whole_zip"
+mut trailing-zip-any-run '))\.?,?\s+(\d{5})(?:-?\d{4})?\s*$",' '))\.?,?\s+(\d{5})\d*(?:-?\d{4})?\s*$",' \
+  "test_no_comma_needs_a_real_state_and_a_whole_zip"
+mut trailing-guesses-a-city '            return {"city": "", "state": state, "zip": t.group(3)}' '            return {"city": part[:t.start()].split()[-1], "state": state, "zip": t.group(3)}' \
+  "test_no_comma_before_the_state_reads_state_and_zip_only"
+mut trailing-state-alone-anchors '            return {"city": "", "state": state, "zip": t.group(3)}' '            return {"city": "SURPRISE", "state": state, "zip": t.group(3)}' \
+  "test_no_comma_true_owner_publishes_on_the_zip_and_only_on_the_zip"
+
 # ---------------------------------------------------------------- Q4 lint sabotage
 S="$SCRATCH/q4a"; fresh_scratch "$S"
 printf '%s\n' 'def identity_gate(ccn, head, registry):' '    return None if head else "no head"' > "$S/scripts/sabotage_gate.py"
