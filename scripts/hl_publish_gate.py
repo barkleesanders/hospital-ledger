@@ -213,11 +213,30 @@ def _pipe_parts(text) -> list:
     return [p.strip() for p in str(text or "").split("|") if p.strip()]
 
 
+# A trailing country ("..., FL 34609, USA") is not part of the address.
+_COUNTRY = re.compile(r"\s*,?\s*(?:USA|United States(?: of America)?)\.?\s*$", re.IGNORECASE)
+# No comma before the state ("7150 Tampa Ave Reseda CA 91335": 76 of the 114 name-but-no-address
+# headers in the Wave 5 scratch census, measured 2026-11-23). The city cannot be told from the
+# street, so it is NOT read: only a real state code and a whole zip are, and admission then needs
+# the zip to equal the registry's (state AND city-or-zip is unchanged). A state alone, two letters
+# that are not a state, or a digit run that is not 5 or 9 digits read as nothing.
+_STATE_CODES = frozenset(_STATES.values())
+_TRAILING_STATE_ZIP = re.compile(
+    r"(?:^|[\s,;])(?:([A-Za-z]{2})|(" + _STATE_NAME_RE + r"))\.?,?\s+(\d{5})(?:-?\d{4})?\s*$",
+    re.IGNORECASE)
+
+
 def _parse_campus(part: str) -> Optional[dict]:
-    m = _CAMPUS.search(part.strip())
-    if not m:
-        return None
-    return {"city": m.group(1).strip(), "state": _state_code(m.group(2)), "zip": m.group(3) or ""}
+    part = _COUNTRY.sub("", part.strip())
+    m = _CAMPUS.search(part)
+    if m:
+        return {"city": m.group(1).strip(), "state": _state_code(m.group(2)), "zip": m.group(3) or ""}
+    t = _TRAILING_STATE_ZIP.search(part)
+    if t:
+        state = _state_code(t.group(1) or t.group(2))
+        if state in _STATE_CODES:
+            return {"city": "", "state": state, "zip": t.group(3)}
+    return None
 
 
 def _locations(si: Mapping, addrs: list) -> list:
